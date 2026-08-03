@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/2010/manifest" xmlns:m2="http://schemas.microsoft.com/appx/2013/manifest" xmlns:m3="http://schemas.microsoft.com/appx/2014/manifest" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:build="http://schemas.microsoft.com/developer/appx/2012/build" IgnorableNamespaces="build">
-  <Identity Name="5af5154f-1a19-4562-b64b-080166d73a5c" Publisher="CN=Lol" Version="5.26.0.0" ProcessorArchitecture="arm" />
+  <Identity Name="5af5154f-1a19-4562-b64b-080166d73a5c" Publisher="CN=Lol" Version="5.27.0.0" ProcessorArchitecture="arm" />
   <Properties>
     <DisplayName>VKClient</DisplayName>
     <PublisherDisplayName>Lol</PublisherDisplayName>

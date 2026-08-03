@@ -8,7 +8,7 @@
     <Language code="pt-BR" />
     <Language code="kk-KZ" />
   </Languages>
-  <App xmlns="" ProductID="{1c4bd564-5426-417b-a5a0-e141abe6f858}" Title="@AppResLib.dll,-100" RuntimeType="Silverlight" Version="5.26" Genre="apps.normal" Author="VKClient author" Description="Sample description" Publisher="VKClient" PublisherID="{3bd70d61-ecbc-4a0d-b609-c375858f71c4}" NotificationService="MPN">
+  <App xmlns="" ProductID="{1c4bd564-5426-417b-a5a0-e141abe6f858}" Title="@AppResLib.dll,-100" RuntimeType="Silverlight" Version="5.27" Genre="apps.normal" Author="VKClient author" Description="Sample description" Publisher="VKClient" PublisherID="{3bd70d61-ecbc-4a0d-b609-c375858f71c4}" NotificationService="MPN">
     <IconPath IsRelative="true" IsResource="false">AppIcon.png</IconPath>
     <Capabilities>
       <Capability Name="ID_CAP_IDENTITY_DEVICE" />
