@@ -62,9 +62,6 @@ namespace VKClient.Common
       //base.\u002Ector();
       this.InitializeComponent();
       this.BuildAppBar();
-      this.panelComments.InitializeWithScrollViewer((IScrollableArea) new ViewportScrollableAreaAdapter(this.scrollComments), false);
-      this.scrollComments.BindViewportBoundsTo((FrameworkElement) this.stackPanelComments);
-      this.RegisterForCleanup((IMyVirtualizingPanel) this.panelComments);
       this.panelFeedback.InitializeWithScrollViewer((IScrollableArea) new ViewportScrollableAreaAdapter(this.scrollFeedback), false);
       this.scrollFeedback.BindViewportBoundsTo((FrameworkElement) this.stackPanelFeedback);
       this.RegisterForCleanup((IMyVirtualizingPanel) this.panelFeedback);
@@ -91,10 +88,7 @@ namespace VKClient.Common
 
     private void _appBarButtonRefresh_Click(object sender, EventArgs e)
     {
-      if (this.pivot.SelectedItem == this.pivotItemFeedback)
-        this.FeedbackVM.LoadFeedback(true);
-      else
-        this.FeedbackVM.LoadComments(true);
+      this.FeedbackVM.LoadFeedback(true);
     }
 
     protected override void HandleOnNavigatedTo(NavigationEventArgs e)
@@ -107,33 +101,18 @@ namespace VKClient.Common
       vm.LoadFeedback(false);
       this.UpdateAppBar();
       this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.panelFeedback);
-      this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.panelComments);
       this.panelFeedback.OnRefresh = (Action) (() => vm.FeedbackVM.LoadData(true, false,  null, false));
-      this.panelComments.OnRefresh = (Action) (() => vm.CommentsVM.LoadData(true, false,  null, false));
       CountersManager.Current.ResetFeedback();
       this._isInitilized = true;
     }
 
     private void pivot_SelectionChanged_1(object sender, SelectionChangedEventArgs e)
     {
-      if (this.pivot.SelectedItem != this.pivotItemComments || this._triggeredLoadingComments)
-        return;
-      this.FeedbackVM.LoadComments(false);
-      this._triggeredLoadingComments = true;
     }
 
     public void OnHeaderTap()
     {
-      if (this.pivot.SelectedItem == this.pivotItemFeedback)
-      {
-        this.panelFeedback.ScrollToBottom(false);
-      }
-      else
-      {
-        if (this.pivot.SelectedItem != this.pivotItemComments)
-          return;
-        this.panelComments.ScrollToBottom(false);
-      }
+      this.panelFeedback.ScrollToBottom(false);
     }
 
     [DebuggerNonUserCode]

@@ -21,9 +21,11 @@
         <ScrollViewer Grid.Row="1">
             <StackPanel Margin="16">
 
-                <Image Source="../Resources/AboutAppDog.png" Stretch="Fill" Height="144"
-                    Width="144" Margin="0,8,0,0"/>
-                <TextBlock Name="VersionBlock" HorizontalAlignment="Center" Margin="0,14,0,48"
+                <Image x:Name="AboutImage" Source="../Resources/AboutAppDog.png" Stretch="Fill" Height="144"
+                    Width="144" Margin="0,8,0,0" Tap="AboutImage_OnTap"/>
+                <TextBlock Name="VersionBlock" HorizontalAlignment="Center" Margin="0,14,0,0"
+                    FontSize="20" Foreground="{StaticResource PhoneVKSubtleBrush}"/>
+                <TextBlock Name="PatchVersionBlock" Text="Patch 1.0" HorizontalAlignment="Center" Margin="0,2,0,48"
                     FontSize="20" Foreground="{StaticResource PhoneVKSubtleBrush}"/>
 
                 <TextBlock Text="{Binding Path=LocalizedResources.Action_SendFeedback, Source={StaticResource LocalizedStrings}}"

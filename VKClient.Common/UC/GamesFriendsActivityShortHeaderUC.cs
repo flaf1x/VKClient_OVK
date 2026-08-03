@@ -69,7 +69,7 @@ namespace VKClient.Common.UC
       if (newValue == null)
         return;
       ((FrameworkElement) activityShortHeaderUc.imageUserIcon).Tag = newValue.User;
-      ImageLoader.SetUriSource(activityShortHeaderUc.imageUserIcon, newValue.User.photo_max);
+      ImageLoader.SetUriSource(activityShortHeaderUc.imageUserIcon, newValue.User.UiAvatarSmall);
       activityShortHeaderUc.textBlockDate.Text = (UIStringFormatterHelper.FormatDateTimeForUI(newValue.GameActivity.date));
       ((FrameworkElement) activityShortHeaderUc.textBlockDescription).Tag = newValue.Game;
       ((PresentationFrameworkCollection<Inline>) activityShortHeaderUc.textBlockDescription.Inlines).Clear();

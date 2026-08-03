@@ -8,6 +8,17 @@ namespace VKClient.Common
 {
     public static class VKConstants
     {
+        public static string OpenVKDomain
+        {
+            get { return new Uri(OpenVKInstanceManager.Current.ApiOrigin).Authority; }
+        }
+        public static string OpenVKWebAddress
+        {
+            get { return OpenVKInstanceManager.Current.WebOrigin; }
+        }
+        // OpenVK persists client_name in the access token and maps this exact
+        // tag to post_source.platform = "wphone".
+        public const string OpenVKClientName = "windows_phone";
         public static readonly string API_VERSION = "5.64";//todo: bug? 5.63
         public static readonly string UsersWithSyncedContactsKey = "SettingsKey_UsersWithSyncedContacts";
         public static readonly int SerializationVersion = 1;

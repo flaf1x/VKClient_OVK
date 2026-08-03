@@ -41,8 +41,7 @@
                         Grid.Row="1"
                         Name="pivot"
                         Style="{StaticResource PivotStyleNoHeader}" 
-                        Foreground="White"
-                        SelectionChanged="pivot_SelectionChanged_1">
+                        Foreground="White">
             <!--Pivot item one-->
             <controls:PivotItem Name="pivotItemAll"
                             >
@@ -66,50 +65,6 @@
 
                     </framework:ExtendedLongListSelector>                    
                 </Grid>
-            </controls:PivotItem>
-            <controls:PivotItem Name="pivotItemShared">
-                <controls:PivotItem.Header>
-                    <TextBlock FontSize="46" FontFamily="Segoe WP SemiLight" 
-                               Text="{Binding LocalizedResources.LikesPage_Shared, Source={StaticResource LocalizedStrings}}"/>
-                </controls:PivotItem.Header>
-
-
-
-                <framework:ExtendedLongListSelector ItemsSource="{Binding Collection}"
-                                                    
-                                                    Name="listBoxShared"
-                                                    DataContext="{Binding Shared}"
-                                                    ItemTemplate="{StaticResource FriendItemTemplate}"
-                                                    IsFlatList="True"
-                                                    Link="Shared_Link"
-                                                    ListFooter="{Binding}"
-                                                    ListFooterTemplate="{StaticResource FooterTemplate}"
-                                                    ListHeaderTemplate="{StaticResource HeaderTemplate}"
-                                                    SelectionChanged="ExtendedLongListSelector_SelectionChanged_1">
-
-                </framework:ExtendedLongListSelector>
-
-            </controls:PivotItem>
-            <controls:PivotItem Name="pivotItemFriends">
-                <controls:PivotItem.Header>
-                    <TextBlock FontSize="46" FontFamily="Segoe WP SemiLight" 
-                               Text="{Binding LocalizedResources.LikesPage_Friends, Source={StaticResource LocalizedStrings}}"/>
-                </controls:PivotItem.Header>
-
-                <framework:ExtendedLongListSelector ItemsSource="{Binding Collection}"
-                                                    
-                                                    Name="listBoxFriends"
-                                                    DataContext="{Binding Friends}"
-                                                    ItemTemplate="{StaticResource FriendItemTemplate}"
-                                                    IsFlatList="True"
-                                                    Link="Friends_Link"
-                                                    ListFooter="{Binding}"
-                                                    ListFooterTemplate="{StaticResource FooterTemplate}"
-                                                    ListHeaderTemplate="{StaticResource HeaderTemplate}"
-                                                    SelectionChanged="ExtendedLongListSelector_SelectionChanged_1">
-
-                </framework:ExtendedLongListSelector>
-
             </controls:PivotItem>
         </controls:Pivot>
     </Grid>

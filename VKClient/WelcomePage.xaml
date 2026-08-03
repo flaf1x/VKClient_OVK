@@ -12,8 +12,11 @@
 
     <Grid Background="{StaticResource PhoneHeaderBackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="400"/>
+            <RowDefinition Height="340"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="72"/>
         </Grid.RowDefinitions>
         <Border Grid.Row="0" Width="175" Height="102"
             Background="{StaticResource PhoneWelcomePageLogoForegroundBrush}">
@@ -21,19 +24,61 @@
                 <ImageBrush framework:ImageLoader.ImageBrushMultiResSource="/Resources/New/WelcomeLogo.png"/>
             </Border.OpacityMask>
         </Border>
-        <StackPanel Grid.Row="1">
-            <Button Content="{Binding Path=LocalizedResources.Login_SignUp_Title, Source={StaticResource LocalizedStrings}}"
-                Click="OnSignUpClicked" Margin="12,-12,12,32" Style="{StaticResource VKSignUpButton}"/>
-            <TextBlock FontSize="22.667" Foreground="{StaticResource PhoneWelcomePageForegroundBrush}"
-                Text="{Binding Path=LocalizedResources.Start_LoginHint, Source={StaticResource LocalizedStrings}}"
-                HorizontalAlignment="Center" Margin="12,0,12,-4"/>
-            <Button Content="{Binding Path=LocalizedResources.Login_LogIn, Source={StaticResource LocalizedStrings}}"
-                Click="OnLogInClicked" Margin="12,0,12,0" Style="{StaticResource VKLogInButton}"/>
+        <StackPanel Grid.Row="1" Margin="18,0,18,0">
+            <TextBlock Text="instance" FontSize="18.667"
+                       Foreground="{StaticResource PhoneWelcomePageForegroundBrush}"
+                       HorizontalAlignment="Center" Margin="0,0,0,0"/>
+            <Grid x:Name="InstanceSelector" Height="58"
+                  ManipulationCompleted="InstanceSelector_ManipulationCompleted">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="58"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="58"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="‹" FontSize="48" Foreground="White"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"
+                           Margin="0,-7,0,0" Tap="PreviousInstance_Tap"
+                           framework:MetroInMotion.Tilt="2.1"/>
+                <StackPanel x:Name="InstanceTextPanel" Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel.RenderTransform>
+                        <TranslateTransform x:Name="InstanceTextTransform"/>
+                    </StackPanel.RenderTransform>
+                    <TextBlock x:Name="InstanceNameBlock" FontSize="23" Foreground="White"
+                               TextAlignment="Center" TextTrimming="WordEllipsis"/>
+                    <TextBlock x:Name="InstanceAddressBlock" FontSize="16"
+                               Foreground="#C9D9EA" TextAlignment="Center"
+                               TextTrimming="WordEllipsis"/>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="›" FontSize="48" Foreground="White"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"
+                           Margin="0,-7,0,0" Tap="NextInstance_Tap"
+                           framework:MetroInMotion.Tilt="2.1"/>
+                <Border Grid.ColumnSpan="3" Height="1" Background="#80FFFFFF"
+                        VerticalAlignment="Bottom" Margin="8,0"/>
+            </Grid>
+            <StackPanel x:Name="CustomInstancePanel" Visibility="Collapsed" Margin="8,10,8,0">
+                <Border Height="68" Background="White" BorderBrush="#D7D7D7" BorderThickness="1">
+                    <TextBox x:Name="CustomInstanceText" Text="https://" InputScope="Url"
+                             Height="66" Margin="1" Padding="9,0" FontSize="22"
+                             VerticalContentAlignment="Center"
+                             Background="Transparent" Foreground="#222222"
+                             BorderThickness="0"
+                             KeyDown="CustomInstanceText_KeyDown"
+                             LostFocus="CustomInstanceText_LostFocus"/>
+                </Border>
+            </StackPanel>
         </StackPanel>
-        <TextBlock Grid.Row="1" VerticalAlignment="Bottom" FontSize="22.667"
+        <StackPanel Grid.Row="3">
+            <Button Content="{Binding Path=LocalizedResources.Login_LogIn, Source={StaticResource LocalizedStrings}}"
+                Click="OnLogInClicked" Margin="12,0,12,4" Style="{StaticResource VKLogInButton}"/>
+            <Button Content="{Binding Path=LocalizedResources.Login_SignUp_Title, Source={StaticResource LocalizedStrings}}"
+                Click="OnSignUpClicked" Margin="12,0,12,12" Style="{StaticResource VKSignUpButton}"/>
+        </StackPanel>
+        <TextBlock Grid.Row="4" VerticalAlignment="Center" FontSize="22.667"
             Foreground="{StaticResource PhoneWelcomePageForegroundBrush}" Tap="OnTermsClicked"
-            HorizontalAlignment="Center" Margin="0,0,0,32" framework:MetroInMotion.Tilt="2.1"
+            HorizontalAlignment="Center" framework:MetroInMotion.Tilt="2.1"
             Text="{Binding Path=LocalizedResources.Start_TermsOfUse, Source={StaticResource LocalizedStrings}}"/>
+
     </Grid>
 
 </framework:PageBase>

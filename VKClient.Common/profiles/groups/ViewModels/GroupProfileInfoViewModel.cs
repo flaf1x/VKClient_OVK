@@ -120,11 +120,11 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
           if (friends != null)
           {
             if (friends.Count > 0)
-              infoListItem2.Preview1 = friends[0].photo_max;
+              infoListItem2.Preview1 = friends[0].UiAvatarSmall;
             if (friends.Count > 1)
-              infoListItem2.Preview2 = friends[1].photo_max;
+              infoListItem2.Preview2 = friends[1].UiAvatarSmall;
             if (friends.Count > 2)
-              infoListItem2.Preview3 = friends[2].photo_max;
+              infoListItem2.Preview3 = friends[2].UiAvatarSmall;
           }
           infoListItemList1.Add(infoListItem2);
         }

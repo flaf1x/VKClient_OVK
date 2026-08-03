@@ -73,7 +73,7 @@ namespace VKClient.Groups
 
     private void TermsLink_OnClicked(object sender, RoutedEventArgs e)
     {
-      Navigator.Current.NavigateToWebUri("https://vk.com/terms", false, false);
+      Navigator.Current.NavigateToWebUri("https://openvk.org/terms", false, false);
     }
 
     private void NameBox_OnKeyDown(object sender, KeyEventArgs e)

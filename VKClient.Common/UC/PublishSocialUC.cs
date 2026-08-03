@@ -56,9 +56,6 @@ namespace VKClient.Common.UC
         case PublishSocialType.Twitter:
           MultiResImageLoader.SetUriSource(publishSocialUc.imageIcon, "/Resources/NewPost/ImportTwitter.png");
           break;
-        case PublishSocialType.Facebook:
-          MultiResImageLoader.SetUriSource(publishSocialUc.imageIcon, "/Resources/NewPost/ImportFacebook.png");
-          break;
       }
     }
 

@@ -499,8 +499,6 @@ namespace VKClient.Common
         this._appBar.MenuItems.Add(this._appBarMenuItemEdit);
       if (this.PostCommentsVM.WallPostData != null && this.PostCommentsVM.WallPostData.WallPost != null && (this.PostCommentsVM.WallPostData.WallPost.CanDelete(this.PostCommentsVM.WallPostData.Groups, false) && !this._appBar.MenuItems.Contains(this._appBarMenuItemDelete)))
         this._appBar.MenuItems.Add(this._appBarMenuItemDelete);
-      if (this.PostCommentsVM.WallPost != null && this.PostCommentsVM.WallPost.CanReport() && !this._appBar.MenuItems.Contains(this._appBarMenuItemReport))
-        this._appBar.MenuItems.Add(this._appBarMenuItemReport);
       if (this.PostCommentsVM.CanPin && !this._appBar.MenuItems.Contains(this._appBarMenuItemPin))
         this._appBar.MenuItems.Insert(0, this._appBarMenuItemPin);
       if (!this.PostCommentsVM.CanPin && this._appBar.MenuItems.Contains(this._appBarMenuItemPin))

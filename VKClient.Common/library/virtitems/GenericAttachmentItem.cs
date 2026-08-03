@@ -101,7 +101,7 @@ namespace VKClient.Common.Library.VirtItems
       {
         this._title = this._attachment.note.title ?? "";
         this._subtitle = CommonResources.Note;
-        this._navigateUri = string.Format("vk.com/note{0}_{1}", this._attachment.note.owner_id, this._attachment.note.nid);
+        this._navigateUri = string.Format("openvk.org/note{0}_{1}", this._attachment.note.owner_id, this._attachment.note.nid);
         this._iconSrc = "/Resources/WallPost/AttachNote.png";
       }
       if (this._attachment.type == "doc" && this._attachment.doc != null)
@@ -116,7 +116,7 @@ namespace VKClient.Common.Library.VirtItems
       {
         this._title = this._attachment.Page.title ?? "";
         this._subtitle = CommonResources.WikiPage;
-        this._navigateUri = string.Format("https://vk.com/club{0}?w=page-{0}_{1}", this._attachment.Page.gid, this._attachment.Page.pid);
+        this._navigateUri = string.Format("https://openvk.org/club{0}?w=page-{0}_{1}", this._attachment.Page.gid, this._attachment.Page.pid);
         this._iconSrc = "/Resources/WallPost/AttachLink.png";
       }
       Product market = this._attachment.market;
@@ -124,7 +124,7 @@ namespace VKClient.Common.Library.VirtItems
       {
         this._title = market.title;
         this._subtitle = market.price.text;
-        this._navigateUri = string.Format("http://m.vk.com/market{0}?w=product{1}_{2}", market.owner_id, market.owner_id, market.id);
+        this._navigateUri = string.Format("https://openvk.org/market{0}?w=product{1}_{2}", market.owner_id, market.owner_id, market.id);
         this._imageSrc = market.thumb_photo;
       }
       ((UIElement) this._view).Tap += (new EventHandler<System.Windows.Input.GestureEventArgs>(this.View_OnTap));

@@ -278,21 +278,8 @@ namespace VKClient.Audio.Base.BackendServices
 
     public void GetBalanceData(Action<BackendResult<BalanceData, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<BalanceDataResponse>("execute.getBalanceData", new Dictionary<string, string>()
-      {
-        {
-          "type",
-          "votes"
-        },
-        {
-          "merchant",
-          "microsoft"
-        },
-        {
-          "no_inapp",
-          "1"
-        }
-      }, (Action<BackendResult<BalanceDataResponse, ResultCode>>) (result =>
+      VKRequestsDispatcher.DispatchRequestToVK<BalanceDataResponse>("account.getBalance", new Dictionary<string, string>(),
+        (Action<BackendResult<BalanceDataResponse, ResultCode>>) (result =>
       {
         BalanceData balanceData = new BalanceData();
         ResultCode resultCode = result.ResultCode;
@@ -305,7 +292,7 @@ namespace VKClient.Audio.Base.BackendServices
         BackendResult<BalanceData, ResultCode> response = backendResult1;
         if (resultData != null)
         {
-          balanceData.Balance = resultData.balance;
+          balanceData.Balance = resultData.votes;
           VKList<StockItem> stockItems2 = resultData.stockItems;
           stockItems1 = stockItems2 != null ? stockItems2.items :  null;
         }

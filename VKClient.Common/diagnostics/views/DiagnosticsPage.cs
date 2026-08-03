@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Navigation;
@@ -6,6 +7,7 @@ using VKClient.Common.Diagnostics.ViewModels;
 using VKClient.Common.Framework;
 using VKClient.Common.Localization;
 using VKClient.Common.UC;
+using Windows.Storage.Pickers;
 
 namespace VKClient.Common.Diagnostics.Views
 {
@@ -34,7 +36,12 @@ namespace VKClient.Common.Diagnostics.Views
 
     private void SendData_OnClicked(object sender, RoutedEventArgs e)
     {
-      this._viewModel.SendData();
+      FileSavePicker picker = new FileSavePicker();
+      picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+      picker.FileTypeChoices.Add("Text log", new List<string>() { ".txt" });
+      picker.SuggestedFileName = "VKClient_OpenVK_Log";
+      picker.ContinuationData["Operation"] = "SaveDiagnosticsLog";
+      picker.PickSaveFileAndContinue();
     }
 
     [DebuggerNonUserCode]

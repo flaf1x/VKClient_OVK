@@ -141,7 +141,21 @@ namespace VKClient.Common.Library
 
     private static void UpdateUserInfo()
     {
-      User loggedInUser = AppGlobalStateManager.Current.GlobalState.LoggedInUser;
+      long loggedInUserId = AppGlobalStateManager.Current.LoggedInUserId;
+      if (loggedInUserId == 0L)
+        return;
+
+      UsersService.Instance.GetProfileInfo(loggedInUserId, (Action<BackendResult<UserData, ResultCode>>) (result =>
+      {
+        if (result.ResultCode != ResultCode.Succeeded ||
+            result.ResultData == null ||
+            result.ResultData.user == null)
+          return;
+
+        AppGlobalStateManager.Current.GlobalState.LoggedInUser = result.ResultData.user;
+        UsersService.Instance.SetCachedUser(result.ResultData.user);
+        EventAggregator.Current.Publish(new BaseDataChangedEvent());
+      }));
     }
   }
 }

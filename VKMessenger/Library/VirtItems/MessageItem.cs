@@ -440,13 +440,13 @@ namespace VKMessenger.Library.VirtItems
               Geometry triangleGeometry = PathHelper.CreateTriangleGeometry( new Point(), new Point(100.0, 0.0), new Point(100.0, 100.0));
               path.Data = triangleGeometry;
               this._calloutPath = path;
-              if (this._userTyping == null || this._userTyping.photo_max == null)
+              if (this._userTyping == null || this._userTyping.UiAvatarSmall == null)
                 return;
               double width = 52.0;
               double height = 52.0;
               thickness1 =  new Thickness();
               Thickness margin2 = thickness1;
-              string photoMax = this._userTyping.photo_max;
+              string photoMax = this._userTyping.UiAvatarSmall;
               Action<VirtualizableImage> callbackOnTap = (Action<VirtualizableImage>) (vi =>
               {
                 if (this._mvm.AssociatedUser == null)

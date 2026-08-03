@@ -17,5 +17,11 @@ namespace VKClient.Common.Backend.DataObjects
         //public int new_offset { get; set; }//todo:bug
 
         public int last_viewed { get; set; }
+
+        // notifications.fetch cursor. OpenVK historically returned both
+        // spellings, so the client accepts either one.
+        public string next_last_id { get; set; }
+
+        public string new_lastId { get; set; }
     }
 }

@@ -29,7 +29,6 @@ namespace VKClient.Common.Balance.Views
     {
       this.InitializeComponent();
       this.ucHeader.TextBlockTitle.Text = (CommonResources.Balance.ToUpperInvariant());
-      this.InitLicenseAgreementHyperlink();
     }
 
     protected override void HandleOnNavigatedTo(NavigationEventArgs e)

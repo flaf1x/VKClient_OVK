@@ -34,7 +34,7 @@ namespace VKClient.Common.MoneyTransfers.Library
         User targetUser = this._targetUser;
         if (targetUser == null)
           return  null;
-        return targetUser.photo_max;
+        return targetUser.UiAvatarMedium;
       }
     }
 

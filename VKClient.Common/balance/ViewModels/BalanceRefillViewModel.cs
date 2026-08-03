@@ -15,7 +15,7 @@ namespace VKClient.Common.Balance.ViewModels
 {
   public class BalanceRefillViewModel : ViewModelStatefulBase, IHandle<BalanceUpdatedEvent>, IHandle
   {
-    public int Balance { get; private set; }
+    public double Balance { get; private set; }
 
     public List<VotesPackViewModel> VotesPacks { get; private set; }
 
@@ -60,7 +60,7 @@ namespace VKClient.Common.Balance.ViewModels
       BalanceRefillViewModel.LoadUnfulfilledConsumables((Action<List<InAppUnfulfilledProduct>>) (unfulfilledProducts =>
       {
         BalanceData balanceData1 = balanceData;
-        this.Balance = balanceData1 != null ? balanceData1.Balance : 0;
+        this.Balance = balanceData1 != null ? balanceData1.Balance : 0.0;
         this.VotesPacks = new List<VotesPackViewModel>();
         BalanceData balanceData2 = balanceData;
         List<VotesPack> m0List;
@@ -91,7 +91,7 @@ namespace VKClient.Common.Balance.ViewModels
         {
           // ISSUE: type reference
           // ISSUE: method reference
-          this.NotifyPropertyChanged<int>(() => this.Balance);
+          this.NotifyPropertyChanged<double>(() => this.Balance);
           // ISSUE: type reference
           // ISSUE: method reference
           this.NotifyPropertyChanged<List<VotesPackViewModel>>(()=>this.VotesPacks);

@@ -22,7 +22,7 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
       this.Data = description;
       if (group != null)
       {
-        this.GroupImage = group.photo_200;
+        this.GroupImage = group.UiAvatarSmall;
         this.NavigationAction = (Action) (() => Navigator.Current.NavigateToGroup(group.id, group.name, false));
       }
       if (!string.IsNullOrEmpty(this.GroupImage))

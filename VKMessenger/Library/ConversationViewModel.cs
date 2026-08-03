@@ -9,6 +9,7 @@ using System.Windows;
 using VKClient.Audio.Base;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
+using VKClient.Audio.Base.Utils;
 using VKClient.Audio.Base.Library;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
@@ -676,7 +677,10 @@ namespace VKMessenger.Library
                     List<Message> messages = result.ResultData.Messages;
                     UsersService.Instance.GetUsers(Message.GetAssociatedUserIds(messages, true).Select<long, long>((Func<long, long>)(uid => uid)).ToList<long>(), (Action<BackendResult<List<User>, ResultCode>>)(r =>
                     {
-                        if (r.ResultCode == ResultCode.Succeeded)
+                        // History is already usable when profile enrichment fails.
+                        // Keeping this screen dependent on a second users.get request
+                        // made otherwise valid OpenVK dialogs appear completely empty.
+                        if (r.ResultCode == ResultCode.Succeeded || messages != null)
                         {
                             if (startMessageId.HasValue)
                                 this.Skipped = result.ResultData.Skipped;
@@ -1118,7 +1122,7 @@ namespace VKMessenger.Library
                     {
                         string str = string.Format(CommonResources.DialogWithFrm, (object)res.ResultData[0].first_name);
                         List<string> imageUris = new List<string>();
-                        imageUris.Add(res.ResultData[0].photo_max);
+                        imageUris.Add(res.ResultData[0].UiAvatarSmall);
                         string title = str;
                         this.DoCreateTile(imageUris, title);
                     }
@@ -1135,9 +1139,9 @@ namespace VKMessenger.Library
                     }
                     else
                     {
-                        List<string> list = res.ResultData.chat_participants.Select<ChatUser, string>((Func<ChatUser, string>)(c => c.photo_max)).ToList<string>();
+                        List<string> list = res.ResultData.chat_participants.Select<ChatUser, string>((Func<ChatUser, string>)(c => AvatarHelper.Prepare(c.photo_max))).ToList<string>();
                         if (!string.IsNullOrWhiteSpace(res.ResultData.chat.photo_200))
-                            list.Insert(0, res.ResultData.chat.photo_200);
+                            list.Insert(0, AvatarHelper.Prepare(res.ResultData.chat.photo_200));
                         this.DoCreateTile(list, res.ResultData.chat.title);
                     }
                 }));

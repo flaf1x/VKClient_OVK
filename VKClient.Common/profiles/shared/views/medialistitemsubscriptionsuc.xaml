@@ -32,7 +32,8 @@
                             Background="{StaticResource PhoneChromeBrush}">
                         <Image framework:ImageLoader.UriSource="{Binding}"
                                Width="58"
-                               Height="58" />
+                               Height="58"
+                               Stretch="UniformToFill" />
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

@@ -40,18 +40,22 @@ namespace VKClient.Common.Backend
 
         public void GetAllTracksAndAlbums(long userOrGroupId, bool isGroup, Action<BackendResult<AudioData, ResultCode>> callback)
         {
-            Dictionary<string, string> parameters = new Dictionary<string, string>();
-            string str = string.Format("var allTracks = API.audio.get({{{0}:\"{1}\", count:\"{2}\", offset:\"0\"}}).items;\r\n                                            var allAlbums = API.audio.getAlbums({{{0}:\"{1}\", count:\"{3}\", offset:\"0\"}}).items;\r\n                                            return {{\"allTracks\":allTracks, \"allAlbums\":allAlbums}};", (isGroup ? "group_id" : "user_id"), userOrGroupId, VKConstants.TracksReadCount.ToString(), VKConstants.AlbumsReadCount.ToString());
-            parameters["code"] = str;
-            VKRequestsDispatcher.DispatchRequestToVK<AudioData>("execute", parameters, callback, (Func<string, AudioData>)(jsonStr =>
+            // OpenVK's execute is unavailable on some instances (e.g. VepurOVK),
+            // so compose the same data from the two public audio methods.
+            AudioData data = new AudioData() { AllAlbums = new List<AudioAlbum>(), AllTracks = new List<AudioObj>() };
+            int remaining = 2;
+            Action completed = () => { if (--remaining == 0) callback(new BackendResult<AudioData, ResultCode>(ResultCode.Succeeded, data)); };
+            this.GetAllAudio(res => { if (res.ResultCode == ResultCode.Succeeded && res.ResultData != null) data.AllTracks = res.ResultData; completed(); },
+                userOrGroupId, isGroup, null, 0, VKConstants.TracksReadCount);
+            this.GetUserAlbums(res =>
             {
-                AudioData audioData = new AudioData();
-                int resultCount;
-                jsonStr = VKRequestsDispatcher.GetArrayCountAndRemove(jsonStr, "allAlbums", out resultCount);
-                AudioData response = JsonConvert.DeserializeObject<AudioDataRoot>(jsonStr).response;
-                response.AllAlbumsCount = resultCount;
-                return response;
-            }), false, true, new CancellationToken?(), null);
+                if (res.ResultCode == ResultCode.Succeeded && res.ResultData != null)
+                {
+                    data.AllAlbums = res.ResultData.Data;
+                    data.AllAlbumsCount = res.ResultData.TotalCount;
+                }
+                completed();
+            }, userOrGroupId, isGroup, 0, VKConstants.AlbumsReadCount);
         }
 
         public void MoveToAlbum(List<long> aids, long albumId, Action<BackendResult<object, ResultCode>> callback)
@@ -87,13 +91,12 @@ namespace VKClient.Common.Backend
         public void GetAllAudio(Action<BackendResult<List<AudioObj>, ResultCode>> callback, long? userOrGroupId = null, bool isGroup = false, long? albumId = null, int offset = 0, int count = 0)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
-            if (userOrGroupId.HasValue && !isGroup)
-                parameters["user_id"] = userOrGroupId.Value.ToString();
-            if (userOrGroupId.HasValue & isGroup)
-                parameters["group_id"] = userOrGroupId.Value.ToString();
+            if (userOrGroupId.HasValue)
+                parameters["owner_id"] = (isGroup ? -Math.Abs(userOrGroupId.Value) : userOrGroupId.Value).ToString();
             if (albumId.HasValue)
                 parameters["album_id"] = albumId.Value.ToString();
             parameters["offset"] = offset.ToString();
+            parameters["count"] = (count > 0 ? count : VKConstants.TracksReadCount).ToString();
             VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.get", parameters, callback, AudioService._deserializeAudioList, false, true, new CancellationToken?(), null);
         }
 
@@ -117,10 +120,8 @@ namespace VKClient.Common.Backend
         public void GetUserAlbums(Action<BackendResult<ListResponse<AudioAlbum>, ResultCode>> callback, long? userOrGroupId = null, bool isGroup = false, int offset = 0, int count = 0)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
-            if (userOrGroupId.HasValue && !isGroup)
-                parameters["user_id"] = userOrGroupId.Value.ToString();
-            if (userOrGroupId.HasValue & isGroup)
-                parameters["group_id"] = userOrGroupId.Value.ToString();
+            if (userOrGroupId.HasValue)
+                parameters["owner_id"] = (isGroup ? -Math.Abs(userOrGroupId.Value) : userOrGroupId.Value).ToString();
             parameters["offset"] = offset.ToString();
             parameters["count"] = count == 0 ? VKConstants.AlbumsReadCount.ToString() : count.ToString();
             VKRequestsDispatcher.DispatchRequestToVK<ListResponse<AudioAlbum>>("audio.getAlbums", parameters, callback, (Func<string, ListResponse<AudioAlbum>>)(jsonStr =>
@@ -161,7 +162,15 @@ namespace VKClient.Common.Backend
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             parameters["owner_id"] = ownerId.ToString();
             parameters["audio_id"] = aid.ToString();
-            VKRequestsDispatcher.DispatchRequestToVK<long>("audio.add", parameters, callback, null, false, true, new CancellationToken?(), null);
+            VKRequestsDispatcher.DispatchRequestToVK<long>("audio.add", parameters, callback, (Func<string, long>)(jsonStr =>
+            {
+                string prettyId = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<string>>(jsonStr).response;
+                string[] strArray = (prettyId ?? "").Split('_');
+                long num = 0;
+                if (strArray.Length > 0)
+                    long.TryParse(strArray[strArray.Length - 1], out num);
+                return num;
+            }), false, true, new CancellationToken?(), null);
         }
 
         public void DeleteAudios(List<long> list)

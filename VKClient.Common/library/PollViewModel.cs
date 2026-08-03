@@ -78,9 +78,10 @@ namespace VKClient.Common.Library
 
     public PollViewModel(Poll poll, long topicId = 0)
     {
-      this.Poll = poll;
+      this.Poll = poll ?? new Poll();
+      this.Poll.answers = this.Poll.answers ?? new List<Answer>();
       this._topicId = topicId;
-      this.Answers = new List<PollAnswerHeader>((IEnumerable<PollAnswerHeader>)Enumerable.Select<Answer, PollAnswerHeader>(poll.answers, (Func<Answer, PollAnswerHeader>)(answer => new PollAnswerHeader(this, answer))));
+      this.Answers = new List<PollAnswerHeader>((IEnumerable<PollAnswerHeader>)Enumerable.Select<Answer, PollAnswerHeader>(this.Poll.answers.Where(answer => answer != null), (Func<Answer, PollAnswerHeader>)(answer => new PollAnswerHeader(this, answer))));
       EventAggregator.Current.Subscribe(this);
     }
 

@@ -31,6 +31,7 @@ namespace VKClient.Common.Library
     private readonly Action _moreOptionsTapCallback;
     private readonly Action _navigatedToUserOrGroupCallback;
     private readonly string _extraTextEnd;
+    private readonly bool _isVerified;
     private Canvas _optionsIcon;
 
     public override double FixedHeight
@@ -54,12 +55,13 @@ namespace VKClient.Common.Library
       this._moreOptionsTapCallback = moreOptionsTapCallback;
       this._navigatedToUserOrGroupCallback = navigatedToUserOrGroupCallback;
       this._extraTextEnd = extraTextEnd;
+      this._isVerified = this._isGroupPost ? (this._group != null && this._group.verified > 0) : (this._user != null && this._user.verified > 0);
       this.GenerateVirtChildren();
     }
 
     private void GenerateVirtChildren()
     {
-      VirtualizableImage virtualizableImage = new VirtualizableImage(64.0, 64.0, new Thickness(0.0), this._isGroupPost ? this._group.photo_200 : this._user.photo_max,  null, "", false, true, (Stretch) 3,  null, -1.0, false, true);
+      VirtualizableImage virtualizableImage = new VirtualizableImage(64.0, 64.0, new Thickness(0.0), this._isGroupPost ? this._group.UiAvatarSmall : this._user.UiAvatarSmall,  null, "", false, true, (Stretch) 3,  null, -1.0, false, true);
       MetroInMotion.SetTilt((DependencyObject) virtualizableImage.View, 1.5);
       Canvas.SetLeft((UIElement) virtualizableImage.View, 16.0);
       Canvas.SetTop((UIElement) virtualizableImage.View, 16.0);
@@ -94,6 +96,7 @@ namespace VKClient.Common.Library
       Border postTypeIcon = this.GetPostTypeIcon();
       if (postTypeIcon != null)
         num1 += UserOrGroupHeaderItem.GetElementTotalWidth((FrameworkElement) postTypeIcon);
+      double verifiedWidth = this._isVerified ? 28.0 : 0.0;
       TextBlock textBlock = new TextBlock();
       string str = this._isGroupPost ? this._group.name : this._user.Name;
       textBlock.Text = str;
@@ -102,16 +105,51 @@ namespace VKClient.Common.Library
       SolidColorBrush solidColorBrush = Application.Current.Resources["PhoneDarkBlueBrush"] as SolidColorBrush;
       textBlock.Foreground = ((Brush) solidColorBrush);
       TextBlock textName = textBlock;
-      double maxWidth = this.Width - (92.0 + (this._moreOptionsTapCallback != null ? 68.0 : 16.0) + num1);
+      double maxWidth = this.Width - (92.0 + (this._moreOptionsTapCallback != null ? 68.0 : 16.0) + num1 + verifiedWidth);
       textName.CorrectText(maxWidth);
       Canvas.SetLeft((UIElement) textName, 92.0);
       Canvas.SetTop((UIElement) textName, 17.0);
       this.Children.Add((FrameworkElement) textName);
+      double left = 92.0 + ((FrameworkElement) textName).ActualWidth;
+      if (this._isVerified)
+      {
+        Border verifiedIcon = this.GetVerifiedIcon();
+        left += 8.0;
+        Canvas.SetLeft((UIElement) verifiedIcon, left);
+        Canvas.SetTop((UIElement) verifiedIcon, 22.0);
+        this.Children.Add((FrameworkElement) verifiedIcon);
+        left += 20.0;
+      }
       if (postTypeIcon == null)
         return;
-      Canvas.SetLeft((UIElement) postTypeIcon, 92.0 + ((FrameworkElement) textName).ActualWidth);
+      Canvas.SetLeft((UIElement) postTypeIcon, left);
       Canvas.SetTop((UIElement) postTypeIcon, 17.0);
       this.Children.Add((FrameworkElement) postTypeIcon);
+    }
+
+    private Border GetVerifiedIcon()
+    {
+      ImageBrush imageBrush = new ImageBrush();
+      ImageLoader.SetImageBrushSource(imageBrush, UserOrGroupHeaderItem.GetVerifiedIconPath());
+      Border border = new Border();
+      ((FrameworkElement) border).Width = 21.0;
+      ((FrameworkElement) border).Height = 17.0;
+      border.Background = ((Brush) (SolidColorBrush) Application.Current.Resources["PhoneVerifiedIconBrush"]);
+      ((UIElement) border).OpacityMask = ((Brush) imageBrush);
+      return border;
+    }
+
+    private static string GetVerifiedIconPath()
+    {
+      int scale = ScaleFactor.GetRealScaleFactor();
+      string file;
+      if (scale == 150)
+        file = "verified_1_5x.png";
+      else if (scale == 160 || scale == 225)
+        file = "verified_1_6x.png";
+      else
+        file = "verified_1x.png";
+      return "/Resources/" + file;
     }
 
     private Border GetOnlineIcon()

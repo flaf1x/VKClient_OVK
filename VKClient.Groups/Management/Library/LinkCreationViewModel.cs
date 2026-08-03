@@ -159,7 +159,7 @@ namespace VKClient.Groups.Management.Library
       {
         string url = this.Address;
         if (!url.Contains("://"))
-          url = (url.Contains("vk.com") || url.Contains("vkontakte.ru") || url.Contains("vk.cc") ? "https://" : "http://") + url;
+          url = (url.Contains("vk.com") || url.Contains("vkontakte.ru") || url.Contains("vk.cc") || url.Contains("openvk.org") ? "https://" : "http://") + url;
         GroupsService.Current.AddLink(this._communityId, url, this.Description, (Action<BackendResult<GroupLink, ResultCode>>) (result => this.AddEditCallback(result.ResultCode, result.Error, result.ResultData)));
       }
       else

@@ -252,4 +252,16 @@
   <data name="AppBar_NowPlaying" xml:space="preserve">
     <value>аудиопле-ер</value>
   </data>
+  <data name="AudioDownloads_DownloadAll" xml:space="preserve">
+    <value>скачать всё</value>
+  </data>
+  <data name="AudioDownloads_Cancel" xml:space="preserve">
+    <value>остановить загрузку</value>
+  </data>
+  <data name="AudioDownloads_Preparing" xml:space="preserve">
+    <value>Подготовка загрузок...</value>
+  </data>
+  <data name="AudioDownloads_Progress" xml:space="preserve">
+    <value>Скачано: {0}/{1}</value>
+  </data>
 </root>

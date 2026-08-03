@@ -1,11 +1,14 @@
+using Microsoft.Phone.BackgroundAudio;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using VKClient.Audio.Base.BLExtensions;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
+using VKClient.Common.AudioManager;
 using VKClient.Common.Framework;
 using VKClient.Common.Library;
 using VKClient.Common.Library.Events;
@@ -15,13 +18,19 @@ namespace VKClient.Audio.Base.AudioCache
 {
     public class AudioCacheManager : IBinarySerializable, IHandle<AudioPlayerStateChanged>, IHandle
     {
-        private readonly int DEFAULT_CHUNK_SIZE = 100000;
         private List<InProgressDownloadInfo> _inProgressDownloads = new List<InProgressDownloadInfo>();
         private Dictionary<string, string> _downloadedDict = new Dictionary<string, string>();
         private List<AudioObj> _downloadedList = new List<AudioObj>();
         private static AudioCacheManager _instance;
         private bool _isDownloading;
         private bool _cacheChanging;
+        private RemoteFileInfo _autoCacheCandidate;
+        private HashSet<string> _bulkDownloadIds = new HashSet<string>();
+        private int _bulkDownloadTotal;
+        private int _bulkDownloadCompleted;
+        private int _bulkDownloadFailed;
+        private InProgressDownloadInfo _currentDownload;
+        private Cancellation _currentDownloadCancellation;
 
         public static AudioCacheManager Instance
         {
@@ -40,15 +49,21 @@ namespace VKClient.Audio.Base.AudioCache
         {
             get
             {
-                if (!AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled)
-                    return new List<AudioObj>();
-                List<AudioObj> list = this._downloadedList.Where<AudioObj>((Func<AudioObj, bool>)(a => a.owner_id == AppGlobalStateManager.Current.LoggedInUserId)).ToList<AudioObj>();
+                List<AudioObj> list = this._downloadedList.ToList<AudioObj>();
                 list.Reverse();
                 return list;
             }
         }
 
         public bool NetworkStatusInfo { get; set; }
+
+        public AudioDownloadQueueProgress BulkDownloadProgress
+        {
+            get
+            {
+                return this.CreateBulkDownloadProgress(0.0);
+            }
+        }
 
         public AudioCacheManager()
         {
@@ -62,8 +77,6 @@ namespace VKClient.Audio.Base.AudioCache
 
         public string GetLocalFileForUniqueId(string uniqueId)
         {
-            if (!AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled)
-                return null;
             if (this._downloadedDict.ContainsKey(uniqueId))
                 return this._downloadedDict[uniqueId];
             return null;
@@ -93,14 +106,66 @@ namespace VKClient.Audio.Base.AudioCache
                     }
                 }
             }
-            //Dictionary<string, string>.Enumerator enumerator = new Dictionary<string, string>.Enumerator();
+            this.Save();
             this._cacheChanging = false;
+        }
+
+        public void Download(AudioObj audio)
+        {
+            if (audio == null || string.IsNullOrWhiteSpace(audio.url) ||
+                !audio.url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return;
+            this.AddFileToDownload(new List<RemoteFileInfo>()
+            {
+                new RemoteFileInfo(audio)
+            });
+        }
+
+        public void DownloadAll(IEnumerable<AudioObj> audios)
+        {
+            if (audios == null)
+                return;
+            List<RemoteFileInfo> files = audios
+                .Where(a => a != null && !string.IsNullOrWhiteSpace(a.url) &&
+                    a.url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(a => a.UniqueId)
+                .Select(g => new RemoteFileInfo(g.First()))
+                .Where(f => !this._downloadedDict.ContainsKey(f.UniqueId))
+                .ToList();
+            Execute.ExecuteOnUIThread((Action)(() =>
+            {
+                this._bulkDownloadIds = new HashSet<string>(files.Select(f => f.UniqueId));
+                this._bulkDownloadTotal = this._bulkDownloadIds.Count;
+                this._bulkDownloadCompleted = 0;
+                this._bulkDownloadFailed = 0;
+                this.PublishBulkDownloadProgress(0.0);
+                this.AddFileToDownload(files);
+            }));
+        }
+
+        public void CancelBulkDownload()
+        {
+            Execute.ExecuteOnUIThread((Action)(() =>
+            {
+                if (this._bulkDownloadIds.Count == 0)
+                    return;
+                HashSet<string> idsToCancel = new HashSet<string>(this._bulkDownloadIds);
+                if (this._currentDownloadCancellation != null && this._currentDownload != null &&
+                    idsToCancel.Contains(this._currentDownload.RemoteFile.UniqueId))
+                    this._currentDownloadCancellation.Set();
+                this._inProgressDownloads.RemoveAll(d => d != this._currentDownload &&
+                    d != null && d.RemoteFile != null && idsToCancel.Contains(d.RemoteFile.UniqueId));
+                this._bulkDownloadIds.Clear();
+                this._bulkDownloadTotal = 0;
+                this._bulkDownloadCompleted = 0;
+                this._bulkDownloadFailed = 0;
+                this.Save();
+                this.PublishBulkDownloadProgress(0.0);
+            }));
         }
 
         public void AddFileToDownload(List<RemoteFileInfo> remoteFileInfoList)
         {
-            if (!AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled)
-                return;
             Execute.ExecuteOnUIThread((Action)(() =>
             {
                 foreach (RemoteFileInfo remoteFileInfo1 in remoteFileInfoList)
@@ -112,20 +177,23 @@ namespace VKClient.Audio.Base.AudioCache
                         
                         if (progressDownloadInfo1 != null)
                         {
-                            progressDownloadInfo1.RemoteFile.UriStr = remoteFileInfo.UriStr;
+                            progressDownloadInfo1.RemoteFile = remoteFileInfo;
                             progressDownloadInfo1.LastDownloadResult = DownloadResult.OK;
+                            progressDownloadInfo1.DownloadedToByte = -1L;
+                            progressDownloadInfo1.Length = -1L;
                         }
                         else
                             this._inProgressDownloads.Add(new InProgressDownloadInfo(remoteFileInfo));
                     }
                 }
+                this.Save();
                 this.DownloadNextOneIfNeeded();
             }));
         }
 
         private void DownloadNextOneIfNeeded()
         {
-            if (!AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled || VKClient.Common.Library.NetworkStatusInfo.Instance.NetworkStatus == NetworkStatus.MobileRestricted)
+            if (VKClient.Common.Library.NetworkStatusInfo.Instance.NetworkStatus == NetworkStatus.MobileRestricted)
                 return;
             Execute.ExecuteOnUIThread((Action)(() =>
             {
@@ -141,33 +209,29 @@ namespace VKClient.Audio.Base.AudioCache
                 {
                     Logger.Instance.Info("AudioCacheManager.DownloadNextOneIfNeeded: found download " + currentDownload.ToString());
                     this._isDownloading = true;
-                    this.PerformChunkDownload(currentDownload, (Action)(() =>
+                    this._currentDownload = currentDownload;
+                    this.PerformFullDownload(currentDownload, (Action)(() =>
                     {
-                        DownloadResult lastDownloadResult = currentDownload.LastDownloadResult;
-                        Logger.Instance.Info("AudioCacheManager.DownloadNextOneIfNeeded: download completed with result " + lastDownloadResult);
-                        if (lastDownloadResult != DownloadResult.OK)
-                            Execute.ExecuteOnUIThread((Action)(() =>
+                        Execute.ExecuteOnUIThread((Action)(() =>
+                        {
+                            DownloadResult lastDownloadResult = currentDownload.LastDownloadResult;
+                            Logger.Instance.Info("AudioCacheManager: download completed with result " + lastDownloadResult);
+                            this._inProgressDownloads.Remove(currentDownload);
+                            if (lastDownloadResult == DownloadResult.OK)
+                                this.ProcessFullyDownloadedFile(currentDownload);
+                            if (this._bulkDownloadIds.Remove(currentDownload.RemoteFile.UniqueId))
                             {
-                                this._inProgressDownloads.Remove(currentDownload);
-                                this._inProgressDownloads.Insert(0, currentDownload);
-                            }));
-                        else if (currentDownload.DownloadedToByte == currentDownload.Length - 1L)
-                        {
-                            Logger.Instance.Info("AudioCacheManager.DownloadNextOneIfNeeded: downloaded the full file!");
-                            this.ProcessFullyDownloadedFile(currentDownload);
-                            Execute.ExecuteOnUIThread((Action)(() => this._inProgressDownloads.Remove(currentDownload)));
-                        }
-                        //
-                        float temp = (float)currentDownload.DownloadedToByte / (float)currentDownload.Length;
-
-                        EventAggregator.Current.Publish(new AudioTrackDownloadProgress
-                        {
-                            Id = currentDownload.RemoteFile.UniqueId,
-                            Progress = (temp * 100f)
-                        });
-                        //
-                        this._isDownloading = false;
-                        this.DownloadNextOneIfNeeded();
+                                ++this._bulkDownloadCompleted;
+                                if (lastDownloadResult != DownloadResult.OK)
+                                    ++this._bulkDownloadFailed;
+                                this.PublishBulkDownloadProgress(0.0);
+                            }
+                            this._isDownloading = false;
+                            this._currentDownload = null;
+                            this._currentDownloadCancellation = null;
+                            this.Save();
+                            this.DownloadNextOneIfNeeded();
+                        }));
                     }));
                 }
             }));
@@ -175,37 +239,87 @@ namespace VKClient.Audio.Base.AudioCache
 
         private void ProcessFullyDownloadedFile(InProgressDownloadInfo currentDownload)
         {
+            if (!string.IsNullOrWhiteSpace(currentDownload.RemoteFile.Title) ||
+                !string.IsNullOrWhiteSpace(currentDownload.RemoteFile.Artist))
+            {
+                this.RegisterDownloadedFile(currentDownload, currentDownload.RemoteFile.ToAudioObj());
+                return;
+            }
+
             List<string> ids = new List<string>();
             ids.Add(currentDownload.RemoteFile.UniqueId);
             Action<BackendResult<List<AudioObj>, ResultCode>> callback = (Action<BackendResult<List<AudioObj>, ResultCode>>)(res =>
             {
                 if (res.ResultCode != ResultCode.Succeeded)
                     return;
-                this._downloadedDict[currentDownload.RemoteFile.UniqueId] = currentDownload.LocalFileId;
-                AudioObj audioObj = res.ResultData[0];
-                audioObj.url = currentDownload.LocalFileId;
-                this._downloadedList.Add(audioObj);
+                if (res.ResultData == null || res.ResultData.Count == 0)
+                    return;
+                this.RegisterDownloadedFile(currentDownload, res.ResultData[0]);
             });
             AudioService.Instance.GetAudio(ids, callback);
         }
 
-        private void PerformChunkDownload(InProgressDownloadInfo di, Action resultCallback)
+        private void RegisterDownloadedFile(InProgressDownloadInfo currentDownload, AudioObj audioObj)
         {
-            JsonWebRequest.Download(di.RemoteFile.UriStr, di.DownloadedToByte + 1L, di.DownloadedToByte + (long)this.DEFAULT_CHUNK_SIZE, (Action<HttpStatusCode, long, byte[]>)((statusCode, length, dataBytes) =>
+            this._downloadedDict[currentDownload.RemoteFile.UniqueId] = currentDownload.LocalFileId;
+            audioObj.url = currentDownload.LocalFileId;
+            this._downloadedList.RemoveAll(a => a.UniqueId == audioObj.UniqueId);
+            this._downloadedList.Add(audioObj);
+            this.Save();
+            EventAggregator.Current.Publish(new AudioTrackDownloadProgress
             {
-                if (statusCode == HttpStatusCode.NotFound)
-                    di.LastDownloadResult = DownloadResult.UriNoLongerValid;
-                else if (length > 0L && dataBytes != null)
+                Id = currentDownload.RemoteFile.UniqueId,
+                Progress = 100f
+            });
+        }
+
+        private void PerformFullDownload(InProgressDownloadInfo di, Action resultCallback)
+        {
+            CacheManager.EnsureCacheFolderExists();
+            Stream destination = null;
+            try
+            {
+                destination = CacheManager.GetStreamForWrite(di.LocalFileId);
+                Cancellation cancellation = new Cancellation();
+                this._currentDownloadCancellation = cancellation;
+                JsonWebRequest.Download(di.RemoteFile.UriStr, destination, (Action<bool>)(succeeded =>
                 {
-                    CacheManager.TrySaveRawCachedData(dataBytes, di.LocalFileId, FileMode.Append);
-                    di.DownloadedToByte += (long)dataBytes.Length;
+                    long length = 0L;
+                    try
+                    {
+                        length = destination.Position;
+                        destination.Dispose();
+                    }
+                    catch
+                    {
+                    }
                     di.Length = length;
-                    di.LastDownloadResult = DownloadResult.OK;
-                }
-                else
-                    di.LastDownloadResult = DownloadResult.Failed;
+                    di.DownloadedToByte = length > 0L ? length - 1L : -1L;
+                    di.LastDownloadResult = succeeded && length > 0L
+                        ? DownloadResult.OK
+                        : DownloadResult.Failed;
+                    if (di.LastDownloadResult != DownloadResult.OK)
+                        CacheManager.TryDeleteAsync(di.LocalFileId);
+                    resultCallback();
+                }), (Action<double>)(progress =>
+                {
+                    EventAggregator.Current.Publish(new AudioTrackDownloadProgress
+                    {
+                        Id = di.RemoteFile.UniqueId,
+                        Progress = (float)progress
+                    });
+                    if (this._bulkDownloadIds.Contains(di.RemoteFile.UniqueId))
+                        this.PublishBulkDownloadProgress(progress);
+                }), cancellation);
+            }
+            catch (Exception ex)
+            {
+                if (destination != null)
+                    destination.Dispose();
+                di.LastDownloadResult = DownloadResult.Failed;
+                Logger.Instance.Error("AudioCacheManager: failed to start download", ex);
                 resultCallback();
-            }));
+            }
         }
 
         public void Write(BinaryWriter writer)
@@ -223,13 +337,59 @@ namespace VKClient.Audio.Base.AudioCache
             this._downloadedDict = new Dictionary<string, string>();
             foreach (AudioObj downloaded in this._downloadedList)
                 this._downloadedDict[downloaded.UniqueId] = downloaded.url;
+            this._bulkDownloadIds = new HashSet<string>(this._inProgressDownloads
+                .Where(d => d != null && d.RemoteFile != null)
+                .Select(d => d.RemoteFile.UniqueId));
+            this._bulkDownloadTotal = this._bulkDownloadIds.Count;
+            this._bulkDownloadCompleted = 0;
+            this._bulkDownloadFailed = 0;
         }
 
         public void Handle(AudioPlayerStateChanged message)
         {
-            PlayedFilesInfo playedFilesInfo = new PlayedFilesInfo();
-            playedFilesInfo.Restore();
-            this.AddFileToDownload(playedFilesInfo.PlayedFiles);
+            AudioTrack currentTrack = BGAudioPlayerWrapper.Instance.Track;
+            string currentId = currentTrack != null ? currentTrack.GetTagId() : null;
+
+            if (this._autoCacheCandidate != null &&
+                (currentId != this._autoCacheCandidate.UniqueId ||
+                 message.PlayState == PlayState.TrackEnded ||
+                 message.PlayState == PlayState.Stopped))
+            {
+                if (AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled)
+                    this.AddFileToDownload(new List<RemoteFileInfo>() { this._autoCacheCandidate });
+                this._autoCacheCandidate = null;
+            }
+
+            if (message.PlayState != PlayState.Playing || currentTrack == null ||
+                currentTrack.Source == null ||
+                !currentTrack.Source.OriginalString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Playlist playlist = PlaylistManager.LoadTracksFromIsolatedStorage(true);
+            AudioObj audio = playlist.Tracks.FirstOrDefault(a => a.UniqueId == currentId);
+            if (audio != null && audio.added)
+                this._autoCacheCandidate = new RemoteFileInfo(audio);
+        }
+
+        private AudioDownloadQueueProgress CreateBulkDownloadProgress(double currentTrackProgress)
+        {
+            bool isActive = this._bulkDownloadIds.Count > 0;
+            double progress = this._bulkDownloadTotal > 0
+                ? (this._bulkDownloadCompleted + currentTrackProgress / 100.0) / this._bulkDownloadTotal
+                : 1.0;
+            return new AudioDownloadQueueProgress
+            {
+                Completed = this._bulkDownloadCompleted,
+                Failed = this._bulkDownloadFailed,
+                Total = this._bulkDownloadTotal,
+                Progress = Math.Max(0.0, Math.Min(1.0, progress)),
+                IsActive = isActive
+            };
+        }
+
+        private void PublishBulkDownloadProgress(double currentTrackProgress)
+        {
+            EventAggregator.Current.Publish(this.CreateBulkDownloadProgress(currentTrackProgress));
         }
     }
 }

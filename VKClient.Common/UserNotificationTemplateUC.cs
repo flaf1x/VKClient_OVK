@@ -82,7 +82,7 @@ namespace VKClient.Common
         val2 = Math.Min(3, val2);
       for (int index = 0; index < val2; ++index)
       {
-        ImageLoader.SetSourceForImage(imageList2[index], this._users[index + 1].photo_max, false);
+        ImageLoader.SetSourceForImage(imageList2[index], this._users[index + 1].UiAvatarSmall, false);
         ((FrameworkElement) imageList2[index]).Tag=(this._users[index + 1]);
         ((UIElement) imageList2[index]).Tap += (new EventHandler<System.Windows.Input.GestureEventArgs>(this.UserNotificationTemplateUC_Tap));
       }
@@ -107,6 +107,35 @@ namespace VKClient.Common
       this.ConfigureHeaderText(users, actionText, hightlightedText, totalUsersCount);
       this.textBlockDate.Text = dateText;
       ((UIElement) this.ucEarlierReplies).Visibility = (showEarlierReplies ? Visibility.Visible : Visibility.Collapsed);
+      return this.CalculateHeight(showEarlierReplies);
+    }
+
+    public double ConfigureGeneric(string text, string dateText, string thumb,
+      NotificationType type, bool showEarlierReplies, string forcedTypeIcon = null)
+    {
+      this._users = new List<User>();
+      this._thumb = thumb;
+      this.imageThumb.Visibility = string.IsNullOrWhiteSpace(thumb)
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+      this.canvasAdditionalUserImages.Visibility = Visibility.Collapsed;
+      this.ConfigureLeftSideImage(type, forcedTypeIcon);
+      this.textBlockHeader.Width = this.CalculateTextBlockHeaderWidth();
+      this.textBlockHeader.Inlines.Clear();
+      Run textRun = new Run();
+      textRun.Text = text;
+      textRun.FontFamily = new FontFamily("Segoe WP SemiLight");
+      textRun.Foreground = (Brush) Application.Current.Resources["PhoneVKSubtleBrush"];
+      this.textBlockHeader.Inlines.Add(textRun);
+      this.textBlockDate.Text = dateText;
+      this.ucEarlierReplies.Visibility = showEarlierReplies
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+      return this.CalculateHeight(showEarlierReplies);
+    }
+
+    private double CalculateHeight(bool showEarlierReplies)
+    {
       Thickness margin = ((FrameworkElement) this.textBlockHeader).Margin;
       // ISSUE: explicit reference operation
       double num1 = ((Thickness) @margin).Top + ((FrameworkElement) this.textBlockHeader).ActualHeight;
@@ -227,7 +256,7 @@ namespace VKClient.Common
         ((FrameworkElement) this.mainUserImagePlaceholder).Tag=((User) (user = this._users[0]));
         object obj = user;
         ((FrameworkElement) mainUserImage).Tag = obj;
-        ImageLoader.SetSourceForImage(this.mainUserImage, this._users[0].photo_max, false);
+        ImageLoader.SetSourceForImage(this.mainUserImage, this._users[0].UiAvatarSmall, false);
       }
       string str = "";
       switch (type)
@@ -237,6 +266,10 @@ namespace VKClient.Common
           break;
         case NotificationType.friend_accepted:
           str = "/Resources/FeedbackIconsRequest.png";
+          break;
+        case NotificationType.wall:
+        case NotificationType.wall_publish:
+          str = "/Resources/FeedbackIconsFollower.png";
           break;
         case NotificationType.like_post:
         case NotificationType.like_comment:
@@ -251,6 +284,25 @@ namespace VKClient.Common
         case NotificationType.copy_photo:
         case NotificationType.copy_video:
           str = "/Resources/FeedbackIconsRepost.png";
+          break;
+        case NotificationType.sent_gift:
+          str = "/Resources/FeedbackIconsGift.png";
+          break;
+        case NotificationType.comment_post:
+        case NotificationType.comment_photo:
+        case NotificationType.comment_video:
+        case NotificationType.reply_comment:
+        case NotificationType.reply_topic:
+        case NotificationType.reply_comment_photo:
+        case NotificationType.reply_comment_video:
+        case NotificationType.reply_comment_market:
+          str = "/Resources/FeedbackIconsComment.png";
+          break;
+        case NotificationType.mention:
+        case NotificationType.mention_comments:
+        case NotificationType.mention_comment_photo:
+        case NotificationType.mention_comment_video:
+          str = "/Resources/FeedbackIconsMention.png";
           break;
       }
       if (forcedTypeIcon != null)
@@ -287,7 +339,10 @@ namespace VKClient.Common
       if (tag == null)
         return;
       e.Handled = true;
-      Navigator.Current.NavigateToUserProfile(tag.uid, tag.Name, "", false);
+      if (tag.uid < 0)
+        Navigator.Current.NavigateToGroup(-tag.uid, tag.Name, false);
+      else
+        Navigator.Current.NavigateToUserProfile(tag.uid, tag.Name, "", false);
     }
 
     [DebuggerNonUserCode]

@@ -487,7 +487,7 @@ namespace VKClient.Common.Market.ViewModels
 
     private void UpdateMetaData()
     {
-      this.GroupImage = this._group.photo_200;
+      this.GroupImage = this._group.UiAvatarMedium;
       this.GroupName = this._group.name;
       this.Category = this._product.category != null ? this._product.category.name : "";
       string str = UIStringFormatterHelper.FormateDateForEventUI(Extensions.UnixTimeStampToDateTime((double) this._product.date, true));
@@ -573,7 +573,7 @@ namespace VKClient.Common.Market.ViewModels
 
     public void CopyLink()
     {
-      Clipboard.SetText(string.Format("https://vk.com/market{0}?w=product{1}_{2}", this.OwnerId, this.OwnerId, this.ItemId));
+      Clipboard.SetText(string.Format("https://openvk.org/market{0}?w=product{1}_{2}", this.OwnerId, this.OwnerId, this.ItemId));
     }
 
     public void ShareToGroup(string text, long groupId, string groupName)

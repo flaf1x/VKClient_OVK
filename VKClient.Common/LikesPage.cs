@@ -25,10 +25,6 @@ namespace VKClient.Common
     internal Pivot pivot;
     internal PivotItem pivotItemAll;
     internal ExtendedLongListSelector listBoxAll;
-    internal PivotItem pivotItemShared;
-    internal ExtendedLongListSelector listBoxShared;
-    internal PivotItem pivotItemFriends;
-    internal ExtendedLongListSelector listBoxFriends;
     private bool _contentLoaded;
 
     private LikesViewModel LikesVM
@@ -54,18 +50,11 @@ namespace VKClient.Common
       long itemId = long.Parse(((Page) this).NavigationContext.QueryString["ItemId"]);
       int num1 = int.Parse(((Page) this).NavigationContext.QueryString["Type"]);
       int knownCount = int.Parse(((Page) this).NavigationContext.QueryString["knownCount"]);
-      int num2 = bool.Parse(((Page) this).NavigationContext.QueryString["SelectFriendLikes"]) ? 1 : 0;
       LikesViewModel vm = new LikesViewModel(ownerId, itemId, (LikeObjectType) num1, knownCount);
       base.DataContext = vm;
       this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.listBoxAll);
       this.listBoxAll.OnRefresh = (Action) (() => vm.All.LoadData(true, false,  null, false));
-      this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.listBoxShared);
-      this.listBoxShared.OnRefresh = (Action) (() => vm.Shared.LoadData(true, false,  null, false));
-      this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.listBoxFriends);
-      this.listBoxFriends.OnRefresh = (Action) (() => vm.Friends.LoadData(true, false,  null, false));
       vm.All.LoadData(false, false,  null, false);
-      if (num2 != 0)
-        this.pivot.SelectedItem = this.pivotItemFriends;
       this._isInitialized = true;
     }
 
@@ -87,39 +76,10 @@ namespace VKClient.Common
       this.LikesVM.All.LoadMoreIfNeeded(e.ContentPresenter.Content);
     }
 
-    private void Shared_Link(object sender, LinkUnlinkEventArgs e)
-    {
-      this.LikesVM.Shared.LoadMoreIfNeeded(e.ContentPresenter.Content);
-    }
-
-    private void Friends_Link(object sender, LinkUnlinkEventArgs e)
-    {
-      this.LikesVM.Friends.LoadMoreIfNeeded(e.ContentPresenter.Content);
-    }
-
-    private void pivot_SelectionChanged_1(object sender, SelectionChangedEventArgs e)
-    {
-      if (this.pivot.SelectedItem == this.pivotItemFriends)
-        this.LikesVM.Friends.LoadData(false, false,  null, false);
-      if (this.pivot.SelectedItem != this.pivotItemShared)
-        return;
-      this.LikesVM.Shared.LoadData(false, false,  null, false);
-    }
-
     private void OnHeaderTap()
     {
       if (this.pivot.SelectedItem == this.pivotItemAll && Enumerable.Any<FriendHeader>(this.LikesVM.All.Collection))
         this.listBoxAll.ScrollTo(Enumerable.First<FriendHeader>(this.LikesVM.All.Collection));
-      else if (this.pivot.SelectedItem == this.pivotItemFriends && Enumerable.Any<FriendHeader>(this.LikesVM.Friends.Collection))
-      {
-        this.listBoxFriends.ScrollTo(Enumerable.First<FriendHeader>(this.LikesVM.Friends.Collection));
-      }
-      else
-      {
-        if (this.pivot.SelectedItem != this.pivotItemShared || !Enumerable.Any<FriendHeader>(this.LikesVM.Shared.Collection))
-          return;
-        this.listBoxShared.ScrollTo(Enumerable.First<FriendHeader>(this.LikesVM.Shared.Collection));
-      }
     }
 
     [DebuggerNonUserCode]
@@ -135,10 +95,6 @@ namespace VKClient.Common
       this.pivot = (Pivot) base.FindName("pivot");
       this.pivotItemAll = (PivotItem) base.FindName("pivotItemAll");
       this.listBoxAll = (ExtendedLongListSelector) base.FindName("listBoxAll");
-      this.pivotItemShared = (PivotItem) base.FindName("pivotItemShared");
-      this.listBoxShared = (ExtendedLongListSelector) base.FindName("listBoxShared");
-      this.pivotItemFriends = (PivotItem) base.FindName("pivotItemFriends");
-      this.listBoxFriends = (ExtendedLongListSelector) base.FindName("listBoxFriends");
     }
   }
 }

@@ -136,7 +136,7 @@ namespace VKClient.Common.UC
             if (intersection == null || intersection.Count == 0)
                 return;
             int count = intersection.Count;
-            string photoMax1 = intersection[0].photo_max;
+            string photoMax1 = intersection[0].UiAvatarSmall;
             if (!string.IsNullOrEmpty(photoMax1))
             {
                 ((UIElement)this.gridUser1).Visibility = Visibility.Visible;
@@ -145,7 +145,7 @@ namespace VKClient.Common.UC
             int num1 = 1;
             if (count > num1)
             {
-                string photoMax2 = intersection[1].photo_max;
+                string photoMax2 = intersection[1].UiAvatarSmall;
                 if (!string.IsNullOrEmpty(photoMax2))
                 {
                     ((UIElement)this.gridUser2).Visibility = Visibility.Visible;
@@ -155,7 +155,7 @@ namespace VKClient.Common.UC
             int num2 = 2;
             if (count > num2)
             {
-                string photoMax2 = intersection[2].photo_max;
+                string photoMax2 = intersection[2].UiAvatarSmall;
                 if (!string.IsNullOrEmpty(photoMax2))
                 {
                     ((UIElement)this.gridUser3).Visibility = Visibility.Visible;

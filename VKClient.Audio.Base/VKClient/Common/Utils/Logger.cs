@@ -118,6 +118,11 @@ namespace VKClient.Common.Utils
             this.WriteLogToStorage(str);
         }
 
+        public void Diagnostic(string message)
+        {
+            this.WriteLogToStorage("DEBUG: " + message);
+        }
+
         private string GetExceptionData(Exception e)
         {
             string str = "e.Message = " + e.Message + Environment.NewLine + "e.Stack = " + e.StackTrace;

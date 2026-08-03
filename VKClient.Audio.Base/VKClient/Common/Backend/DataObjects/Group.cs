@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using VKClient.Audio.Base.DataObjects;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Framework;
 
 namespace VKClient.Common.Backend.DataObjects
@@ -164,6 +165,45 @@ namespace VKClient.Common.Backend.DataObjects
 
     public string photo_max { get; set; }
 
+    public string UiAvatarSmall
+    {
+      get
+      {
+        string url = this.photo_50;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_200;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_max;
+        return AvatarHelper.Prepare(url);
+      }
+    }
+
+    public string UiAvatarMedium
+    {
+      get
+      {
+        string url = this.photo_200;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_max;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_50;
+        return AvatarHelper.Prepare(url);
+      }
+    }
+
+    public string UiAvatarLarge
+    {
+      get
+      {
+        string url = this.photo_max;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_200;
+        if (string.IsNullOrEmpty(url))
+          url = this.photo_50;
+        return AvatarHelper.Prepare(url);
+      }
+    }
+
     public int start_date { get; set; }
 
     public int finish_date { get; set; }
@@ -282,9 +322,40 @@ namespace VKClient.Common.Backend.DataObjects
       }
     }
 
-    private int is_admin { get; set; }
+    private int _isAdmin;
 
-    public int admin_level { get; set; }
+    public int is_admin
+    {
+      get
+      {
+        return this._isAdmin;
+      }
+      set
+      {
+        this._isAdmin = value;
+        // OpenVK exposes only the VK-compatible is_admin flag, while this
+        // client gates community publishing controls on admin_level.
+        if (value > 0 && this.admin_level == 0)
+          this.admin_level = 2;
+      }
+    }
+
+    private int _adminLevel;
+
+    public int admin_level
+    {
+      get
+      {
+        return this._adminLevel;
+      }
+      set
+      {
+        // OpenVK currently exposes one positive administrator level. The
+        // legacy client reserves level 2 for posting as the community. Keep
+        // that capability regardless of JSON property ordering with is_admin.
+        this._adminLevel = value > 0 && value < 2 ? 2 : value;
+      }
+    }
 
     public int is_member { get; set; }
 

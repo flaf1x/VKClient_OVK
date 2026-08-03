@@ -45,10 +45,10 @@ namespace VKClient.Audio.Base.BackendServices
         },
         {
           "type",
-          type.ToString()
+          (type <= 0L ? -1L : type).ToString()
         }
       };
-      string methodName = "execute.getDocuments";
+      string methodName = "docs.get";
       Dictionary<string, string> parameters = dictionary;
       Action<BackendResult<DocumentsInfo, ResultCode>> callback1 = callback;
       int num1 = 0;
@@ -56,7 +56,19 @@ namespace VKClient.Audio.Base.BackendServices
       CancellationToken? cancellationToken = new CancellationToken?();
       // ISSUE: variable of the null type
       
-      VKRequestsDispatcher.DispatchRequestToVK<DocumentsInfo>(methodName, parameters, callback1, (Func<string, DocumentsInfo>) (jsonString => JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<DocumentsInfo>>(jsonString).response), num1 != 0, num2 != 0, cancellationToken, null);
+      VKRequestsDispatcher.DispatchRequestToVK<DocumentsInfo>(methodName, parameters, callback1, (Func<string, DocumentsInfo>) (jsonString =>
+      {
+        VKList<Doc> documents = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<VKList<Doc>>>(jsonString).response;
+        if (documents == null)
+          documents = new VKList<Doc>();
+        if (documents.items == null)
+          documents.items = new List<Doc>();
+        return new DocumentsInfo()
+        {
+          documents = documents,
+          types = new VKList<Category>() { items = new List<Category>() }
+        };
+      }), num1 != 0, num2 != 0, cancellationToken, null);
     }
 
     public void UploadVoiceMessageDocument(Stream stream, List<int> waveform, Action<BackendResult<Doc, ResultCode>> callback, Action<double> progressCallback = null, Cancellation cancellation = null)
@@ -208,7 +220,16 @@ namespace VKClient.Audio.Base.BackendServices
       parameters["doc_id"] = docId.ToString();
       if (!string.IsNullOrWhiteSpace(accessKey))
         parameters["access_key"] = accessKey;
-      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Audio.Base.ResponseWithId>("docs.add", parameters, callback, (Func<string, VKClient.Audio.Base.ResponseWithId>) (s => new VKClient.Audio.Base.ResponseWithId()), false, true, new CancellationToken?(),  null);
+      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Audio.Base.ResponseWithId>("docs.add", parameters, callback, (Func<string, VKClient.Audio.Base.ResponseWithId>) (jsonString =>
+      {
+        // OpenVK returns the copied document's pretty id as a string, not the
+        // numeric response expected by the legacy client.  Validate that
+        // string so the UI only reports success after a real copy was made.
+        VKRequestsDispatcher.GenericRoot<string> response = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<string>>(jsonString);
+        if (response == null || string.IsNullOrWhiteSpace(response.response))
+          throw new JsonSerializationException("OpenVK docs.add returned no document id.");
+        return new VKClient.Audio.Base.ResponseWithId();
+      }), false, true, new CancellationToken?(),  null);
     }
 
     public void Edit(long ownerId, long id, string title, string tags, Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>> callback)

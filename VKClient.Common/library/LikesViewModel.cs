@@ -19,30 +19,12 @@ namespace VKClient.Common.Library
     private LikeObjectType _type;
     private bool _isLoading;
     private GenericCollectionViewModel<LikesList, FriendHeader> _all;
-    private GenericCollectionViewModel<LikesList, FriendHeader> _shared;
-    private GenericCollectionViewModel<LikesList, FriendHeader> _friends;
 
     public GenericCollectionViewModel<LikesList, FriendHeader> All
     {
       get
       {
         return this._all;
-      }
-    }
-
-    public GenericCollectionViewModel<LikesList, FriendHeader> Shared
-    {
-      get
-      {
-        return this._shared;
-      }
-    }
-
-    public GenericCollectionViewModel<LikesList, FriendHeader> Friends
-    {
-      get
-      {
-        return this._friends;
       }
     }
 
@@ -102,17 +84,11 @@ namespace VKClient.Common.Library
       this._all = new GenericCollectionViewModel<LikesList, FriendHeader>((ICollectionDataProvider<LikesList, FriendHeader>) this);
       this._all.LoadCount = 60;
       this._all.ReloadCount = 100;
-      this._friends = new GenericCollectionViewModel<LikesList, FriendHeader>((ICollectionDataProvider<LikesList, FriendHeader>) this);
-      this._friends.LoadCount = 60;
-      this._friends.ReloadCount = 100;
-      this._shared = new GenericCollectionViewModel<LikesList, FriendHeader>((ICollectionDataProvider<LikesList, FriendHeader>) this);
-      this._shared.LoadCount = 60;
-      this._shared.ReloadCount = 100;
     }
 
     public void GetData(GenericCollectionViewModel<LikesList, FriendHeader> caller, int offset, int count, Action<BackendResult<LikesList, ResultCode>> callback)
     {
-      LikesService.Current.GetLikesList(this._type, this._ownerId, this._itemId, count, offset, caller == this._shared, caller == this._friends, (Action<BackendResult<LikesList, ResultCode>>) (res =>
+      LikesService.Current.GetLikesList(this._type, this._ownerId, this._itemId, count, offset, false, false, (Action<BackendResult<LikesList, ResultCode>>) (res =>
       {
         if (res.ResultCode == ResultCode.Succeeded && caller == this._all)
         {

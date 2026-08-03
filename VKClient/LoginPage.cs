@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Navigation;
 using VKClient.Audio.Base;
 using VKClient.Audio.Base.Library;
+using VKClient.Common;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -207,7 +208,7 @@ namespace VKClient
 
     private void ForgotPasswordTap(object sender, System.Windows.Input.GestureEventArgs e)
     {
-      Navigator.Current.NavigateToWebUri("https://m.vk.com/restore", true, false);
+      Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/restore", true, false);
     }
 
     [DebuggerNonUserCode]

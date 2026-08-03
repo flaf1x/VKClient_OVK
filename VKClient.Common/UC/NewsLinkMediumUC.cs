@@ -122,7 +122,7 @@ namespace VKClient.Common.UC
         Link link1 = link;
         LinkButton linkButton2 = new LinkButton();
         linkButton2.title = CommonResources.ViewProduct;
-        string str2 = string.Format("https://vk.com/product{0}_{1}", link.product.owner_id, link.product.id);
+        string str2 = string.Format("https://openvk.org/product{0}_{1}", link.product.owner_id, link.product.id);
         linkButton2.url = str2;
         LinkButton linkButton3 = linkButton2;
         link1.button = linkButton2;

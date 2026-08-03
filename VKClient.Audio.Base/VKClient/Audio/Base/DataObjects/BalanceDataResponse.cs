@@ -4,6 +4,8 @@ namespace VKClient.Audio.Base.DataObjects
   {
     public VKList<StockItem> stockItems { get; set; }
 
-    public int balance { get; set; }
+    public double balance { get; set; }
+
+    public double votes { get; set; }
   }
 }

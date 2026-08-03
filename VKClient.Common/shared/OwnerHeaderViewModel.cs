@@ -91,7 +91,7 @@ namespace VKClient.Common.Shared
       this._ownerId = -g.id;
       this.Title = g.name;
       this.Subtitle = UIStringFormatterHelper.FormatNumberOfSomething(g.members_count, CommonResources.OneFollowerFrm, CommonResources.TwoFourFollowersFrm, CommonResources.FiveFollowersFrm, true,  null, false);
-      this.ImageUri = g.photo_200;
+      this.ImageUri = g.UiAvatarMedium;
     }
 
     private void InitilizeWithUser(User u)
@@ -101,7 +101,7 @@ namespace VKClient.Common.Shared
       this._ownerId = u.id;
       this.Title = u.Name;
       this.Subtitle = "";
-      this.ImageUri = u.photo_max;
+      this.ImageUri = u.UiAvatarMedium;
     }
   }
 }

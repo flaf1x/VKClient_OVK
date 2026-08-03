@@ -115,9 +115,9 @@ namespace VKClient.Common.Library
     private string GetPhoto()
     {
       if (this.IsCommunityType)
-        return this._searchHint.group.photo_max;
+        return this._searchHint.group.UiAvatarSmall;
       if (this.IsUserType)
-        return this._searchHint.profile.photo_max;
+        return this._searchHint.profile.UiAvatarSmall;
       return "";
     }
 

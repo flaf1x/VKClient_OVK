@@ -159,8 +159,8 @@ namespace VKMessenger.Library
     {
       if (this._user == null)
         return;
-      this.ImageUrl = this._user.photo_max;
-      this.MediumImageUrl = this._user.photo_max;
+      this.ImageUrl = this._user.UiAvatarMedium;
+      this.MediumImageUrl = this._user.UiAvatarMedium;
       this.FullName = string.Format("{0} {1}", this._user.first_name, this._user.last_name);
       this.SetIsOnline((uint) this._user.online > 0U);
       this._userId = this._user.uid;

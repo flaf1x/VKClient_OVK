@@ -35,7 +35,7 @@ namespace VKClient.Common.Library
             get
             {
                 User currentUser = this._currentUser;
-                return (currentUser != null ? currentUser.photo_max : null) ?? "";
+                return (currentUser != null ? currentUser.UiAvatarSmall : null) ?? "";
             }
         }
 

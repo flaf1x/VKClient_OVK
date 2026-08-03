@@ -22,12 +22,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <uc:GenericHeaderUC x:Name="ucHeader"
-                            OptionsMenuItemSelected="OnOptionsMenuItemSelected">
-            <uc:GenericHeaderUC.OptionsMenu>
-                <library:OptionsMenuItem Type="More" />
-            </uc:GenericHeaderUC.OptionsMenu>
-        </uc:GenericHeaderUC>
+        <uc:GenericHeaderUC x:Name="ucHeader" />
 
         <ScrollViewer x:Name="scrollViewer"
                       Grid.Row="1">
@@ -52,38 +47,6 @@
                 <TextBlock FontSize="25.33"
                            Foreground="{StaticResource PhoneGray800_Gray000Brush}"
                            Text="{Binding BalanceStr, FallbackValue='Votes count'}" />
-
-                <Rectangle Height="1"
-                           Margin="-16 29 -16 0"
-                           Opacity="0.1"
-                           Fill="{StaticResource PhoneForegroundBrush}" />
-
-                <TextBlock Margin="0 17 0 19"
-                           FontFamily="{StaticResource PhoneFontFamilySemiBold}"
-                           Foreground="{StaticResource PhoneGray400_Gray500Brush}"
-                           Text="{Binding LocalizedResources.TopUpBalance, Source={StaticResource LocalizedStrings}, Converter={StaticResource StringToUpper}}" />
-
-                <views:BalanceRefillUC BalanceTopup="settings" />
-
-                <RichTextBox Margin="-12 32 -12 44"
-                             IsReadOnly="True"
-                             FontSize="21.33"
-                             Foreground="{StaticResource PhoneGray500Brush}"
-                             LineStackingStrategy="BlockLineHeight"
-                             LineHeight="28">
-                    <Paragraph>
-                        <Run Text="{Binding LocalizedResources.VotesPurchaseDisclaimer1, Source={StaticResource LocalizedStrings}}" />
-
-                        <Hyperlink x:Name="hyperlinkLicenseAgreement"
-                                   Foreground="{StaticResource PhoneNameBlueBrush}"
-                                   MouseOverForeground="{StaticResource PhoneNameBlueBrush}"
-                                   Click="HyperlinkLicenseAgreement_OnClick">
-                            <Run Text="{Binding LocalizedResources.VotesPurchaseDisclaimer2, Source={StaticResource LocalizedStrings}}" />
-                        </Hyperlink><Run Text="." />
-
-                        <Run Text="{Binding LocalizedResources.VotesPurchaseDisclaimer3, Source={StaticResource LocalizedStrings}}" />
-                    </Paragraph>
-                </RichTextBox>
 
             </StackPanel>
         </ScrollViewer>

@@ -107,14 +107,11 @@ namespace VKMessenger.Views
             ConversationHeader dataContext = (sender as FrameworkElement).DataContext as ConversationHeader;
             if (dataContext == null)
                 return;
-            bool isChat = true;
-            long userOrChatId = (long)dataContext._message.chat_id;
-            if (userOrChatId == 0L)
-            {
-                isChat = false;
-                userOrChatId = (long)dataContext._message.uid;
-            }
-            Navigator.Current.NavigateToConversation(userOrChatId, isChat, this.IsLookup, "", 0, false);
+            long userOrChatId = dataContext.UserOrChatId;
+            if (userOrChatId <= 0L)
+                return;
+            args.Handled = true;
+            Navigator.Current.NavigateToConversation(userOrChatId, dataContext.IsChat, this.IsLookup, "", 0, false);
         }
 
         private void HandleTap(object s)
@@ -122,14 +119,10 @@ namespace VKMessenger.Views
             ConversationHeader dataContext = (s as FrameworkElement).DataContext as ConversationHeader;
             if (dataContext == null)
                 return;
-            bool isChat = true;
-            long userOrChatId = (long)dataContext._message.chat_id;
-            if (userOrChatId == 0L)
-            {
-                isChat = false;
-                userOrChatId = (long)dataContext._message.uid;
-            }
-            Navigator.Current.NavigateToConversation(userOrChatId, isChat, this.IsLookup, "", 0, false);
+            long userOrChatId = dataContext.UserOrChatId;
+            if (userOrChatId <= 0L)
+                return;
+            Navigator.Current.NavigateToConversation(userOrChatId, dataContext.IsChat, this.IsLookup, "", 0, false);
         }
 
         private void conversationsListBox_ScrollPositionChanged(object sender, MyVirtualizingPanel2.ScrollPositionChangedEventAgrs e)

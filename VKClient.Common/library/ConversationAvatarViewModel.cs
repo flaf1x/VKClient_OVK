@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Windows;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 
@@ -202,6 +203,7 @@ namespace VKClient.Common.Library
             //      ConversationAvatarViewModel.<>c__DisplayClass45_0 cDisplayClass450 = new ConversationAvatarViewModel.<>c__DisplayClass45_0();
             // ISSUE: reference to a compiler-generated field
             //      cDisplayClass450.chatParticipantsIds = chatParticipantsIds;
+            defaultAvatar = AvatarHelper.Prepare(defaultAvatar);
             this._defaultAvatar = defaultAvatar;
             this.IsChat = isChat;
             // ISSUE: method reference
@@ -220,7 +222,7 @@ namespace VKClient.Common.Library
                         // ISSUE: method pointer
                         User user = Enumerable.FirstOrDefault<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[0]);
                         if (user != null)
-                            str = user.photo_max;
+                            str = user.UiAvatarMedium;
                     }
                     this._defaultAvatar = defaultAvatar = str;
                     // ISSUE: method reference
@@ -252,7 +254,7 @@ namespace VKClient.Common.Library
                         // ISSUE: method pointer
                         User user1 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[0]));
                         if (user1 != null)
-                            this.ChatLeftImageUrl = user1.photo_max;
+                            this.ChatLeftImageUrl = user1.UiAvatarMedium;
                         // ISSUE: reference to a compiler-generated field
                         if (chatParticipantsIds.Count == 1)
                         {
@@ -264,7 +266,7 @@ namespace VKClient.Common.Library
                             // ISSUE: method pointer
                             User user2 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[1]));
                             if (user2 != null)
-                                this.ChatRightImageUrl = user2.photo_max;
+                                this.ChatRightImageUrl = user2.UiAvatarMedium;
                         }
                         this.UIChatImage1Url = this.UIChatImage2Url = this.UIChatImage3Url = this.UIChatImage4Url = "";
                     }
@@ -275,18 +277,18 @@ namespace VKClient.Common.Library
                         User user4 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[0]));
                         if (user4 != null)
                         {
-                            this.ChatLeftImageUrl = user4.photo_max;
+                            this.ChatLeftImageUrl = user4.UiAvatarMedium;
                         }
                         this.ChatRightImageVisibility = Visibility.Collapsed;
                         User user5 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[1]));
                         if (user5 != null)
                         {
-                            this.UIChatImage2Url = user5.photo_max;
+                            this.UIChatImage2Url = user5.UiAvatarMedium;
                         }
                         User user6 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[2]));
                         if (user6 != null)
                         {
-                            this.UIChatImage4Url = user6.photo_max;
+                            this.UIChatImage4Url = user6.UiAvatarMedium;
                         }
                         this.UIChatImage1Url = this.UIChatImage3Url = "";
                     }
@@ -296,22 +298,22 @@ namespace VKClient.Common.Library
                     User user7 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[0]));
                     if (user7 != null)
                     {
-                        this.UIChatImage1Url = user7.photo_max;
+                        this.UIChatImage1Url = user7.UiAvatarMedium;
                     }
                     user7 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[1]));
                     if (user7 != null)
                     {
-                        this.UIChatImage2Url = user7.photo_max;
+                        this.UIChatImage2Url = user7.UiAvatarMedium;
                     }
                     user7 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[2]));
                     if (user7 != null)
                     {
-                        this.UIChatImage3Url = user7.photo_max;
+                        this.UIChatImage3Url = user7.UiAvatarMedium;
                     }
                     user7 = Enumerable.FirstOrDefault<User>(Enumerable.Where<User>(associatedUsers, (User u) => u.uid == chatParticipantsIds[3]));
                     if (user7 != null)
                     {
-                        this.UIChatImage4Url = user7.photo_max;
+                        this.UIChatImage4Url = user7.UiAvatarMedium;
                     }
                     this.ChatRightImageVisibility = this.ChatLeftImageVisibility = Visibility.Collapsed;
                 }

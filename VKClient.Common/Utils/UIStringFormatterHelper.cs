@@ -9,7 +9,9 @@ namespace VKClient.Common.Utils
 {
   public class UIStringFormatterHelper
   {
-    private static readonly Regex _userOrGroupRegEx = new Regex("\\[(id|club)\\d+.*?\\|.*?\\]");
+    // OpenVK accepts @domain mentions and serializes them as
+    // [domain|@domain], not only as the legacy [id123|Name] form.
+    private static readonly Regex _userOrGroupRegEx = new Regex("\\[[^\\]|]+\\|[^\\]]*\\]");
 
     private static string YesterdayStr
     {
@@ -47,6 +49,11 @@ namespace VKClient.Common.Utils
     }
 
     public static string FormatNumberOfSomething(int number, string oneSomethingFrm, string twoSomethingFrm, string fiveSomethingFrm, bool includeNumberInResult = true, string additionalFormatParam = null, bool includeZero = false)
+    {
+      return BaseFormatterHelper.FormatNumberOfSomething(number, oneSomethingFrm, twoSomethingFrm, fiveSomethingFrm, includeNumberInResult, additionalFormatParam, includeZero);
+    }
+
+    public static string FormatNumberOfSomething(double number, string oneSomethingFrm, string twoSomethingFrm, string fiveSomethingFrm, bool includeNumberInResult = true, string additionalFormatParam = null, bool includeZero = false)
     {
       return BaseFormatterHelper.FormatNumberOfSomething(number, oneSomethingFrm, twoSomethingFrm, fiveSomethingFrm, includeNumberInResult, additionalFormatParam, includeZero);
     }

@@ -241,40 +241,7 @@ namespace VKClient.Common.Gifts.ViewModels
 
     public void Send()
     {
-        if (this._isSending || this._userIds.Count == 0 || this._giftId == 0L)
-            return;
-        this._isSending = true;
-        this.SetInProgress(true, "");
-        EventAggregator.Current.Publish((object)new GiftsPurchaseStepsEvent(GiftPurchaseStepsSource.gift_page, GiftPurchaseStepsAction.purchase_click));
-        List<long> userIds = this._userIds;
-        long giftId = this._giftId;
-        string message = this.Message;
-        GiftPrivacy privacy = this.AreNameAndTextPublic ? GiftPrivacy.VisibleToAll : GiftPrivacy.VisibleToRecipient;
-        string categoryName = this._categoryName;
-        int randomId = this._randomId;
-
-        GiftsService.Instance.Send(userIds, giftId, randomId, message, privacy, categoryName, (Action<BackendResult<VKList<GiftSentResponse>, ResultCode>>)(result =>
-        {
-            this._isSending = false;
-            this.SetInProgress(false, "");
-            Execute.ExecuteOnUIThread((Action)(() =>
-            {
-                ResultCode resultCode = result.ResultCode;
-                if (resultCode == ResultCode.Succeeded)
-                {
-                    EventAggregator.Current.Publish((object)new GiftsPurchaseStepsEvent(GiftPurchaseStepsSource.gift_page, GiftPurchaseStepsAction.success));
-                    EventAggregator.Current.Publish((object)new GiftSentEvent(giftId, userIds));
-                    this.RemoveGiftSendStepsPages();
-                    if (this._navigationService.CanGoBack)
-                        Navigator.Current.GoBack();
-                    else
-                        Navigator.Current.NavigateToMainPage();
-                    new DelayedExecutor(1000).AddToDelayedExecution((Action)(() => Execute.ExecuteOnUIThread((Action)(() => new VKClient.Common.UC.GenericInfoUC().ShowAndHideLater(userIds.Count > 1 ? CommonResources.GiftsSent : CommonResources.GiftSent, null)))));
-                }
-                else
-                    VKClient.Common.UC.GenericInfoUC.ShowBasedOnResult(resultCode, "", null);
-            }));
-        }));
+        // OpenVK's gift API is not compatible enough to send gifts safely.
     }
 
     private void RemoveGiftSendStepsPages()

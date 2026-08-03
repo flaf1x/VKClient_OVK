@@ -212,7 +212,7 @@ namespace VKClient.Groups.Library
       {
         if (caller != this.ManagedVM)
           return;
-        GroupsService.Current.GetUserGroups(this._userId, offset, count, "moder", (Action<BackendResult<GroupsLists, ResultCode>>) (result =>
+        GroupsService.Current.GetUserGroups(this._userId, offset, count, "admin", (Action<BackendResult<GroupsLists, ResultCode>>) (result =>
         {
           if (result.ResultCode == ResultCode.Succeeded)
             callback(new BackendResult<VKList<Group>, ResultCode>(ResultCode.Succeeded)
@@ -235,16 +235,7 @@ namespace VKClient.Groups.Library
 
     public void GetData(GenericCollectionViewModel<VKList<Group>, Group<GroupHeader>> caller, int offset, int count, Action<BackendResult<VKList<Group>, ResultCode>> callback)
     {
-      GroupsService.Current.GetUserGroups(this._userId, offset, count, "events", (Action<BackendResult<GroupsLists, ResultCode>>) (result =>
-      {
-        if (result.ResultCode == ResultCode.Succeeded)
-          callback(new BackendResult<VKList<Group>, ResultCode>(ResultCode.Succeeded)
-          {
-            ResultData = result.ResultData.Communities
-          });
-        else
-          callback(new BackendResult<VKList<Group>, ResultCode>(result.ResultCode));
-      }));
+      GroupsService.Current.GetUserEvents(this._userId, callback);
     }
 
     public string GetFooterTextForCount(GenericCollectionViewModel<VKList<Group>, Group<GroupHeader>> caller, int count)
@@ -259,7 +250,7 @@ namespace VKClient.Groups.Library
       if (this._userId != AppGlobalStateManager.Current.LoggedInUserId)
         return;
       this.AllVM.LoadData(true, true,  null, false);
-      this.EventsVM.LoadData(true, true,  null, false);
+      this.EventsVM.LoadData(true, true, null, false);
       this.ManagedVM.LoadData(true, true,  null, false);
       CountersManager.Current.RefreshCounters();
     }

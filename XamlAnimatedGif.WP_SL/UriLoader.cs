@@ -132,6 +132,7 @@ namespace XamlAnimatedGif
                 HttpClient httpClient = new HttpClient();
                 try
                 {
+                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("VKClient/4.28 Windows Phone 8.1");
                     IBuffer source = await httpClient.GetBufferAsync(uri).AsTask(cancellationToken, new Progress<HttpProgress>(delegate(HttpProgress progress)
                     {
                         ulong? totalBytesToReceive = progress.TotalBytesToReceive;

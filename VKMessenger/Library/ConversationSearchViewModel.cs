@@ -70,7 +70,7 @@ namespace VKMessenger.Library
                 if (this.CachedConversations.ContainsKey(index))
                     this.Conversations = new ObservableCollection<SearchConversationHeader>(this.CachedConversations[index]);
                 else
-                    this.SearchConversationsOnline(index);
+                    this.SearchConversationsLocally(index);
             }
         }
 
@@ -91,7 +91,7 @@ namespace VKMessenger.Library
                 if (this.CachedMessages.ContainsKey(index))
                     this.Messages = new ObservableCollection<ConversationHeader>(this.CachedMessages[index]);
                 else
-                    this.SearchMessages(index, 0, (Action)null);
+                    this.SearchMessagesLocally(index);
             }
         }
 
@@ -103,6 +103,27 @@ namespace VKMessenger.Library
             Func<char, bool> func = (Func<char, bool>)(c => Transliteration.IsCyrillic(c));
             List<string> stringList2 = !source.Any<char>(func) ? list.Select<string, string>((Func<string, string>)(l => Transliteration.LatinToCyrillic(l))).ToList<string>() : list.Select<string, string>((Func<string, string>)(l => Transliteration.CyrillicToLatin(l))).ToList<string>();
             this.AllSearchStrings = list.Concat<string>((IEnumerable<string>)stringList2).Distinct<string>().ToList<string>();
+        }
+
+        private void SearchConversationsLocally(string query)
+        {
+            List<SearchConversationHeader> results = ConversationsViewModel.Instance.Conversations
+                .Where(header => header != null && header.Matches(this.AllSearchStrings))
+                .Select(header => header.ToSearchHeader())
+                .ToList();
+            this.CachedConversations[query] = results;
+            this.Conversations = new ObservableCollection<SearchConversationHeader>(results);
+        }
+
+        private void SearchMessagesLocally(string query)
+        {
+            List<ConversationHeader> results = ConversationsViewModel.Instance.Conversations
+                .Where(header => header != null && !string.IsNullOrEmpty(header.UIBody) && header.Matches(this.AllSearchStrings))
+                .ToList();
+            this.CachedMessages[query] = results;
+            this.Messages = new ObservableCollection<ConversationHeader>(results);
+            this._availableMessages = results.Count;
+            this._loadedMessages = results.Count;
         }
 
         private void SearchConversationsOnline(string query)

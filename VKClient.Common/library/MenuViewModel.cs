@@ -2,6 +2,7 @@ using System;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Windows;
+using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 using VKClient.Common.Library.Events;
 
@@ -53,7 +54,8 @@ namespace VKClient.Common.Library
         {
             get
             {
-                return AppGlobalStateManager.Current.GlobalState.LoggedInUser.photo_max;
+                User user = AppGlobalStateManager.Current.GlobalState.LoggedInUser;
+                return user != null ? user.UiAvatarSmall : "";
             }
         }
 
@@ -61,7 +63,8 @@ namespace VKClient.Common.Library
         {
             get
             {
-                return AppGlobalStateManager.Current.GlobalState.LoggedInUser.Name;
+                User user = AppGlobalStateManager.Current.GlobalState.LoggedInUser;
+                return user != null ? user.Name : "";
             }
         }
 

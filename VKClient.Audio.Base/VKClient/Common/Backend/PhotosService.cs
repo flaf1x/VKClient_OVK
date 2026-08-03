@@ -14,6 +14,16 @@ namespace VKClient.Common.Backend
   public class PhotosService
   {
     private static PhotosService _current;
+    private readonly Dictionary<long, string> _profileAlbumIds = new Dictionary<long, string>();
+    private static readonly HashSet<string> _profileAlbumTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+      "Profile photos", "Фотографии со страницы", "Фотографії зі сторінки",
+      "Foto Profil", "Fotos de perfil", "Profilaj fotoj", "Profilfotos",
+      "Profilio nuotraukos", "Zdjęcia ze strony", "Fotografii so stranicy",
+      "Парақшамдағы суреттер", "Paraqcamdağı süwretter", "Պրոֆիլի ալբոմներ",
+      "Картинки из досье", "Фотографіи с паспорта", "个人资料照片",
+      "Lietotāja lapas attēli", "Ӵош туспуктэм бам"
+    };
 
     public static PhotosService Current
     {
@@ -30,17 +40,25 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["owner_id"] = isGroup ? (-userOrGroupId).ToString() : userOrGroupId.ToString();
       parameters["album_ids"] = album_id.ToString();
+      parameters["need_covers"] = "1";
+      parameters["photo_sizes"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<VKList<Album>>("photos.getAlbums", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
     public void GetUsersAlbums(long userOrGroupid, bool isGroup, int offset, int count, Action<BackendResult<AlbumsData, ResultCode>> callback, bool needGroupSystemAlbums = true)
     {
+      // Generic execute is optional in OpenVK and is absent on VepurOVK.
+      // Compose the same screen from public methods so every instance can
+      // load albums and the five system photo previews.
+      this.GetUsersAlbumsWithoutExecute(userOrGroupid, isGroup, offset, count, callback, needGroupSystemAlbums);
+      return;
+      /*
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       string str;
       if (!isGroup)
-        str = string.Format("var allPhotos= API.photos.getAll({{extended:\"1\", owner_id:\"{0}\", count:\"3\", offset:\"0\"}});\r\nvar profilePhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"profile\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\"}});\r\nvar userPhotos = API.photos.getUserPhotos({{extended:\"1\", user_id:\"{0}\", count:\"3\", offset:\"0\", sort:\"0\"}});\r\nvar wallPhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"wall\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\"}});\r\nvar savedPhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"saved\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\"}});\r\nvar albumPhotos = API.photos.getAlbums({{need_covers:\"1\", offset:\"{1}\", count:\"{2}\", owner_id:\"{0}\"}}); \r\n\r\nvar full_gen = API.users.get({{\"user_ids\":\"{0}\", \"name_case\":\"gen\"}})[0];\r\n\r\nvar full_ins = API.users.get({{\"user_ids\":\"{0}\", \"name_case\":\"ins\"}})[0];\r\n\r\nvar owners = albumPhotos.items@.owner_id;\r\nvar thumbIds = albumPhotos.items@.thumb_id;\r\n\r\nvar ownersPlusThumbs = [];\r\nvar i=albumPhotos.items.length-1;\r\n\r\nwhile(i != -1)\r\n{{\r\n  var s = owners[i] + \"_\" + thumbIds[i];\r\n  ownersPlusThumbs.push(s);\r\n  i = i -1;\r\n}};\r\n\r\nvar p = [];\r\nif (albumPhotos.items.length >0)\r\n{{\r\n  p= API.photos.getById({{photos:ownersPlusThumbs}});\r\n}};\r\n\r\nreturn {{\"AllPhotos\":allPhotos, \"ProfilePhotos\":profilePhotos, \"UserPhotos\":userPhotos, \r\n\"WallPhotos\":wallPhotos, \"SavedPhotos\":savedPhotos, \"Albums\":albumPhotos, \"covers\":p,\r\n\"userGen\":full_gen, \"userIns\":full_ins}};", userOrGroupid, offset, count);
+        str = string.Format("var allPhotos= API.photos.getAll({{extended:\"1\", photo_sizes:\"1\", owner_id:\"{0}\", count:\"3\", offset:\"0\"}});\r\nvar profilePhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"profile\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\", photo_sizes:\"1\"}});\r\nvar userPhotos = API.photos.getUserPhotos({{extended:\"1\", user_id:\"{0}\", count:\"3\", offset:\"0\", sort:\"0\", photo_sizes:\"1\"}});\r\nvar wallPhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"wall\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\", photo_sizes:\"1\"}});\r\nvar savedPhotos = API.photos.get({{owner_id:\"{0}\", album_id:\"saved\", offset:\"0\", count:\"3\", extended:\"1\", rev:\"1\", photo_sizes:\"1\"}});\r\nvar albumPhotos = API.photos.getAlbums({{need_covers:\"1\", photo_sizes:\"1\", offset:\"{1}\", count:\"{2}\", owner_id:\"{0}\"}}); \r\n\r\nvar full_gen = API.users.get({{\"user_ids\":\"{0}\", \"name_case\":\"gen\"}})[0];\r\n\r\nvar full_ins = API.users.get({{\"user_ids\":\"{0}\", \"name_case\":\"ins\"}})[0];\r\n\r\nreturn {{\"AllPhotos\":allPhotos, \"ProfilePhotos\":profilePhotos, \"UserPhotos\":userPhotos, \r\n\"WallPhotos\":wallPhotos, \"SavedPhotos\":savedPhotos, \"Albums\":albumPhotos, \"covers\":[],\r\n\"userGen\":full_gen, \"userIns\":full_ins}};", userOrGroupid, offset, count);
       else
-        str = string.Format("var allPhotos= API.photos.getAll({{extended:\"1\", owner_id:\"{0}\", count:\"3\", offset:\"0\"}});\r\nvar albumPhotos = API.photos.getAlbums({{need_covers:\"1\", offset:\"{2}\", count:\"{3}\", gid:\"{1}\", need_system:\"{4}\"}}); \r\n\r\nvar owners = albumPhotos.items@.owner_id;\r\nvar thumbIds = albumPhotos.items@.thumb_id;\r\n\r\nvar ownersPlusThumbs = [];\r\nvar i=albumPhotos.items.length-1;\r\n\r\nwhile(i != -1)\r\n{{\r\n  var s = owners[i] + \"_\" + thumbIds[i];\r\n  ownersPlusThumbs.push(s);\r\n  i = i -1;\r\n}};\r\n\r\nvar p = [];\r\nif (albumPhotos.items.length >0)\r\n{{\r\n  p= API.photos.getById({{photos:ownersPlusThumbs}});\r\n}};\r\n\r\nreturn {{\"AllPhotos\":allPhotos,  \"Albums\":albumPhotos, \"covers\":p }};", -userOrGroupid, userOrGroupid, offset, count, (needGroupSystemAlbums ? "1" : "0"));
+        str = string.Format("var allPhotos= API.photos.getAll({{extended:\"1\", photo_sizes:\"1\", owner_id:\"{0}\", count:\"3\", offset:\"0\"}});\r\nvar albumPhotos = API.photos.getAlbums({{need_covers:\"1\", photo_sizes:\"1\", offset:\"{2}\", count:\"{3}\", owner_id:\"{0}\", need_system:\"{4}\"}}); \r\n\r\nreturn {{\"AllPhotos\":allPhotos,  \"Albums\":albumPhotos, \"covers\":[] }};", -userOrGroupid, userOrGroupid, offset, count, (needGroupSystemAlbums ? "1" : "0"));
       parameters["code"] = str;
       VKRequestsDispatcher.DispatchRequestToVK<AlbumsData>("execute", parameters, callback, (Func<string, AlbumsData>) (jsonStr =>
       {
@@ -63,6 +81,76 @@ namespace VKClient.Common.Backend
         }
         return response;
       }), false, true, new CancellationToken?(),  null);
+      */
+    }
+
+    private void GetUsersAlbumsWithoutExecute(long userOrGroupId, bool isGroup, int offset, int count,
+      Action<BackendResult<AlbumsData, ResultCode>> callback, bool needGroupSystemAlbums)
+    {
+      AlbumsData data = new AlbumsData();
+      object sync = new object();
+      // OpenVK exposes real albums and photos.getAll, but some instances do
+      // not implement VK's synthetic profile/wall/saved/user-photo albums.
+      // Loading those six endpoints made the whole page wait on HTTP 400s.
+      int remaining = isGroup ? 2 : 3;
+      Action completed = () =>
+      {
+        bool invoke = false;
+        lock (sync)
+        {
+          remaining--;
+          invoke = remaining == 0;
+        }
+        if (invoke)
+          callback(new BackendResult<AlbumsData, ResultCode>(ResultCode.Succeeded, data));
+      };
+      string ownerId = (isGroup ? -userOrGroupId : userOrGroupId).ToString();
+
+      this.LoadPhotoList("photos.getAll", ownerId, null, offset == 0 ? 0 : offset, offset == 0 ? 3 : 0,
+        result => { if (offset == 0 && result != null) data.AllPhotos = result; completed(); });
+      this.LoadAlbumList(ownerId, offset, count, needGroupSystemAlbums,
+        result => { if (result != null) data.Albums = result; completed(); });
+
+      if (isGroup)
+        return;
+      VKRequestsDispatcher.DispatchRequestToVK<List<User>>("users.get",
+        new Dictionary<string, string>() { { "user_ids", userOrGroupId.ToString() } },
+        result =>
+        {
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null && result.ResultData.Count > 0)
+            data.userGen = data.userIns = result.ResultData[0];
+          completed();
+        }, null, false, true, new CancellationToken?(), null);
+    }
+
+    private void LoadPhotoList(string method, string ownerId, string albumId, int offset, int count,
+      Action<VKList<Photo>> callback)
+    {
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      {
+        { method == "photos.getUserPhotos" ? "user_id" : "owner_id", ownerId },
+        { "offset", offset.ToString() },
+        { "count", count.ToString() },
+        { "extended", "1" },
+        { "photo_sizes", "1" }
+      };
+      if (!string.IsNullOrEmpty(albumId))
+        parameters["album_id"] = albumId;
+      VKRequestsDispatcher.DispatchRequestToVK<VKList<Photo>>(method, parameters,
+        result => callback(result.ResultCode == ResultCode.Succeeded ? result.ResultData : null),
+        null, false, true, new CancellationToken?(), null);
+    }
+
+    private void LoadAlbumList(string ownerId, int offset, int count, bool needSystem,
+      Action<VKList<Album>> callback)
+    {
+      VKRequestsDispatcher.DispatchRequestToVK<VKList<Album>>("photos.getAlbums",
+        new Dictionary<string, string>()
+        {
+          { "owner_id", ownerId }, { "offset", offset.ToString() }, { "count", count.ToString() },
+          { "need_covers", "1" }, { "photo_sizes", "1" }, { "need_system", needSystem ? "1" : "0" }
+        }, result => callback(result.ResultCode == ResultCode.Succeeded ? result.ResultData : null),
+        null, false, true, new CancellationToken?(), null);
     }
 
     private void UpdateThumbSrc(List<Album> albums, List<Photo> covers)
@@ -103,12 +191,41 @@ namespace VKClient.Common.Backend
 
     public void GetProfilePhotos(long userId, int offset, int count, Action<BackendResult<PhotosListWithCount, ResultCode>> callback)
     {
-      this.GetAlbumPhotosImpl(userId, false, "profile", offset, count, callback);
+      string cachedAlbumId;
+      if (this._profileAlbumIds.TryGetValue(userId, out cachedAlbumId))
+      {
+        this.GetAlbumPhotosImpl(userId, false, cachedAlbumId, offset, count, callback);
+        return;
+      }
+
+      // OpenVK stores avatars in a real special_type=16 album. The API does
+      // not expose special_type itself, but does return its official localized
+      // title and numeric id when need_system is enabled.
+      this.LoadAlbumList(userId.ToString(), 0, 100, true, albums =>
+      {
+        Album profileAlbum = albums == null || albums.items == null
+          ? null
+          : albums.items.FirstOrDefault(album => album != null &&
+              !string.IsNullOrWhiteSpace(album.id) &&
+              _profileAlbumTitles.Contains((album.title ?? string.Empty).Trim()));
+        if (profileAlbum != null)
+        {
+          this._profileAlbumIds[userId] = profileAlbum.id;
+          this.GetAlbumPhotosImpl(userId, false, profileAlbum.id, offset, count, callback);
+          return;
+        }
+
+        // Newer instances also understand the VK-compatible synthetic name.
+        // Crucially, failure is no longer replaced with photos.getAll.
+        this.GetAlbumPhotosImpl(userId, false, "profile", offset, count, callback);
+      });
     }
 
     public Task<BackendResult<PhotosListWithCount, ResultCode>> GetProfilePhotos(long userId, int offset, int count)
     {
-      return this.GetAlbumPhotosImpl(userId, false, "profile", offset, count);
+      TaskCompletionSource<BackendResult<PhotosListWithCount, ResultCode>> tcs = new TaskCompletionSource<BackendResult<PhotosListWithCount, ResultCode>>();
+      this.GetProfilePhotos(userId, offset, count, res => tcs.TrySetResult(res));
+      return tcs.Task;
     }
 
     public void GetAlbumPhotos(long userOrGroupId, bool isGroup, string albumId, int offset, int count, Action<BackendResult<PhotosListWithCount, ResultCode>> callback)
@@ -132,26 +249,8 @@ namespace VKClient.Common.Backend
       parameters["count"] = count.ToString();
       parameters["extended"] = 1.ToString();
       parameters["rev"] = 1.ToString();
-      long result;
-      if (long.TryParse(albumId, out result))
-        VKRequestsDispatcher.Execute<PhotosListWithCount>(string.Format("var photos = API.photos.get({{\"owner_id\":{0}, \"album_id\":{1}, \"offset\":{2}, \"count\":{3}, \"extended\":1, \"rev\":1}});\r\n                      var albums  = API.photos.getAlbums({{\"owner_id\":{0}, \"album_ids\":{1}}});\r\n                      var thumbId = albums.items@.thumb_id[0];\r\n                      var ownerPlusThumb = {0} + \"_\" + thumbId;\r\n                      var p= API.photos.getById({{\"photos\":ownerPlusThumb}});\r\n                      return {{\"Album\": albums.items[0], \"Photos\":photos, \"Thumb\": p[0]}};", parameters["owner_id"], result, offset, count), callback, (Func<string, PhotosListWithCount>) (jsonStr =>
-        {
-          PhotosService.AlbumAndPhotosData response = JsonConvert.DeserializeObject<GenericRoot<PhotosService.AlbumAndPhotosData>>(jsonStr).response;
-          PhotosListWithCount photosListWithCount = new PhotosListWithCount()
-          {
-            album = response.Album,
-            photosCount = response.Photos.count,
-            response = response.Photos.items
-          };
-          if (photosListWithCount.album != null && response.Thumb != null)
-            this.UpdateThumbSrc(new List<Album>()
-            {
-              photosListWithCount.album
-            }, new List<Photo>() { response.Thumb });
-          return photosListWithCount;
-        }), false, true, new CancellationToken?());
-      else
-        VKRequestsDispatcher.DispatchRequestToVK<PhotosListWithCount>("photos.get", parameters, callback, (Func<string, PhotosListWithCount>) (jsonStr =>
+      parameters["photo_sizes"] = "1";
+      VKRequestsDispatcher.DispatchRequestToVK<PhotosListWithCount>("photos.get", parameters, callback, (Func<string, PhotosListWithCount>) (jsonStr =>
         {
           VKList<Photo> response = JsonConvert.DeserializeObject<GenericRoot<VKList<Photo>>>(jsonStr).response;
           return new PhotosListWithCount()
@@ -171,6 +270,7 @@ namespace VKClient.Common.Backend
       parameters["count"] = count.ToString();
       parameters["extended"] = 1.ToString();
       parameters["sort"] = 0.ToString();
+      parameters["photo_sizes"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<PhotosListWithCount>(methodName, parameters, callback, (Func<string, PhotosListWithCount>) (jsonStr =>
       {
         VKList<Photo> response = JsonConvert.DeserializeObject<GenericRoot<VKList<Photo>>>(jsonStr).response;
@@ -232,8 +332,9 @@ namespace VKClient.Common.Backend
           string uploadUrl = getUplResp.ResultData.upload_url;
           MemoryStream ms = new MemoryStream(photoData);
           MemoryStream memoryStream = ms;
-          string paramName = "file1";
-          string uploadContentType = "image";
+          // OpenVK's multi-file endpoint names the slots photo1..photo5.
+          string paramName = "photo1";
+          string uploadContentType = "image/jpeg";
           Action<JsonResponseData> resultCallback = (Action<JsonResponseData>) (jsonResult =>
           {
             ms.Close();
@@ -244,7 +345,9 @@ namespace VKClient.Common.Backend
             else
             {
               UploadPhotoResponseData uploadData = JsonConvert.DeserializeObject<UploadPhotoResponseData>(jsonResult.JsonString);
-              this.SavePhoto(uploadData.aid, optionalGroupId, uploadData, callback);
+              // OpenVK's multipart response contains photos_list/hash but no
+              // legacy "aid" field. Preserve the album selected by the user.
+              this.SavePhoto(aid, optionalGroupId, uploadData, callback);
             }
           });
           string fileName = "MyImage.jpg";
@@ -262,7 +365,7 @@ namespace VKClient.Common.Backend
         if (getUplResp.ResultCode != ResultCode.Succeeded)
           callback(new BackendResult<Photo, ResultCode>(getUplResp.ResultCode));
         else
-          JsonWebRequest.Upload(getUplResp.ResultData.upload_url, (Stream) new MemoryStream(photoData), "file1", "image", (Action<JsonResponseData>) (jsonResult =>
+          JsonWebRequest.Upload(getUplResp.ResultData.upload_url, (Stream) new MemoryStream(photoData), "photo", "image/jpeg", (Action<JsonResponseData>) (jsonResult =>
           {
             if (!jsonResult.IsSucceeded)
               callback(new BackendResult<Photo, ResultCode>(ResultCode.UnknownError));
@@ -275,11 +378,10 @@ namespace VKClient.Common.Backend
     private void GetPhotoUploadServerWall(long userOrGroupId, bool isGroup, Action<BackendResult<UploadServerAddress, ResultCode>> callback)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      if (userOrGroupId != 0L)
-      {
-        string index = isGroup ? "group_id" : "user_id";
-        parameters[index] = userOrGroupId.ToString();
-      }
+      // OpenVK accepts only group_id here. Omitting it selects the current
+      // user's wall; the legacy user_id argument invalidates the request.
+      if (userOrGroupId != 0L && isGroup)
+        parameters["group_id"] = userOrGroupId.ToString();
       VKRequestsDispatcher.DispatchRequestToVK<UploadServerAddress>("photos.getWallUploadServer", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -287,8 +389,7 @@ namespace VKClient.Common.Backend
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["album_id"] = aid;
-      if (optionalGroupId != 0L)
-        parameters["group_id"] = optionalGroupId.ToString();
+      // OpenVK resolves album permissions from album_id.
       VKRequestsDispatcher.DispatchRequestToVK<UploadServerAddress>("photos.getUploadServer", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -299,8 +400,6 @@ namespace VKClient.Common.Backend
       dictionary["photos_list"] = uploadData.photos_list;
       dictionary["hash"] = uploadData.hash;
       dictionary["album_id"] = aid;
-      if (optionalGroupId != 0L)
-        dictionary["group_id"] = optionalGroupId.ToString();
       string methodName = "photos.save";
       Dictionary<string, string> parameters = dictionary;
       Action<BackendResult<Photo, ResultCode>> callback1 = callback;
@@ -318,11 +417,8 @@ namespace VKClient.Common.Backend
       dictionary["server"] = uploadData.server;
       dictionary["photo"] = uploadData.photo;
       dictionary["hash"] = uploadData.hash;
-      if (userOrGroupId != 0L)
-      {
-        string index = isGroup ? "group_id" : "user_id";
-        dictionary[index] = userOrGroupId.ToString();
-      }
+      if (userOrGroupId != 0L && isGroup)
+        dictionary["group_id"] = userOrGroupId.ToString();
       string methodName = "photos.saveWallPhoto";
       Dictionary<string, string> parameters = dictionary;
       Action<BackendResult<Photo, ResultCode>> callback1 = callback;
@@ -512,6 +608,7 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["photos"] = ids.GetCommaSeparated(",");
       parameters["extended"] = "1";
+      parameters["photo_sizes"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<List<Photo>>("photos.getById", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -520,6 +617,7 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["photos"] = ownerPlusPhotoId;
       parameters["extended"] = "1";
+      parameters["photo_sizes"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<List<Photo>>("photos.getById", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -531,6 +629,7 @@ namespace VKClient.Common.Backend
       if (!pids.IsNullOrEmpty())
         parameters["photo_ids"] = pids.GetCommaSeparated();
       parameters["extended"] = "1";
+      parameters["photo_sizes"] = "1";
       if (feed != 0L)
         parameters["feed"] = feed.ToString();
       if (!string.IsNullOrEmpty(feedType))

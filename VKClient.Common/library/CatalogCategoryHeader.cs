@@ -64,7 +64,7 @@ namespace VKClient.Common.Library
     private string GetGroupAvatar(int ind)
     {
       if (this._gccp.page_previews.Count > ind)
-        return this._gccp.page_previews[ind].photo_200;
+        return this._gccp.page_previews[ind].UiAvatarMedium;
       return "";
     }
   }

@@ -48,9 +48,7 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["question"] = question;
       parameters["is_anonymous"] = isAnonymous ? "1" : "0";
-      if (ownerId != 0L)
-        parameters["owner_id"] = ownerId.ToString();
-      parameters["add_answers"] = "[" + answers.Select<string, string>((Func<string, string>) (a => "\"" + a + "\"")).ToList<string>().GetCommaSeparated(",") + "]";
+      parameters["add_answers"] = JsonConvert.SerializeObject(answers);
       VKRequestsDispatcher.DispatchRequestToVK<Poll>("polls.create", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 

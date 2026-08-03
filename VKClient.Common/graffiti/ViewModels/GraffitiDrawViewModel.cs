@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using VKClient.Audio.Base.DataObjects;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -94,7 +95,7 @@ namespace VKClient.Common.Graffiti.ViewModels
                 {
                     if (this._user == null)
                         return;
-                    this.ConversationAvatarVM.Initialize(this._user.photo_max, false, new List<long>(), new List<User>());
+                    this.ConversationAvatarVM.Initialize(this._user.UiAvatarLarge, false, new List<long>(), new List<User>());
                 }));
         }
     }

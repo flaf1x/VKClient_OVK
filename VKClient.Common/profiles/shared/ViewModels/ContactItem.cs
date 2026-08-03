@@ -31,7 +31,7 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
       if (string.IsNullOrEmpty(str))
         str = contact.desc;
       this.Data = str;
-      this.GroupImage = user.photo_max;
+      this.GroupImage = user.UiAvatarSmall;
       if (user.id > 0L)
         this.NavigationAction = (Action) (() => Navigator.Current.NavigateToUserProfile(user.id, user.Name, "", false));
       if (!string.IsNullOrEmpty(this.GroupImage))

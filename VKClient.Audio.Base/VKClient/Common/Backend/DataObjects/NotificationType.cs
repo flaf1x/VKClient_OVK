@@ -32,5 +32,10 @@ namespace VKClient.Common.Backend.DataObjects
     money_transfer_received,
     money_transfer_accepted,
     money_transfer_declined,
+    sent_gift,
+    voices_transfer,
+    up_rating,
+    make_you_admin,
+    new_posts_in_club,
   }
 }

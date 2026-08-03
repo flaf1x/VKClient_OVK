@@ -647,13 +647,13 @@ label_56:
       {
         Group group = this._knownGroups.FirstOrDefault<Group>((Func<Group, bool>) (g => g.id == -owner_id));
         if (group != null)
-          return group.photo_200;
+          return group.UiAvatarMedium;
       }
       else
       {
         User user = this._knownUsers.FirstOrDefault<User>((Func<User, bool>) (u => u.id == owner_id));
         if (user != null)
-          return user.photo_max;
+          return user.UiAvatarMedium;
       }
       return "";
     }

@@ -72,6 +72,31 @@
         </controls:Pivot>
         
         <commonUC:PullToRefreshUC x:Name="ucPullToRefresh"/>
+
+        <Border x:Name="downloadProgressPanel"
+                Tap="DownloadProgressPanel_OnTap"
+                Visibility="Collapsed"
+                VerticalAlignment="Bottom"
+                Margin="12,0,12,72"
+                Padding="12,8"
+                Background="{StaticResource PhoneChromeBrush}"
+                BorderBrush="{StaticResource PhoneAccentBrush}"
+                BorderThickness="1">
+            <StackPanel>
+                <TextBlock x:Name="downloadProgressText"
+                           FontSize="20"
+                           TextWrapping="NoWrap" />
+                <TextBlock Text="{Binding LocalizedResources.AudioDownloads_Cancel, Source={StaticResource LocalizedStrings}}"
+                           FontSize="18"
+                           Foreground="{StaticResource PhoneAccentBrush}"
+                           HorizontalAlignment="Right" />
+                <ProgressBar x:Name="downloadProgressBar"
+                             Height="12"
+                             Margin="-12,2,-12,-4"
+                             Minimum="0"
+                             Maximum="1" />
+            </StackPanel>
+        </Border>
     </Grid>
 
 </framework:PageBase>

@@ -50,6 +50,7 @@ namespace VKClient.Photos
     private long _pid;
     private bool _friendsOnly;
     private bool _fromDialog;
+    private bool _isDirectPhotoLink;
     private ApplicationBar _appBar;
     private ApplicationBarIconButton _appBarButtonAttachments;
     private ApplicationBarIconButton _appBarButtonComment;
@@ -205,44 +206,8 @@ namespace VKClient.Photos
             this._appBarButtonSave_Click(this, null);
         };
         list.Add(menuItem);
-        MenuItem menuItem2 = new MenuItem
-        {
-            Header = CommonResources.AppBarMenu_SaveInAlbum
-        };
-        menuItem2.Click += delegate(object s, RoutedEventArgs e)
-        {
-            this.SavePhotoToAlbum();
-        };
-        list.Add(menuItem2);
-        if (this.PhotoVM.PhotoWithInfo != null && this.PhotoVM.PhotoWithInfo.Photo != null && this.PhotoVM.PhotoWithInfo.Photo.album_id != -8L && this.PhotoVM.PhotoWithInfo.Photo.album_id != -12L && this.PhotoVM.PhotoWithInfo.Photo.album_id != -3L && this.PhotoVM.PhotoWithInfo.Photo.album_id != -10L && this.PhotoVM.PhotoWithInfo.Photo.album_id != -5L)
-        {
-            MenuItem menuItem3 = new MenuItem
-            {
-                Header = CommonResources.Photos_GoToAlbum
-            };
-            menuItem3.Click += delegate(object s, RoutedEventArgs e)
-            {
-                this.GoToAlbum();
-            };
-            list.Add(menuItem3);
-        }
         this.ucMoreActions.SetMenu(list);
         this.ucMoreActions.ShowMenu();
-    }
-
-
-    private void GoToAlbum()
-    {
-      if (this.PhotoVM.PhotoWithInfo == null || this.PhotoVM.PhotoWithInfo.Photo == null)
-        return;
-      Photo photo = this.PhotoVM.PhotoWithInfo.Photo;
-      AlbumType albumType = AlbumTypeHelper.GetAlbumType(photo.aid);
-      Navigator.Current.NavigateToPhotoAlbum(photo.owner_id > 0L ? photo.owner_id : -photo.owner_id, photo.owner_id < 0, albumType.ToString(), photo.aid.ToString(), "", 0, "", "", false, 0, false);
-    }
-
-    private void SavePhotoToAlbum()
-    {
-      this.PhotoVM.SaveInSavedPhotosAlbum();
     }
 
     private void AddAttachTap()
@@ -287,6 +252,7 @@ namespace VKClient.Photos
         PhotoViewModel photoViewModel;
         if (parameterForIdAndReset1 == null)
         {
+          this._isDirectPhotoLink = true;
           photoViewModel = new PhotoViewModel(this._ownerId, this._pid, accessKey);
         }
         else
@@ -297,8 +263,19 @@ namespace VKClient.Photos
         }
         this.InitializeCommentVM();
         base.DataContext = photoViewModel;
-        // ISSUE: method pointer
-        photoViewModel.LoadInfoWithComments(new Action<bool, int>( this.OnPhotoInfoLoaded));
+        if (this._isDirectPhotoLink)
+        {
+          this.ucCommentGeneric.HideCommentsSection = true;
+          ((UIElement) this.ucNewMessage).Visibility = Visibility.Collapsed;
+          this._appBar.Buttons.Remove(this._appBarButtonComment);
+          this._appBar.Buttons.Remove(this._appBarButtonEmojiToggle);
+          this._appBar.Buttons.Remove(this._appBarButtonAttachments);
+          photoViewModel.LoadInfoWithoutComments(new Action<bool, int>(this.OnPhotoInfoLoaded));
+        }
+        else
+        {
+          photoViewModel.LoadInfoWithComments(new Action<bool, int>(this.OnPhotoInfoLoaded));
+        }
         this.RestoreUnboundState();
         this._isInitialized = true;
         flag = false;
@@ -427,7 +404,6 @@ namespace VKClient.Photos
       this._appBar.Buttons.Add(this._appBarButtonLikeUnlike);
       this._appBar.MenuItems.Add(this._appBarMenuItemShare);
       this._appBar.MenuItems.Add(this._appBarMenuItemSave);
-      this._appBar.MenuItems.Add(this._appBarMenuItemReport);
       this._appBar.Opacity = 0.9;
       this._appBar.StateChanged += (new EventHandler<ApplicationBarStateChangedEventArgs>(this._appBar_StateChanged));
     }
@@ -504,7 +480,10 @@ namespace VKClient.Photos
 
     private void _appBarButtonSave_Click(object sender, EventArgs e)
     {
-      ImageHelper.SaveImage(this.image.Source as BitmapImage);
+      if (this.PhotoVM != null && !string.IsNullOrWhiteSpace(this.PhotoVM.OriginalImageSrc))
+        ImageHelper.SaveImage(this.PhotoVM.OriginalImageSrc);
+      else
+        ImageHelper.SaveImage(this.image.Source as BitmapImage);
     }
 
     private void UpdateAppBar()

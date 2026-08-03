@@ -44,6 +44,7 @@ namespace VKClient.Common.UC
     private Point _translationOrigin;
     private bool _isAnimatingHoldToRecord;
     private bool _panelInitialized;
+    private bool _emojiOnly;
     private SwipeThroughControl _stickersSlideView;
     internal MentionPickerUC mentionPicker;
     internal StackPanel panelReply;
@@ -52,6 +53,7 @@ namespace VKClient.Common.UC
     internal ReplyUserUC ucReplyUser;
     internal ScrollViewer scrollNewMessage;
     internal NewPostUC ucNewPost;
+    internal Grid gridAddAttachment;
     internal Border borderEmoji;
     internal Ellipse ellipseHasStickersUpdates;
     internal Border borderHoldToRecord;
@@ -74,6 +76,24 @@ namespace VKClient.Common.UC
 
     public bool IsChat { get; set; }
 
+    public bool EmojiOnly
+    {
+      get
+      {
+        return this._emojiOnly;
+      }
+      set
+      {
+        if (this._emojiOnly == value)
+          return;
+        this._emojiOnly = value;
+        this.UpdateHasStickersUpdatesState();
+        this.UpdateAutoSuggestVisibility();
+        if (this._panelInitialized)
+          this.ReloadStickersItems(true, false);
+      }
+    }
+
     public ScrollViewer ScrollNewMessage
     {
       get
@@ -93,6 +113,18 @@ namespace VKClient.Common.UC
     public Action OnAddAttachTap { get; set; }
 
     public Action OnSendTap { get; set; }
+
+    private bool _attachmentsAndVoiceAvailable = true;
+
+    public void SetAttachmentsAndVoiceAvailable(bool available)
+    {
+      this._attachmentsAndVoiceAvailable = available;
+      ((UIElement) this.gridAddAttachment).Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+      ((FrameworkElement) this.ucNewPost).Margin = available
+        ? new Thickness(72.0, 9.0, 128.0, 0.0)
+        : new Thickness(12.0, 9.0, 128.0, 0.0);
+      this.UpdateVoiceMessageAvailability();
+    }
 
     public TextBox TextBoxNewComment
     {
@@ -216,7 +248,9 @@ namespace VKClient.Common.UC
 
     private void UpdateVoiceMessageAvailability()
     {
-      this._canRecordVoiceMessage = AudioRecorderHelper.CanRecord && this.IsVoiceMessageButtonEnabled;
+      this._canRecordVoiceMessage = this._attachmentsAndVoiceAvailable &&
+        AudioRecorderHelper.CanRecord &&
+        this.IsVoiceMessageButtonEnabled;
       if (this._canRecordVoiceMessage)
       {
         ((UIElement) this.borderSend).Opacity = 0.0;
@@ -225,7 +259,9 @@ namespace VKClient.Common.UC
       else
       {
         ((UIElement) this.borderSend).Opacity = 1.0;
+        ((UIElement) this.borderSend).IsHitTestVisible = true;
         ((UIElement) this.borderVoice).Visibility = Visibility.Collapsed;
+        ((UIElement) this.borderVoice).IsHitTestVisible = false;
       }
     }
 
@@ -264,6 +300,11 @@ namespace VKClient.Common.UC
 
     private void UpdateAutoSuggest(bool force = false)
     {
+      if (this.EmojiOnly)
+      {
+        this.UpdateAutoSuggestVisibility();
+        return;
+      }
       string text = this.TextBoxNewComment.Text;
       if (!string.IsNullOrEmpty(this._replyAutoForm) && text.StartsWith(this._replyAutoForm))
         text = text.Substring(this._replyAutoForm.Length);
@@ -279,7 +320,7 @@ namespace VKClient.Common.UC
 
     private void UpdateAutoSuggestVisibility()
     {
-        this.ucStickersAutoSuggest.ShowHide((this.ucNewPost.IsFocused || this.panelControl.IsOpen) && (this._parentPage == null || this._parentPage.Orientation != PageOrientation.Landscape && this._parentPage.Orientation != PageOrientation.LandscapeLeft && this._parentPage.Orientation != PageOrientation.LandscapeRight) && this.ucStickersAutoSuggest.HasItemsToShow);
+        this.ucStickersAutoSuggest.ShowHide(!this.EmojiOnly && (this.ucNewPost.IsFocused || this.panelControl.IsOpen) && (this._parentPage == null || this._parentPage.Orientation != PageOrientation.Landscape && this._parentPage.Orientation != PageOrientation.LandscapeLeft && this._parentPage.Orientation != PageOrientation.LandscapeRight) && this.ucStickersAutoSuggest.HasItemsToShow);
     }
 
     private void UpdateAudioMessage()
@@ -487,6 +528,16 @@ namespace VKClient.Common.UC
     {
       if (!this._panelInitialized)
         return;
+      if (this.EmojiOnly)
+      {
+        this._stickersSlideView.Items = new ObservableCollection<object>()
+        {
+          new SpriteListItemData() { IsEmoji = true }
+        };
+        this._stickersSlideView.HeaderItems = new List<object>();
+        this._stickersSlideView.FooterItems = new List<object>();
+        return;
+      }
       StoreProduct storeProduct =  null;
       if (keepPosition)
         storeProduct = this.GetCurrentSelectedProduct();
@@ -608,7 +659,7 @@ namespace VKClient.Common.UC
 
     private void UpdateHasStickersUpdatesState()
     {
-      Execute.ExecuteOnUIThread((Action) (() => ((UIElement) this.ellipseHasStickersUpdates).Visibility = (AppGlobalStateManager.Current.GlobalState.HasStickersUpdates ? Visibility.Visible : Visibility.Collapsed)));
+      Execute.ExecuteOnUIThread((Action) (() => ((UIElement) this.ellipseHasStickersUpdates).Visibility = (!this.EmojiOnly && AppGlobalStateManager.Current.GlobalState.HasStickersUpdates ? Visibility.Visible : Visibility.Collapsed)));
     }
 
     public void Handle(StickersAutoSuggestDictionary.AutoSuggestDictionaryUpdatedEvent message)
@@ -637,13 +688,15 @@ namespace VKClient.Common.UC
 
     public void Handle(StickersSettings.StickersKeyboardOpenRequestEvent message)
     {
-      if (this._parentPage != FramePageUtils.CurrentPage)
+      if (this.EmojiOnly || this._parentPage != FramePageUtils.CurrentPage)
         return;
       new DelayedExecutor(1000).AddToDelayedExecution((Action) (() => Execute.ExecuteOnUIThread((Action) (() => this.OpenKeyboardOrPopup(message.StockItemHeader)))));
     }
 
     public void Handle(StickersSettings.StickersItemTapEvent message)
     {
+      if (this.EmojiOnly)
+        return;
       this.OpenKeyboardOrPopup(message.StockItemHeader);
     }
 
@@ -661,6 +714,7 @@ namespace VKClient.Common.UC
       this.ucReplyUser = (ReplyUserUC) base.FindName("ucReplyUser");
       this.scrollNewMessage = (ScrollViewer) base.FindName("scrollNewMessage");
       this.ucNewPost = (NewPostUC) base.FindName("ucNewPost");
+      this.gridAddAttachment = (Grid) base.FindName("gridAddAttachment");
       this.borderEmoji = (Border) base.FindName("borderEmoji");
       this.ellipseHasStickersUpdates = (Ellipse) base.FindName("ellipseHasStickersUpdates");
       this.borderHoldToRecord = (Border) base.FindName("borderHoldToRecord");

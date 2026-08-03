@@ -282,7 +282,7 @@ namespace VKClient.Common.Library
         else
         {
           this.PhotoImageClipRect = new Rect(0.0, 0.0, 10000.0, 10000.0);
-          this.PhotoImageSource = user.photo_400_orig ?? user.photo_200_orig ?? user.photo_max;
+          this.PhotoImageSource = user.UiAvatarLarge;
           this.PhotoImageWidth = 256.0;
           this.PhotoImageHeight = double.NaN;
         }

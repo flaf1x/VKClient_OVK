@@ -43,6 +43,7 @@ namespace VKClient.Common.Library
         private readonly List<Attachment> _marketAlbumAttachments;
         private readonly List<Attachment> _audioAttachments;
         private readonly List<Attachment> _docImageAttachments;
+        private readonly List<Attachment> _genericDocAttachments;
         private readonly WallPost _wallAttachment;
         private readonly Comment _commentAttachment;
         private readonly Gift _giftAttachment;
@@ -111,6 +112,7 @@ namespace VKClient.Common.Library
             this._marketAlbumAttachments = new List<Attachment>();
             this._audioAttachments = new List<Attachment>();
             this._docImageAttachments = new List<Attachment>();
+            this._genericDocAttachments = new List<Attachment>();
             if (this._attachments != null)
             {
                 foreach (Attachment attachment in this._attachments)
@@ -328,26 +330,37 @@ namespace VKClient.Common.Library
                     }
                     else if (type == "doc")
                     {
-                        if (attachment.doc.IsGraffiti)// UPDATE: 4.8.0
+                        Doc document = attachment.doc;
+                        if (document == null)
+                            continue;
+                        if (document.IsGraffiti)// UPDATE: 4.8.0
                         {
-                            this._graffitiDoc = attachment.doc;
+                            this._graffitiDoc = document;
                             continue;
                         }
-                        if (attachment.doc.IsVoiceMessage)// UPDATE: 4.12.0
+                        if (document.IsVoiceMessage)// UPDATE: 4.12.0
                         {
-                            this._voiceMessageDoc = attachment.doc;
+                            this._voiceMessageDoc = document;
                             continue;
                         }
-                        if (attachment.doc.IsVideoGif)
+                        // OpenVK returns GIF previews as preview.photo.  Only
+                        // the legacy preview.video GIFs belong in ThumbsItem;
+                        // photo-preview GIFs are rendered with document tiles.
+                        if (document.IsVideoGif)
                         {
                             this._gifAttachments.Add(attachment);
                             continue;
                         }
-                        if (new DocumentHeader(attachment.doc, 0, false).HasThumbnail)
+                        if (new DocumentHeader(document).HasThumbnail)
                         {
                             this._docImageAttachments.Add(attachment);
                             continue;
                         }
+                        // Keep every ordinary document in its own collection.
+                        // Rendering it from the source attachment list used to
+                        // make mixed sets (for example, an archive plus a GIF)
+                        // depend on preview classification side effects.
+                        this._genericDocAttachments.Add(attachment);
                         continue;
                         
                     }
@@ -542,16 +555,13 @@ namespace VKClient.Common.Library
                     this._voiceMessageDoc = attachment.doc;
                     continue;
                   }
-                  if (!attachment.doc.IsVideoGif)
+                  if (attachment.doc.IsGif)
                   {
-                    if (new DocumentHeader(attachment.doc, 0, false, 0L).HasThumbnail)
-                    {
-                      this._docImageAttachments.Add(attachment);
-                      continue;
-                    }
+                    this._gifAttachments.Add(attachment);
                     continue;
                   }
-                  this._gifAttachments.Add(attachment);
+                  if (new DocumentHeader(attachment.doc).HasThumbnail)
+                    this._docImageAttachments.Add(attachment);
                   continue;
                 }
                 continue;
@@ -844,7 +854,7 @@ namespace VKClient.Common.Library
             };
             LinkProduct linkProduct = new LinkProduct(product);
             link.product = linkProduct;
-            string str = string.Format("https://vk.com/product{0}_{1}", product.owner_id, product.id);
+            string str = string.Format("https://openvk.org/product{0}_{1}", product.owner_id, product.id);
             link.url = str;
             return this.CreateSnippetItem(link, topMargin);
         }
@@ -1033,7 +1043,7 @@ namespace VKClient.Common.Library
                 }
             }
             this._genericItemsList = new List<GenericAttachmentItem>();
-            using (IEnumerator<Attachment> enumerator2 = Enumerable.Where<Attachment>(this._attachments, (Attachment a) => (a.doc != null && !a.doc.IsGraffiti && !a.doc.IsVoiceMessage && !new DocumentHeader(a.doc, 0, false, 0L).HasThumbnail) || a.note != null || a.Page != null || (a.link != null && this._linkItem == null)).GetEnumerator())
+            using (IEnumerator<Attachment> enumerator2 = Enumerable.Where<Attachment>(this._attachments, (Attachment a) => a != null && (this._genericDocAttachments.Contains(a) || a.note != null || a.Page != null || (a.link != null && this._linkItem == null))).GetEnumerator())
             {
                 while (enumerator2.MoveNext())
                 {

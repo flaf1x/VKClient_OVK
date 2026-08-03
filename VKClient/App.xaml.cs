@@ -1,6 +1,3 @@
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Extensibility;
-using Microsoft.ApplicationInsights.Extensibility.Windows;
 using Microsoft.Phone.Controls;
 using Microsoft.Phone.Shell;
 using System;
@@ -8,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.IO.IsolatedStorage;
 using System.Threading;
 using System.Windows;
@@ -20,6 +18,7 @@ using VKClient.Audio.Base.AudioCache;
 using VKClient.Audio.Base.Core;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Library;
+using VKClient.Audio.Base.Social;
 using VKClient.Common.AudioManager;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
@@ -36,6 +35,7 @@ using VKMessenger;
 using VKMessenger.Library;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.DataTransfer.ShareTarget;
+using Windows.Storage;
 
 namespace VKClient
 {
@@ -68,46 +68,63 @@ namespace VKClient
         {
             //base.\u002Ector();
             //this.InitializeTelemetry();
+            AppendEarlyStartupMarker("01 App constructor entered");
             Logger.Instance.Info("App() check 1");
             this.UnhandledException += (new EventHandler<ApplicationUnhandledExceptionEventArgs>(this.App_UnhandledException));
+            AppendEarlyStartupMarker("02 before InitializeComponent");
             this.InitializeComponent();
+            AppendEarlyStartupMarker("03 after InitializeComponent");
+            WriteOpenVkBuildMarker();
             Logger.Instance.Info("App() check 2");
             ThemeSettings themeSettings = ThemeSettingsManager.GetThemeSettings();
+            AppendEarlyStartupMarker("04 theme settings loaded");
             Logger.Instance.Info("App() check 3");
             this.ApplyThemeBasedOnSettings(themeSettings);
+            AppendEarlyStartupMarker("05 theme applied");
             Logger.Instance.Info("App() check 4");
             this.InitializePhoneApplication();
+            AppendEarlyStartupMarker("06 phone application initialized");
             Logger.Instance.Info("App() check 5");
             this.InitializeLanguage(themeSettings);
+            AppendEarlyStartupMarker("07 language initialized");
             Logger.Instance.Info("App() check 6");
             this.InitializeServiceLocator();
+            AppendEarlyStartupMarker("08 service locator initialized");
             Logger.Instance.Info("App() check 7");
             IPageDataRequesteeInfo pageDataRequestee = PageBase.CurrentPageDataRequestee;
         }
 
-        private void InitializeTelemetry()
+        private static void AppendEarlyStartupMarker(string stage)
         {
             try
             {
-                bool Telemetry = false;
-                if (!Telemetry)
-                {
-                    TelemetryConfiguration.Active.InstrumentationKey = "0e558d17-1207-46e2-a99d-f3224bfef5ba";
-                    Telemetry = (DateTime.Now.Ticks / 10L ^ 7L) % 10L == 0L;
-                }
-                else
-                {
-                    PageViewTelemetryModule viewTelemetryModule = new PageViewTelemetryModule();
-                    viewTelemetryModule.Initialize(TelemetryConfiguration.Active);
-                    TelemetryConfiguration.Active.TelemetryModules.Add(viewTelemetryModule);
-                }
-                if (!Telemetry)
-                    TelemetryConfiguration.Active.DisableTelemetry = true;
-                TelemetryConfiguration.Active.TelemetryInitializers.Add((ITelemetryInitializer)new VKTelemetryInitializer());
-                //App.TelemetryClient = new TelemetryClient();
+                using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                using (IsolatedStorageFileStream stream = new IsolatedStorageFileStream(
+                    "StartupTrace.txt", FileMode.Append, FileAccess.Write, store))
+                using (StreamWriter writer = new StreamWriter(stream))
+                    writer.WriteLine(DateTime.UtcNow.ToString("O") + " " + stage);
             }
-            catch (Exception )
+            catch
             {
+            }
+        }
+
+        private static void WriteOpenVkBuildMarker()
+        {
+            try
+            {
+                using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                using (IsolatedStorageFileStream stream = new IsolatedStorageFileStream(
+                    "OpenVKBuild.txt",
+                    System.IO.FileMode.Create,
+                    System.IO.FileAccess.Write,
+                    store))
+                using (System.IO.StreamWriter writer = new System.IO.StreamWriter(stream))
+                    writer.Write("4.98-diagnostic");
+            }
+            catch
+            {
+                // A marker is diagnostic only and must never block startup.
             }
         }
 
@@ -175,6 +192,7 @@ namespace VKClient
 
         private void App_UnhandledException(object sender, ApplicationUnhandledExceptionEventArgs e)
         {
+            AppendEarlyStartupMarker("UNHANDLED " + (e.ExceptionObject == null ? "null" : e.ExceptionObject.ToString()));
             Logger.Instance.ErrorAndSaveToIso("UNHANDLED", e.ExceptionObject);
             e.Handled = true;
             //this.ReportException(e.ExceptionObject);
@@ -182,22 +200,33 @@ namespace VKClient
 
         private void Application_Launching(object sender, LaunchingEventArgs e)
         {
+            AppendEarlyStartupMarker("09 launching entered");
             this.RemoveCurrentDeactivationSettings();
+            AppendEarlyStartupMarker("10 deactivation settings removed");
             Logger.Instance.Info("App.Application_Launching check 1");
             this.PerformInitialization();
+            AppendEarlyStartupMarker("11 PerformInitialization completed");
             Logger.Instance.Info("App.Application_Launching check 2");
             this.RestoreState(true);
+            AppendEarlyStartupMarker("12 RestoreState completed");
             Logger.Instance.Info("App.Application_Launching check 3");
             PushNotificationsManager.Instance.Initialize();
+            AppendEarlyStartupMarker("13 push initialized");
             Logger.Instance.Info("App.Application_Launching check 5");
             PlaylistManager.Initialize();
+            AppendEarlyStartupMarker("14 playlist initialized");
             Logger.Instance.Info("App.Application_Launching check 6");
             //AudioCacheManager.Instance.ClearCache(null);
             //Logger.Instance.Info("App.Application_Launching check 7");
             BaseDataManager.Instance.NeedRefreshBaseData = true;
             App._uriMapper.NeedHandleActivation = true;
+            AppendEarlyStartupMarker("15 base state initialized");
             ContactsManager.Instance.EnsureInSyncAsync(false);
+            AppendEarlyStartupMarker("16 contacts ensure sync requested");
+            this.RefreshPeopleHub();
+            AppendEarlyStartupMarker("17 people hub refresh requested");
             ContactsSyncManager.Instance.Sync(null);
+            AppendEarlyStartupMarker("18 contacts sync requested");
             ShareLaunchingEventArgs launchingEventArgs = e as ShareLaunchingEventArgs;
             if (launchingEventArgs == null)
                 return;
@@ -207,20 +236,34 @@ namespace VKClient
         private void PerformInitialization()
         {
             MemoryInfo.Initialize();
+            AppendEarlyStartupMarker("PI 01 memory");
             Navigator.Current = (INavigator)new NavigatorImpl();
+            AppendEarlyStartupMarker("PI 02 navigator");
             Func<IPageDataRequesteeInfo> arg_2E_0 = new Func<IPageDataRequesteeInfo>(() => { return PageBase.CurrentPageDataRequestee; });
 
-            JsonWebRequest.GetCurrentPageDataRequestee = arg_2E_0; BirthdaysNotificationManager.Instance.Initialize();
+            JsonWebRequest.GetCurrentPageDataRequestee = arg_2E_0;
+            AppendEarlyStartupMarker("PI 03 json web request");
+            BirthdaysNotificationManager.Instance.Initialize();
+            AppendEarlyStartupMarker("PI 04 birthdays");
             TileManager.Instance.Initialize();
+            AppendEarlyStartupMarker("PI 05 tile manager");
             TileScheduledUpdate.Instance.Initialize();
+            AppendEarlyStartupMarker("PI 06 tile scheduled update");
             TileManager.Instance.ResetContent();
+            AppendEarlyStartupMarker("PI 07 tile reset");
             MessengerStateManagerInstance.Current = (IMessengerStateManager)new MessengerStateManager();
+            AppendEarlyStartupMarker("PI 08 messenger state");
             SubscriptionFromPostManager.Instance.Restore();
+            AppendEarlyStartupMarker("PI 09 subscriptions");
             MessengerStateManagerInstance.Current.AppStartedTime = DateTime.Now;
             AudioEventTranslator.Initialize();
+            AppendEarlyStartupMarker("PI 10 audio translator");
             IsolatedStorageSettings.ApplicationSettings["ScaleFactor"] = Application.Current.Host.Content.ScaleFactor;
+            AppendEarlyStartupMarker("PI 11 scale factor");
             BGAudioPlayerWrapper.InitializeInstance();
+            AppendEarlyStartupMarker("PI 12 background audio");
             InstalledPackagesFinder.Instance.Initialize();
+            AppendEarlyStartupMarker("PI 13 installed packages");
         }
 
         private void Application_Activated(object sender, ActivatedEventArgs e)
@@ -247,6 +290,7 @@ namespace VKClient
             PlaylistManager.Initialize();
             Logger.Instance.Info("App.Application_Activated check 5");
             ContactsManager.Instance.EnsureInSyncAsync(false);
+            this.RefreshPeopleHub();
             BaseDataManager.Instance.NeedRefreshBaseData = true;
             App._uriMapper.NeedHandleActivation = true;
         }
@@ -327,8 +371,21 @@ namespace VKClient
             this.phoneApplicationInitialized = true;
         }
 
-        private void Application_ContractActivated(object sender, IActivatedEventArgs e)
+        private async void Application_ContractActivated(object sender, IActivatedEventArgs e)
         {
+            FileSavePickerContinuationEventArgs saveArgs = e as FileSavePickerContinuationEventArgs;
+            if (saveArgs != null)
+            {
+                object operation;
+                if (saveArgs.File != null &&
+                    saveArgs.ContinuationData.TryGetValue("Operation", out operation) &&
+                    operation as string == "SaveDiagnosticsLog")
+                {
+                    await FileIO.WriteTextAsync(saveArgs.File, Logger.Instance.GetLog());
+                }
+                return;
+            }
+
             FileOpenPickerContinuationEventArgs continuationEventArgs = e as FileOpenPickerContinuationEventArgs;
             if (continuationEventArgs == null)
                 return;
@@ -537,11 +594,20 @@ namespace VKClient
                 ConversationsViewModel.Instance = new ConversationsViewModel();
                 ConversationsPage.ConversationsUCInstance = null;
                 ContactsManager.Instance.EnsureInSyncAsync(false);
+                this.RefreshPeopleHub();
                 if (navigate)
                 {
                     Navigator.Current.NavigateToMainPage();
                 }
             });
+        }
+
+        private async void RefreshPeopleHub()
+        {
+            if (AppGlobalStateManager.Current.LoggedInUserId == 0L)
+                return;
+            await ContactsManager.Instance.EnsurePeopleHubProvisionedAsync();
+            await SocialDataManager.Instance.ProcessSocialOperationsQueue();
         }
 
         private void ButtonTryAgain_OnTap(object sender, System.Windows.Input.GestureEventArgs e)

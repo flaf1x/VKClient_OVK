@@ -45,7 +45,7 @@ namespace VKClient.Groups.Management.Library
     {
       get
       {
-        return this._manager.photo_max;
+        return this._manager.UiAvatarSmall;
       }
     }
 

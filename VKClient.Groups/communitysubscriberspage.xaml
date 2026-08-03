@@ -72,39 +72,6 @@
                                                     IsFlatList="True"/>
             </controls:PivotItem>
             
-            <controls:PivotItem x:Name="PivotItemUnsure">
-                <controls:PivotItem.Header>
-                    <TextBlock Text="{Binding LocalizedResources.Unsure, Source={StaticResource LocalizedStrings}, Converter={StaticResource StringToLowerConverter}}"
-                               FontFamily="Segoe WP SemiLight"
-                               FontSize="46"/>
-                </controls:PivotItem.Header>
-                <framework:ExtendedLongListSelector x:Name="UnsureList"
-                                                    DataContext="{Binding Unsure}"
-                                                    ItemsSource="{Binding Collection}"
-                                                    ItemTemplate="{StaticResource ItemTemplate}"
-                                                    ListFooterTemplate="{StaticResource FooterTemplate}"
-                                                    SelectionChanged="List_OnSelectionChanged"
-                                                    ListFooter="{Binding}"
-                                                    Link="List_OnLinked"
-                                                    IsFlatList="True"/>
-            </controls:PivotItem>
-            
-            <controls:PivotItem x:Name="PivotItemFriends">
-                <controls:PivotItem.Header>
-                    <TextBlock Text="{Binding LocalizedResources.Pivot_Friends, Source={StaticResource LocalizedStrings}}"
-                               FontFamily="Segoe WP SemiLight"
-                               FontSize="46"/>
-                </controls:PivotItem.Header>
-                <framework:ExtendedLongListSelector x:Name="FriendsList"
-                                                    DataContext="{Binding Friends}"
-                                                    ItemsSource="{Binding Collection}"
-                                                    ItemTemplate="{StaticResource ItemTemplate}"
-                                                    ListFooterTemplate="{StaticResource FooterTemplate}"
-                                                    SelectionChanged="List_OnSelectionChanged"
-                                                    ListFooter="{Binding}"
-                                                    Link="List_OnLinked"
-                                                    IsFlatList="True"/>
-            </controls:PivotItem>
         </controls:Pivot>
 
         <uc:PullToRefreshUC x:Name="PullToRefresh"/>

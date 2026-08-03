@@ -59,19 +59,6 @@
                                                    Margin="128,64,16,0"/>
                 </Grid>
 
-                <Grid Background="{StaticResource PhoneNewsBackgroundBrush}"
-                      Margin="0,0,0,16"
-                      Height="63">
-                    <Grid Background="Transparent"
-                          Tap="EditProfile_OnClicked"
-                          framework:MetroInMotion.Tilt="2.5">
-                        <TextBlock FontSize="25.333"
-                                   Foreground="{StaticResource PhoneListItemAccentForegroundBrush}"
-                                   Text="{Binding LocalizedResources.EditProfile, Source={StaticResource LocalizedStrings}}"
-                                   Margin="16,13,0,0"/>
-                    </Grid>
-                </Grid>
-
                 <StackPanel Background="{StaticResource PhoneNewsBackgroundBrush}"
                             Margin="0,0,0,16">
                     
@@ -88,12 +75,6 @@
                     <uc:SettingsSectionUC Icon="../Resources/MainMenu/Settings32px.png" 
                                           Title="{Binding Path=LocalizedResources.NewSettings_General, Source={StaticResource LocalizedStrings}}"
                                           Tap="General_OnClicked"/>
-                    <uc:SettingsSectionUC Icon="../Resources/Account32px.png" 
-                                          Title="{Binding Path=LocalizedResources.NewSettings_Account, Source={StaticResource LocalizedStrings}}"
-                                          Tap="Account_OnClicked"/>
-                    <uc:SettingsSectionUC Icon="../Resources/Privacy32px.png" 
-                                          Title="{Binding Path=LocalizedResources.NewSettings_Privacy, Source={StaticResource LocalizedStrings}}"
-                                          Tap="Privacy_OnClicked"/>
                     <uc:SettingsSectionUC Icon="../Resources/MainMenu/Communities32px.png" 
                                           Title="{Binding Path=LocalizedResources.NewSettings_BlackList, Source={StaticResource LocalizedStrings}}"
                                           Tap="Blacklist_OnClicked"/>

@@ -7,6 +7,7 @@ namespace VKClient.Common.Backend.DataObjects
   public class Poll : IBinarySerializable
   {
     private string _question = "";
+    private List<long> _answerIds = new List<long>();
 
     public long owner_id { get; set; }
 
@@ -43,6 +44,19 @@ namespace VKClient.Common.Backend.DataObjects
     public int votes { get; set; }
 
     public long answer_id { get; set; }
+
+    public List<long> answer_ids
+    {
+      get
+      {
+        return this._answerIds;
+      }
+      set
+      {
+        this._answerIds = value ?? new List<long>();
+        this.answer_id = this._answerIds.Count > 0 ? this._answerIds[0] : 0L;
+      }
+    }
 
     public List<Answer> answers { get; set; }
 

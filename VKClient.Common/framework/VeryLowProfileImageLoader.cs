@@ -20,7 +20,7 @@ namespace VKClient.Common.Framework
   public static class VeryLowProfileImageLoader
   {
     private static readonly int LRU_CACHE_CAPACITY = 7000000;
-    private static readonly int STALE_THRESHOLD = 3000;
+    private static readonly int STALE_THRESHOLD = 15000;
     private static readonly Thread _thread = new Thread(new ParameterizedThreadStart(VeryLowProfileImageLoader.WorkerThreadProc));
     private static readonly System.Collections.Generic.Queue<VeryLowProfileImageLoader.PendingRequest> _pendingRequests = new System.Collections.Generic.Queue<VeryLowProfileImageLoader.PendingRequest>();
     private static readonly System.Collections.Generic.Queue<IAsyncResult> _pendingResponses = new System.Collections.Generic.Queue<IAsyncResult>();
@@ -51,7 +51,7 @@ namespace VKClient.Common.Framework
     {
       get
       {
-        return !VeryLowProfileImageLoader.AllowBoostLoading ? 1 : 20;
+        return !VeryLowProfileImageLoader.AllowBoostLoading ? 1 : 2;
       }
     }
 
@@ -168,15 +168,19 @@ namespace VKClient.Common.Framework
 		IEnumerable<VeryLowProfileImageLoader.PendingRequest> arg_1F8_0 = list;
         Func<VeryLowProfileImageLoader.PendingRequest, bool> arg_1F8_1 = new Func<VeryLowProfileImageLoader.PendingRequest, bool>((pr) => { return VeryLowProfileImageLoader.HaveInDownloadedDict(pr); });
 		
-		using (IEnumerator<VeryLowProfileImageLoader.PendingRequest> enumerator2 = Enumerable.Take<VeryLowProfileImageLoader.PendingRequest>(Enumerable.ToList<VeryLowProfileImageLoader.PendingRequest>(Enumerable.Where<VeryLowProfileImageLoader.PendingRequest>(arg_1F8_0, arg_1F8_1)), 3).GetEnumerator())
+		using (IEnumerator<VeryLowProfileImageLoader.PendingRequest> enumerator2 = Enumerable.Take<VeryLowProfileImageLoader.PendingRequest>(Enumerable.ToList<VeryLowProfileImageLoader.PendingRequest>(Enumerable.Where<VeryLowProfileImageLoader.PendingRequest>(arg_1F8_0, arg_1F8_1)), 1).GetEnumerator())
 		{
 			while (enumerator2.MoveNext())
 			{
 				VeryLowProfileImageLoader.PendingRequest current2 = enumerator2.Current;
 				HttpWebRequest httpWebRequest = WebRequest.CreateHttp(current2.Uri);
 				httpWebRequest.AllowReadStreamBuffering=(true);
+				VeryLowProfileImageLoader.ConfigureImageRequest(httpWebRequest);
 				current2.DownloadStaredTimestamp = DateTime.Now;
+				current2.WebRequest = httpWebRequest;
 				httpWebRequest.BeginGetResponse(new AsyncCallback(VeryLowProfileImageLoader.HandleGetResponseResult), new VeryLowProfileImageLoader.ResponseState(httpWebRequest, current2.Image, current2.Uri, current2.DownloadStaredTimestamp, current2.UniqueId, current2.CurrentAttempt));
+				VeryLowProfileImageLoader.AddRequestInProgress(current2);
+				num3++;
 				list.Remove(current2);
 				VeryLowProfileImageLoader.Log("Processed Already downloaded " + current2.Uri);
 			}
@@ -214,7 +218,8 @@ IL_3DA:
 				catch (WebException e)
 				{
 					Logger.Instance.Error(string.Format("LowProfileImageLoader exception when fetching {0}", responseState.Uri.OriginalString), e);
-					if (responseState.CurrentAttempt <= 3)
+					VeryLowProfileImageLoader.RemoveRequestInProgress(responseState.RequestId);
+					if (responseState.CurrentAttempt < 3 && e.Status != WebExceptionStatus.RequestCanceled)
 					{
 						Execute.ExecuteOnUIThread(delegate
 						{
@@ -234,20 +239,32 @@ IL_3DA:
 					{
 						VeryLowProfileImageLoader.PendingCompletion pendingCompletion = pendingCompletions.Dequeue();
 						list3.Add(pendingCompletion);
+						if (!VeryLowProfileImageLoader.IsSupportedImageStream(pendingCompletion.Stream))
+						{
+							Logger.Instance.Error("Image endpoint returned unsupported content for " + pendingCompletion.Uri.Host);
+							pendingCompletion.Stream.Dispose();
+							continue;
+						}
 						VeryLowProfileImageLoader.AddToDownloadedDict(pendingCompletion.Uri);
 						VeryLowProfileImageLoader.AddToCache(pendingCompletion.Uri, pendingCompletion.Stream);
 						if (VeryLowProfileImageLoader.GetUriSource(pendingCompletion.Image) == pendingCompletion.Uri)
 						{
 							BitmapImage bitmapImage = VeryLowProfileImageLoader.CreateSizedBitmap(pendingCompletion.Image, pendingCompletion.Uri, VeryLowProfileImageLoader.GetUseBackgroundCreation(pendingCompletion.Image));
+							bool imageDecoded = false;
 							try
 							{
 								bitmapImage.SetSource(pendingCompletion.Stream);
+								imageDecoded = true;
 							}
 							catch (Exception e2)
 							{
 								Logger.Instance.Error("Error of reading image", e2);
 							}
-							pendingCompletion.Image.Source=(bitmapImage);
+							if (imageDecoded)
+              {
+                VeryLowProfileImageLoader.ApplySquareAvatarStretch(pendingCompletion.Image, pendingCompletion.Uri);
+                pendingCompletion.Image.Source=(bitmapImage);
+              }
 							DateTime arg_B8_0 = DateTime.Now;
 							VeryLowProfileImageLoader._totalDownloadCount++;
 							double totalMilliseconds = (arg_B8_0 - pendingCompletion.Timestamp).TotalMilliseconds;
@@ -295,7 +312,9 @@ IL_3DA:
 		list.RemoveAt(count - 1);
 		HttpWebRequest httpWebRequest2 = WebRequest.CreateHttp(pendingRequest3.Uri);
 		httpWebRequest2.AllowReadStreamBuffering=(true);
+		VeryLowProfileImageLoader.ConfigureImageRequest(httpWebRequest2);
 		pendingRequest3.DownloadStaredTimestamp = DateTime.Now;
+		pendingRequest3.WebRequest = httpWebRequest2;
 		httpWebRequest2.BeginGetResponse(new AsyncCallback(VeryLowProfileImageLoader.HandleGetResponseResult), new VeryLowProfileImageLoader.ResponseState(httpWebRequest2, pendingRequest3.Image, pendingRequest3.Uri, pendingRequest3.DownloadStaredTimestamp, pendingRequest3.UniqueId, pendingRequest3.CurrentAttempt));
 		VeryLowProfileImageLoader.AddRequestInProgress(pendingRequest3);
 		num3++;
@@ -345,7 +364,12 @@ IL_3DA:
         bitmapImage2.DecodePixelType=((DecodePixelType) num2);
         bitmapImage1 = bitmapImage2;
       }
-      if (container.Height > 0.0 && container.Width > 0.0)
+      string imagePath = uri == null ? "" : uri.OriginalString;
+      int imageQueryIndex = imagePath.IndexOf('?');
+      if (imageQueryIndex >= 0)
+        imagePath = imagePath.Substring(0, imageQueryIndex);
+      bool isGif = imagePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
+      if (!isGif && container.Height > 0.0 && container.Width > 0.0)
       {
         if (result1 == 0.0 || result2 == 0.0)
         {
@@ -360,7 +384,7 @@ IL_3DA:
           bitmapImage1.DecodePixelHeight=((int) ((Rect) @fill).Height);
         }
       }
-      else
+      else if (!isGif)
         bitmapImage1.DecodePixelHeight = 300;
       return bitmapImage1;
     }
@@ -373,6 +397,72 @@ IL_3DA:
       if (UriExtensions.ParseQueryString(uri).ContainsKey(VeryLowProfileImageLoader.REQUIRE_CACHING_KEY))
         ImageCache.Current.TrySetImageForUri(uri.OriginalString, (Stream) StreamUtils.ReadFully(stream));
       stream.Position = 0L;
+    }
+
+    // Avatar URLs built by AvatarHelper carry "RequireCache". OpenVK does not
+    // crop avatars to a square, so we crop to fill the (square) slot here, the
+    // same way list/profile templates do with Stretch.UniformToFill.
+    private static void ApplySquareAvatarStretch(Image image, Uri uri)
+    {
+      if (image == null || uri == null)
+        return;
+      if (!UriExtensions.ParseQueryString(uri).ContainsKey(VeryLowProfileImageLoader.REQUIRE_CACHING_KEY))
+        return;
+      Stretch stretch = image.Stretch;
+      if (stretch != Stretch.Uniform && stretch != Stretch.None)
+        return;
+      double width = image.Width;
+      double height = image.Height;
+      if (width > 0.0 && height > 0.0 && width != height)
+        return;
+      if (double.IsNaN(width) && double.IsNaN(height))
+        return;
+      if (double.IsNaN(width) && height > 0.0)
+        image.Width = height;
+      else if (double.IsNaN(height) && width > 0.0)
+        image.Height = width;
+      image.Stretch = Stretch.UniformToFill;
+    }
+
+    private static void ConfigureImageRequest(HttpWebRequest request)
+    {
+      request.Accept = "image/jpeg,image/png,image/gif,image/*;q=0.8,*/*;q=0.1";
+      request.UserAgent = "VKClient/4.35 Windows Phone 8.1";
+    }
+
+    private static bool IsSupportedImageStream(Stream stream)
+    {
+      if (stream == null || !stream.CanRead)
+        return false;
+      long originalPosition = 0L;
+      try
+      {
+        if (stream.CanSeek)
+        {
+          originalPosition = stream.Position;
+          stream.Position = 0L;
+        }
+        byte[] header = new byte[8];
+        int read = stream.Read(header, 0, header.Length);
+        bool isJpeg = read >= 2 && header[0] == byte.MaxValue && header[1] == 216;
+        bool isPng = read >= 8 && header[0] == 137 && header[1] == 80 &&
+          header[2] == 78 && header[3] == 71 && header[4] == 13 &&
+          header[5] == 10 && header[6] == 26 && header[7] == 10;
+        bool isGif = read >= 6 && header[0] == 71 && header[1] == 73 &&
+          header[2] == 70 && header[3] == 56 &&
+          (header[4] == 55 || header[4] == 57) && header[5] == 97;
+        bool isBmp = read >= 2 && header[0] == 66 && header[1] == 77;
+        return isJpeg || isPng || isGif || isBmp;
+      }
+      catch
+      {
+        return false;
+      }
+      finally
+      {
+        if (stream.CanSeek)
+          stream.Position = originalPosition;
+      }
     }
 
     public static bool HasImageInLRUCache(Uri uri)
@@ -490,6 +580,14 @@ IL_3DA:
         int num = 0;
         foreach (VeryLowProfileImageLoader.PendingRequest pendingRequest in (List<VeryLowProfileImageLoader.PendingRequest>) list)
         {
+          try
+          {
+            if (pendingRequest.WebRequest != null)
+              pendingRequest.WebRequest.Abort();
+          }
+          catch
+          {
+          }
           VeryLowProfileImageLoader.RemoveRequestInProgress(pendingRequest.UniqueId);
           VeryLowProfileImageLoader.Log("REMOVED STALE " + pendingRequest.Uri.OriginalString);
           ++num;
@@ -511,6 +609,7 @@ IL_3DA:
       // ISSUE: explicit reference operation
       Uri newValue = (Uri) e.NewValue;
       int num1 = newValue ==  null ? 1 : 0;
+      VeryLowProfileImageLoader.CancelRequestsForImage(image, newValue);
       VeryLowProfileImageLoader._hashToUriDict[(image).GetHashCode()] = newValue;
       if (newValue ==  null)
       {
@@ -527,8 +626,26 @@ IL_3DA:
         if (stream != null)
         {
           BitmapImage sizedBitmap = VeryLowProfileImageLoader.CreateSizedBitmap((FrameworkElement) image, newValue, VeryLowProfileImageLoader.GetUseBackgroundCreation(image));
-          ((BitmapSource) sizedBitmap).SetSource(stream);
-          image.Source = ((ImageSource) sizedBitmap);
+          try
+          {
+            if (!VeryLowProfileImageLoader.IsSupportedImageStream(stream))
+              throw new InvalidDataException("Cached response is not a supported image.");
+            ((BitmapSource) sizedBitmap).SetSource(stream);
+            VeryLowProfileImageLoader.ApplySquareAvatarStretch(image, newValue);
+            image.Source = ((ImageSource) sizedBitmap);
+          }
+          catch (Exception ex)
+          {
+            Logger.Instance.Error("Invalid cached image for " + newValue.Host, ex);
+            image.Source = null;
+            VeryLowProfileImageLoader.EnsureLRUCache();
+            VeryLowProfileImageLoader._lruCache.Remove(newValue);
+            VeryLowProfileImageLoader.AddPendingRequest(image, newValue, 1);
+          }
+          finally
+          {
+            stream.Dispose();
+          }
         }
         else if (!newValue.IsAbsoluteUri || !VeryLowProfileImageLoader.IsEnabled || DesignerProperties.IsInDesignTool)
         {
@@ -567,6 +684,29 @@ IL_3DA:
       {
         VeryLowProfileImageLoader._pendingRequests.Enqueue(new VeryLowProfileImageLoader.PendingRequest(image, uri, currentAttempt));
         Monitor.Pulse(VeryLowProfileImageLoader._syncBlock);
+      }
+    }
+
+    private static void CancelRequestsForImage(Image image, Uri newUri)
+    {
+      lock (VeryLowProfileImageLoader._lockDict)
+      {
+        List<VeryLowProfileImageLoader.PendingRequest> requests =
+          VeryLowProfileImageLoader._requestsInProcess.Values
+            .Where(r => r.Image == image && r.Uri != newUri)
+            .ToList();
+        foreach (VeryLowProfileImageLoader.PendingRequest request in requests)
+        {
+          try
+          {
+            if (request.WebRequest != null)
+              request.WebRequest.Abort();
+          }
+          catch
+          {
+          }
+          VeryLowProfileImageLoader._requestsInProcess.Remove(request.UniqueId);
+        }
       }
     }
 
@@ -618,6 +758,8 @@ IL_3DA:
       public Guid UniqueId { get; private set; }
 
       public int CurrentAttempt { get; set; }
+
+      public WebRequest WebRequest { get; set; }
 
       public PendingRequest(Image image, Uri uri, int currentAttempt)
       {

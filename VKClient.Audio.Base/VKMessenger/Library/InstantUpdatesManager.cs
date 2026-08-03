@@ -104,9 +104,11 @@ namespace VKMessenger.Library
     {
       List<long> list = updateData.Where<LongPollServerUpdateData>((Func<LongPollServerUpdateData, bool>) (u =>
       {
-        if (u.UpdateType != LongPollServerUpdateType.MessageHasBeenAdded || !u.hasAttachOrForward && !u.isChat || u.message != null)
-          return u.UpdateType == LongPollServerUpdateType.MessageHasBeenRestored;
-        return true;
+        // OpenVK long poll deliberately carries only a compact event. Always
+        // enrich new/restored messages through messages.getById so text and
+        // attachments use the same model as the working history endpoint.
+        return u.UpdateType == LongPollServerUpdateType.MessageHasBeenAdded ||
+               u.UpdateType == LongPollServerUpdateType.MessageHasBeenRestored;
       })).Select<LongPollServerUpdateData, long>((Func<LongPollServerUpdateData, long>) (u => u.message_id)).ToList<long>();
       List<int> associatedUsersIds = updateData.Where<LongPollServerUpdateData>((Func<LongPollServerUpdateData, bool>) (u =>
       {

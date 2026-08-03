@@ -314,7 +314,7 @@ namespace VKClient.Common.Library.VirtItems
         };
         LinkProduct linkProduct = new LinkProduct(product);
         link1.product = linkProduct;
-        string str = string.Format("https://vk.com/product{0}_{1}", product.owner_id, product.id);
+        string str = string.Format("https://openvk.org/product{0}_{1}", product.owner_id, product.id);
         link1.url = str;
         Link link = link1;
         NewsLinkUCBase tmpUC = (NewsLinkUCBase) new NewsLinkMediumUC();
@@ -392,7 +392,7 @@ namespace VKClient.Common.Library.VirtItems
         str = "photo";
       if (string.IsNullOrEmpty(str))
         return;
-      Clipboard.SetText(string.Format("https://vk.com/{0}{1}_{2}", str, this._ownerId, this._id));
+      Clipboard.SetText(string.Format("https://openvk.org/{0}{1}_{2}", str, this._ownerId, this._id));
     }
 
     private MenuItem GetUnsubscribeMenuItem()

@@ -12,7 +12,7 @@ namespace VKMessenger.Backend
 {
   public class LongPollServerService : ILongPollServerService
   {
-    private readonly string _getUpdatesURIFrm = "https://{0}?act=a_check&key={1}&ts={2}&wait=25&mode=66&version=1";
+    private readonly string _getUpdatesURIFrm = "{0}?act=a_check&key={1}&ts={2}&wait=25&mode=66&version=1";
     private static LongPollServerService _instance;
 
     public static LongPollServerService Instance
@@ -39,7 +39,12 @@ namespace VKMessenger.Backend
 
     public void GetUpdates(string serverName, string key, long ts, Action<BackendResult<UpdatesResponse, LongPollResultCode>> callback)
     {
-      JsonWebRequest.SendHTTPRequestAsync(string.Format(this._getUpdatesURIFrm, serverName, key, ts), (Action<JsonResponseData>) (jsonResp =>
+      string serverUrl = serverName ?? "";
+      Uri absoluteServer;
+      if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out absoluteServer))
+        serverUrl = "https://" + serverUrl.TrimStart('/');
+      serverUrl = serverUrl.TrimEnd('/');
+      JsonWebRequest.SendHTTPRequestAsync(string.Format(this._getUpdatesURIFrm, serverUrl, key, ts), (Action<JsonResponseData>) (jsonResp =>
       {
         BackendResult<UpdatesResponse, LongPollResultCode> backendResult = new BackendResult<UpdatesResponse, LongPollResultCode>();
         if (!jsonResp.IsSucceeded || string.IsNullOrWhiteSpace(jsonResp.JsonString))
@@ -245,24 +250,35 @@ namespace VKMessenger.Backend
         bool flag1 = (long.Parse(updateDataRaw[2].ToString()) & 2L) == 2L;
         long num2 = long.Parse(updateDataRaw[3].ToString());
         long num3 = long.Parse(updateDataRaw[4].ToString());
-        string str = updateDataRaw[6].ToString();
+        // VK/OpenVK long poll event 4 stores the message text at index 5.
+        // Index 6 is the additional-info object; reading it displayed "{}".
+        string str = updateDataRaw.Count > 5 && updateDataRaw[5] != null
+          ? updateDataRaw[5].ToString()
+          : "";
         bool flag2 = false;
         bool flag3 = false;
         long num4 = 0;
-        if (updateDataRaw.Count > 7)
+        if (updateDataRaw.Count > 6)
         {
-          foreach (KeyValuePair<string, JToken> keyValuePair in updateDataRaw[7] as JObject)
+          JObject additionalInfo = updateDataRaw[6] as JObject;
+          if (additionalInfo != null)
           {
-            if (keyValuePair.Key == "from")
+            foreach (KeyValuePair<string, JToken> keyValuePair in additionalInfo)
             {
-              num4 = num2 - 2000000000L;
-              num2 = long.Parse(keyValuePair.Value.ToString());
-              flag3 = true;
+              if (keyValuePair.Key == "from")
+              {
+                num4 = num2 - 2000000000L;
+                num2 = long.Parse(keyValuePair.Value.ToString());
+                flag3 = true;
+              }
+              else if (keyValuePair.Key == "fwd" || keyValuePair.Key == "attach1_type")
+                flag2 = true;
             }
-            else
-              flag2 = true;
           }
         }
+        JObject attachments = updateDataRaw.Count > 7 ? updateDataRaw[7] as JObject : null;
+        if (attachments != null && attachments.HasValues)
+          flag2 = true;
         serverUpdateData.message_id = num1;
         serverUpdateData.@out = flag1;
         serverUpdateData.user_id = num2;

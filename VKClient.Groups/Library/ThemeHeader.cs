@@ -40,9 +40,9 @@ namespace VKClient.Groups.Library
       get
       {
         if (this._user != null)
-          return this._user.photo_max;
+          return this._user.UiAvatarSmall;
         if (this._group != null)
-          return this._group.photo_200;
+          return this._group.UiAvatarSmall;
         return "";
       }
     }

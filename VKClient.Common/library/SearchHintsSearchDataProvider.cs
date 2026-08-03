@@ -134,7 +134,7 @@ namespace VKClient.Common.Library
       if (!Regex.IsMatch(query, "(?![0-9_]+)^[a-zA-Z0-9_]*$"))
         return "";
       if (!string.IsNullOrEmpty(query))
-        query = (!isVKMe ? "vk.com/" : "vk.me/") + query;
+        query = (!isVKMe ? "openvk.org/" : "vk.me/") + query;
       return query;
     }
 
@@ -147,7 +147,7 @@ namespace VKClient.Common.Library
         uri = uri.Remove(0, 2);
       if (uri.StartsWith("www.") || uri.StartsWith("new."))
         uri = uri.Remove(0, 4);
-      if (uri.StartsWith("vk.com/") || uri.StartsWith("vkontakte.ru/"))
+      if (uri.StartsWith("vk.com/") || uri.StartsWith("vkontakte.ru/") || uri.StartsWith("openvk.org/"))
         return uri;
       if (!uri.StartsWith("vk.me/"))
         return  null;

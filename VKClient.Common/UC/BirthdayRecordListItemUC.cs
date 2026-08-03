@@ -54,14 +54,14 @@ namespace VKClient.Common.UC
     {
       this.textBlockUserName.Text = this.UserName;
       double maxWidth = 372.0;
-      if (this.GiftVisibility == Visibility.Visible)
+      if (((UIElement) this.borderGift).Visibility == Visibility.Visible)
         maxWidth = maxWidth - ((FrameworkElement) this.borderGift).Width + 8.0;
       this.textBlockUserName.CorrectText(maxWidth);
     }
 
     private void UpdateGiftVisibility()
     {
-      ((UIElement) this.borderGift).Visibility = this.GiftVisibility;
+      ((UIElement) this.borderGift).Visibility = Visibility.Collapsed;
       this.UpdateUserName();
     }
 

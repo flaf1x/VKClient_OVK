@@ -111,7 +111,7 @@ namespace VKClient.Audio.ViewModels
                 NoContentText = CommonResources.NoContent_Audios,
                 NoContentImage = "../Resources/NoContentImages/Audios.png"
             };
-            this.AllTracks.LoadCount = 80;
+            this.AllTracks.LoadCount = 100;
             this._allAlbumsVM = new AllAlbumsViewModel(userOrGroupId, isGroup, isPickMode, exludeAlbumId);
             EventAggregator.Current.Subscribe(this);
         }
@@ -119,6 +119,48 @@ namespace VKClient.Audio.ViewModels
         public void LoadMore(object linkedItem)
         {
             this.AllTracks.LoadMoreIfNeeded(linkedItem);
+        }
+
+        public void DownloadAll(Action<BackendResult<List<AudioObj>, ResultCode>> callback)
+        {
+            List<AudioObj> loaded = this.AllTracks.Collection
+                .Where(h => h != null && h.Track != null)
+                .Select(h => h.Track)
+                .GroupBy(a => a.UniqueId)
+                .Select(g => g.First())
+                .ToList();
+            this.LoadAllForDownload(0, 50, loaded, callback);
+        }
+
+        private void LoadAllForDownload(int offset, int pageSize, List<AudioObj> result,
+            Action<BackendResult<List<AudioObj>, ResultCode>> callback)
+        {
+            AudioService.Instance.GetAllAudio(res =>
+            {
+                if (res.ResultCode != ResultCode.Succeeded)
+                {
+                    if (result.Count > 0)
+                    {
+                        AudioCacheManager.Instance.DownloadAll(result);
+                        callback(new BackendResult<List<AudioObj>, ResultCode>(ResultCode.Succeeded, result));
+                    }
+                    else
+                        callback(res);
+                    return;
+                }
+                List<AudioObj> page = res.ResultData ?? new List<AudioObj>();
+                result.AddRange(page.Where(a => result.All(existing => existing.UniqueId != a.UniqueId)));
+                if (page.Count == pageSize && result.Count < 10000)
+                {
+                    this.LoadAllForDownload(offset + page.Count, pageSize, result, callback);
+                    return;
+                }
+                AudioCacheManager.Instance.DownloadAll(result);
+                callback(new BackendResult<List<AudioObj>, ResultCode>(ResultCode.Succeeded, result));
+            }, !this.IsGroup && (this.UserOrGroupId == 0L ||
+                                  this.UserOrGroupId == AppGlobalStateManager.Current.LoggedInUserId)
+                ? new long?()
+                : new long?(this.UserOrGroupId), this.IsGroup, new long?(), offset, pageSize);
         }
 
         public void GetData(GenericCollectionViewModel<List<AudioObj>, AudioHeader> caller, int offset, int count, Action<BackendResult<List<AudioObj>, ResultCode>> callback)

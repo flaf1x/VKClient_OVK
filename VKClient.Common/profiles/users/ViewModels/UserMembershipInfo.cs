@@ -73,7 +73,7 @@ namespace VKClient.Common.Profiles.Users.ViewModels
     {
       get
       {
-        if (this._userData != null && this._userData.Id != AppGlobalStateManager.Current.LoggedInUserId && this._userData.user.can_write_private_message != 0)
+        if (this._userData != null && this._userData.user != null && this._userData.Id != AppGlobalStateManager.Current.LoggedInUserId)
           return Visibility.Visible;
         return Visibility.Collapsed;
       }

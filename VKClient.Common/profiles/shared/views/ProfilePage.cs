@@ -204,29 +204,22 @@ namespace VKClient.Common.Profiles.Shared.Views
             if (base.ImageViewerDecorator != null && base.ImageViewerDecorator.IsShown || (base.IsMenuOpen || base.Flyouts.Count > 0))
                 return;
             this._defaultAppBar.MenuItems.Clear();
-            if (this._viewModel.CanPost || this._viewModel.CanSuggestAPost)
+            bool isOwnProfile = this._viewModel.Id == AppGlobalStateManager.Current.LoggedInUserId;
+            if (isOwnProfile || this._viewModel.CanPost || this._viewModel.CanSuggestAPost)
             {
                 if (!this._defaultAppBar.Buttons.Contains(this._appBarButtonAddNews))
                 {
-                    this._appBarButtonAddNews.Text = (this._viewModel.CanPost ? CommonResources.MainPage_News_AddNews : CommonResources.SuggestedNews_SuggestAPost);
+                    this._appBarButtonAddNews.Text = (isOwnProfile || this._viewModel.CanPost ? CommonResources.MainPage_News_AddNews : CommonResources.SuggestedNews_SuggestAPost);
                     this._defaultAppBar.Buttons.Add(this._appBarButtonAddNews);
                 }
             }
             else if (this._defaultAppBar.Buttons.Contains(this._appBarButtonAddNews))
                 this._defaultAppBar.Buttons.Remove(this._appBarButtonAddNews);
-            if (this._viewModel.CanSendGift)
-            {
-                if (!this._defaultAppBar.Buttons.Contains(this._appBarButtonSendGift))
-                    this._defaultAppBar.Buttons.Add(this._appBarButtonSendGift);
-            }
-            else if (this._defaultAppBar.Buttons.Contains(this._appBarButtonSendGift))
+            if (this._defaultAppBar.Buttons.Contains(this._appBarButtonSendGift))
                 this._defaultAppBar.Buttons.Remove(this._appBarButtonSendGift);
-            if (this._viewModel.CanManageCommunity && !this._defaultAppBar.Buttons.Contains(this._appBarButtonManagement))
-                this._defaultAppBar.Buttons.Add(this._appBarButtonManagement);
-            if (!this._viewModel.CanManageCommunity && this._defaultAppBar.Buttons.Contains(this._appBarButtonManagement))
+            // Community management endpoints are not available in OpenVK.
+            if (this._defaultAppBar.Buttons.Contains(this._appBarButtonManagement))
                 this._defaultAppBar.Buttons.Remove(this._appBarButtonManagement);
-            if (this._viewModel.CanEditProfile)
-                this._defaultAppBar.MenuItems.Add(this._appBarMenuItemEditProfile);
             if (this._viewModel.CanSubscribeUnsubscribe)
             {
                 this._appBarMenuItemSubscribeUnsubscribe.Text = (this._viewModel.IsSubscribed ? CommonResources.UnsubscribeFromNews : CommonResources.SubscribeToNews);

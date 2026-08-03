@@ -488,7 +488,7 @@ label_6:
     {
       get
       {
-        if ((this._adminLevel <= 1 || !this._isGroup || (this._isPublicPage || !this.IsInNewWallPostMode)) && (this._adminLevel <= 1 || !this.IsInNewTopicMode))
+        if ((this._adminLevel <= 1 || !this._isGroup || !this.IsInNewWallPostMode) && (this._adminLevel <= 1 || !this.IsInNewTopicMode))
           return Visibility.Collapsed;
         return Visibility.Visible;
       }
@@ -498,7 +498,7 @@ label_6:
     {
       get
       {
-        if ((this._adminLevel <= 1 || !this._isGroup || !this.IsInNewWallPostMode || !this.FromGroup && !this._isPublicPage) && ((!this.IsPostponed || !this._isGroup) && this.WMMode != WallPostViewModel.Mode.PublishWallPost))
+        if ((this._adminLevel <= 1 || !this._isGroup || !this.IsInNewWallPostMode || !this.FromGroup) && ((!this.IsPostponed || !this._isGroup) && this.WMMode != WallPostViewModel.Mode.PublishWallPost))
           return Visibility.Collapsed;
         return Visibility.Visible;
       }
@@ -620,6 +620,8 @@ label_6:
       this._adminLevel = adminLevel;
       this._isPublicPage = isPublicPage;
       this._mode = isNewTopicMode ? WallPostViewModel.Mode.NewTopic : WallPostViewModel.Mode.NewWallPost;
+      if (this._isGroup && this._isPublicPage && this._adminLevel > 1)
+        this._fromGroup = true;
       if (isNewTopicMode)
         return;
       if (this.TwitterVisibility == Visibility.Visible)
@@ -934,12 +936,14 @@ label_6:
         this._isPublishing = true;
         this.SetInProgress(true, "");
         WallPostRequestData postRequestData = new WallPostRequestData();
+        // Preserve every attachment; OpenVK accepts a comma-separated list, so
+        // an archive and a GIF must be sent as two separate document IDs.
         postRequestData.AttachmentIds = this.OutboundAttachments.Where<IOutboundAttachment>((Func<IOutboundAttachment, bool>)(a =>
         {
             if (!a.IsGeo)
                 return a.AttachmentId != "timestamp";
             return false;
-        })).Select<IOutboundAttachment, string>((Func<IOutboundAttachment, string>)(a => a.AttachmentId)).ToList<string>();
+        })).Select<IOutboundAttachment, string>((Func<IOutboundAttachment, string>)(a => a.AttachmentId)).Where<string>((Func<string, bool>)(id => !string.IsNullOrWhiteSpace(id))).ToList<string>();
         postRequestData.message = this.Text.Replace("\r\n", "\r").Replace("\r", "\r\n");
         if (this._userOrGroupId != 0L)
             postRequestData.owner_id = this._isGroup ? -this._userOrGroupId : this._userOrGroupId;
@@ -957,9 +961,10 @@ label_6:
             postRequestData.publish_date = new long?((long)Extensions.DateTimeToUnixTimestamp(timerAttachment.Timer.ScheduledPublishDateTime.ToUniversalTime(), true));
         else if (this.IsPostponed)
             this._mode = WallPostViewModel.Mode.PublishWallPost;
-        postRequestData.FriendsOnly = this.FriendsOnly.Value;
+        // The unsupported legacy per-post privacy option is not exposed by
+        // this OpenVK client. Always create ordinary public wall posts.
+        postRequestData.FriendsOnly = false;
         postRequestData.PublishOnTwitter = this.PublishOnTwitter.Value;
-        postRequestData.PublishOnFacebook = this.PublishOnFacebook.Value;
         if (this._adminLevel > 1 && this._isGroup || this._postId != 0L)
         {
             postRequestData.Sign = this.Signature;
@@ -1123,18 +1128,30 @@ label_6:
     {
       WallService.Current.GetWallPostByIdWithComments(postId, ownerId, 0, 0, 0, true, (Action<BackendResult<GetWallPostResponseData, ResultCode>>) (res =>
       {
-        if (res.ResultData.WallPost == null || res.ResultData.Users == null || res.ResultData.Groups == null)
-          return;
-        WallPostAddedOrEdited postAddedOrEdited = new WallPostAddedOrEdited();
-        postAddedOrEdited.NewlyAddedWallPost = res.ResultData.WallPost;
-        postAddedOrEdited.Users = res.ResultData.Users;
-        postAddedOrEdited.Groups = res.ResultData.Groups;
-        postAddedOrEdited.Edited = !added;
-        EventAggregator.Current.Publish(postAddedOrEdited);
         Action action = callback;
         if (action != null)
           action.Invoke();
         SocialDataManager.Instance.MarkFeedAsStale(ownerId);
+
+        GetWallPostResponseData resultData = res.ResultData;
+        if (res.ResultCode != ResultCode.Succeeded ||
+            resultData == null ||
+            resultData.WallPost == null ||
+            resultData.Users == null ||
+            resultData.Groups == null)
+          return;
+
+        WallPostAddedOrEdited postAddedOrEdited = new WallPostAddedOrEdited();
+        postAddedOrEdited.NewlyAddedWallPost = resultData.WallPost;
+        postAddedOrEdited.Users = resultData.Users;
+        postAddedOrEdited.Groups = resultData.Groups;
+        postAddedOrEdited.Edited = !added;
+
+        // The publish callback closes NewPost on the UI thread. Queue the
+        // feed/profile refresh after it so the old page cannot be left in a
+        // half-open, non-interactive state.
+        Execute.ExecuteOnUIThread((Action) (() =>
+          EventAggregator.Current.Publish(postAddedOrEdited)));
       }), 0, 0, LikeObjectType.post);
     }
 

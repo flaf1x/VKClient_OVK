@@ -71,11 +71,19 @@ namespace VKClient.Common.Library
             }
             set
             {
-                int num = this._newsSource == null ? 1 : 0;
+                bool hadNewsSource = this._newsSource != null;
+                long previousSourceId = hadNewsSource ? this._newsSource.ID : 0L;
                 this._newsSource = value;
+                if (this._newsSource == null)
+                    this._newsSource = NewsSources.NewsFeed.PickableItem;
                 AppGlobalStateManager.Current.GlobalState.SelectedNewsSource = this._newsSource;
-                if (num == 0 && AppGlobalStateManager.Current.LoggedInUserId != 0L)
+                if (hadNewsSource &&
+                    previousSourceId != this._newsSource.ID &&
+                    AppGlobalStateManager.Current.LoggedInUserId != 0L)
+                {
+                    this._from = "";
                     this.ReloadNews(true, true, false);
+                }
                 if (this._newsSource.ID == -10L)
                 {
                     this.NewsFeedVM.NoContentText = CommonResources.NoContent_News;
@@ -1077,45 +1085,16 @@ namespace VKClient.Common.Library
 
         public void Handle(WallPostAddedOrEdited message)
         {
-            if (this.NewsSource == null || message.Edited && message.NewlyAddedWallPost.IsPostponed)
+            if (this.NewsSource == null ||
+                message == null ||
+                message.NewlyAddedWallPost == null ||
+                message.Edited && message.NewlyAddedWallPost.IsPostponed)
                 return;
-            WallPostItem wallPostItem1 = this.CreateWallPostItem(new NewsItemDataWithUsersAndGroupsInfo() { WallPost = message.NewlyAddedWallPost, Profiles = message.Users, Groups = message.Groups });
-            WallPost newWallPost = message.NewlyAddedWallPost;
-            IVirtualizable virtualizable = (IVirtualizable)Enumerable.FirstOrDefault<IVirtualizable>(this.NewsFeedVM.Collection, (Func<IVirtualizable, bool>)(wp =>
-            {
-                WallPostItem wallPostItem2 = wp as WallPostItem;
-                if (wallPostItem2 == null)
-                    return false;
-                WallPost wallPost = wallPostItem2.WallPost;
-                if (wallPost.id == newWallPost.id)
-                    return wallPost.to_id == newWallPost.to_id;
-                return false;
-            }));
-            if (virtualizable == null)
-            {
-                if (this.NewsSource.ID == NewsSources.NewsFeed.PickableItem.ID)
-                {
-                    this.KeepScrollPosition = false;
-                    this.NewsFeedVM.Insert((IVirtualizable)wallPostItem1, 0);
-                    this.KeepScrollPosition = true;
-                }
-                else
-                    new DelayedExecutor(500).AddToDelayedExecution((Action)(() =>
-                    {
-                        PageBase currentPage = FramePageUtils.CurrentPage;
-                        if (currentPage == null || (currentPage).GetType() == typeof(NewsPage))
-                            return;
-                        Execute.ExecuteOnUIThread((Action)(() => GenericInfoUC.ShowPublishResult(GenericInfoUC.PublishedObj.WallPost, 0, "")));
-                    }));
-            }
-            else
-            {
-                this.KeepScrollPosition = false;
-                int ind = this.NewsFeedVM.Collection.IndexOf(virtualizable);
-                this.NewsFeedVM.Delete(virtualizable);
-                this.NewsFeedVM.Insert(wallPostItem1, ind);
-                this.KeepScrollPosition = true;
-            }
+            // A freshly created OpenVK poll post can lack fields that only
+            // newsfeed.get adds. Reload the normalized feed instead of
+            // constructing a partial card that can crash the UI thread.
+            this._from = "";
+            this.ReloadNews(true, true, false);
         }
 
         public void Handle(AdReportedEvent message)

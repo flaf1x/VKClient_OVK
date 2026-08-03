@@ -51,21 +51,12 @@ namespace VKClient.Groups
     {
       this.InitializeComponent();
       this.PullToRefresh.TrackListBox((ISupportPullToRefresh) this.AllList);
-      this.PullToRefresh.TrackListBox((ISupportPullToRefresh) this.UnsureList);
-      this.PullToRefresh.TrackListBox((ISupportPullToRefresh) this.FriendsList);
       this.Header.OnHeaderTap = (Action) (() =>
       {
         if (this.Pivot.SelectedItem == this.PivotItemAll)
           this.AllList.ScrollToTop();
-        if (this.Pivot.SelectedItem == this.PivotItemUnsure)
-          this.UnsureList.ScrollToTop();
-        if (this.Pivot.SelectedItem != this.PivotItemFriends)
-          return;
-        this.FriendsList.ScrollToTop();
       });
       this.AllList.OnRefresh = (Action) (() => this.ViewModel.All.LoadData(true, false, (Action<BackendResult<CommunitySubscribers, ResultCode>>) null, false));
-      this.UnsureList.OnRefresh = (Action) (() => this.ViewModel.Unsure.LoadData(true, false, (Action<BackendResult<CommunitySubscribers, ResultCode>>) null, false));
-      this.FriendsList.OnRefresh = (Action) (() => this.ViewModel.Friends.LoadData(true, false, (Action<BackendResult<CommunitySubscribers, ResultCode>>) null, false));
     }
 
     protected override void HandleOnNavigatedTo(NavigationEventArgs e)
@@ -78,8 +69,6 @@ namespace VKClient.Groups
       this._isManagement = ((Page) this).NavigationContext.QueryString["IsManagement"].ToLower() == "true";
       this._isPicker = ((Page) this).NavigationContext.QueryString["IsPicker"].ToLower() == "true";
       this._isBlockingPicker = ((Page) this).NavigationContext.QueryString["IsBlockingPicker"].ToLower() == "true";
-      if (toEnum != GroupType.Event)
-        ((PresentationFrameworkCollection<object>) ((ItemsControl) this.Pivot).Items).Remove((object) this.PivotItemUnsure);
       CommunitySubscribersViewModel subscribersViewModel = new CommunitySubscribersViewModel(this._communityId, toEnum, this._isManagement);
       base.DataContext=((object) subscribersViewModel);
       ApplicationBarIconButton applicationBarIconButton1 = new ApplicationBarIconButton();
@@ -102,22 +91,12 @@ namespace VKClient.Groups
 
     private void Pivot_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-      if (this.Pivot.SelectedItem == this.PivotItemUnsure)
-        this.ViewModel.Unsure.LoadData(false, false, (Action<BackendResult<CommunitySubscribers, ResultCode>>) null, false);
-      if (this.Pivot.SelectedItem != this.PivotItemFriends)
-        return;
-      this.ViewModel.Friends.LoadData(false, false, (Action<BackendResult<CommunitySubscribers, ResultCode>>) null, false);
     }
 
     private void List_OnLinked(object sender, LinkUnlinkEventArgs e)
     {
       if (sender == this.AllList)
         this.ViewModel.All.LoadMoreIfNeeded(e.ContentPresenter.Content);
-      if (sender == this.UnsureList)
-        this.ViewModel.Unsure.LoadMoreIfNeeded(e.ContentPresenter.Content);
-      if (sender != this.FriendsList)
-        return;
-      this.ViewModel.Friends.LoadMoreIfNeeded(e.ContentPresenter.Content);
     }
 
     private void List_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -183,7 +162,7 @@ namespace VKClient.Groups
         expr_20.AnimationType = DialogService.AnimationTypes.None;
         expr_20.HideOnNavigation = false;
         DataTemplate itemTemplate = (DataTemplate)base.Resources["ItemTemplate"];
-        CommunitySubscribersSearchDataProvider searchDataProvider = new CommunitySubscribersSearchDataProvider(this._communityId, this.ViewModel.CommunityType, this.ViewModel.Managers, this._isManagement, this.Pivot.SelectedItem == this.PivotItemFriends);
+        CommunitySubscribersSearchDataProvider searchDataProvider = new CommunitySubscribersSearchDataProvider(this._communityId, this.ViewModel.CommunityType, this.ViewModel.Managers, this._isManagement, false);
         GenericSearchUC searchUC = new GenericSearchUC();
         searchUC.LayoutRootGrid.Margin=(new Thickness(0.0, 77.0, 0.0, 0.0));
         searchUC.Initialize<User, LinkHeader>(searchDataProvider, delegate(object p, object f)
@@ -218,10 +197,6 @@ namespace VKClient.Groups
       this.Pivot = (Pivot) base.FindName("Pivot");
       this.PivotItemAll = (PivotItem) base.FindName("PivotItemAll");
       this.AllList = (ExtendedLongListSelector) base.FindName("AllList");
-      this.PivotItemUnsure = (PivotItem) base.FindName("PivotItemUnsure");
-      this.UnsureList = (ExtendedLongListSelector) base.FindName("UnsureList");
-      this.PivotItemFriends = (PivotItem) base.FindName("PivotItemFriends");
-      this.FriendsList = (ExtendedLongListSelector) base.FindName("FriendsList");
       this.PullToRefresh = (PullToRefreshUC) base.FindName("PullToRefresh");
     }
   }

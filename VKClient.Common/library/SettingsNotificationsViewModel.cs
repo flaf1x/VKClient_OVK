@@ -467,22 +467,10 @@ namespace VKClient.Common.Library
         {
             if (this._isInProgress)
                 return;
-            DateTime savedValue = AppGlobalStateManager.Current.GlobalState.PushNotificationsBlockedUntil;
             AppGlobalStateManager.Current.GlobalState.PushNotificationsBlockedUntil = seconds != 0 ? DateTime.UtcNow + TimeSpan.FromSeconds((double)seconds) : DateTime.MinValue;
             this.NotifyPropertyChanged<string>((System.Linq.Expressions.Expression<Func<string>>)(() => this.TempDisabledString));
             this.NotifyPropertyChanged<bool>((System.Linq.Expressions.Expression<Func<bool>>)(() => this.TempDisabled));
             this.NotifyPropertyChanged<bool>((System.Linq.Expressions.Expression<Func<bool>>)(() => this.PushNotificationsEnabledAndNotTempDisabled));
-            this.IsInProgress = true;
-            AccountService.Instance.SetSilenceMode(AppGlobalStateManager.Current.GlobalState.RegisteredDeviceId, seconds, (Action<BackendResult<object, ResultCode>>)(res => Execute.ExecuteOnUIThread((Action)(() =>
-            {
-                this.IsInProgress = false;
-                if (res.ResultCode == ResultCode.Succeeded)
-                    return;
-                AppGlobalStateManager.Current.GlobalState.PushNotificationsBlockedUntil = savedValue;
-                this.NotifyPropertyChanged<string>((System.Linq.Expressions.Expression<Func<string>>)(() => this.TempDisabledString));
-                this.NotifyPropertyChanged<bool>((System.Linq.Expressions.Expression<Func<bool>>)(() => this.TempDisabled));
-                this.NotifyPropertyChanged<bool>((System.Linq.Expressions.Expression<Func<bool>>)(() => this.PushNotificationsEnabledAndNotTempDisabled));
-            }))), 0, 0L);
         }
 
     private string GetMsgValue()

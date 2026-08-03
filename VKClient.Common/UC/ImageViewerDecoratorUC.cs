@@ -57,7 +57,6 @@ namespace VKClient.Common.UC
         internal Border borderActions;
         internal Border borderOrientationLock;
         internal ContextMenu contextMenu;
-        internal MenuItem menuItemSaveInAlbum;
         internal Border borderMore;
         internal Canvas gridBottom;
         internal Image rectBlackBottom;
@@ -429,7 +428,6 @@ namespace VKClient.Common.UC
 
         private void UpdateMenuItems()
         {
-            this.menuItemSaveInAlbum.Visibility = ((this.CurrentPhotoVM == null || this.CurrentPhotoVM.OwnerId != AppGlobalStateManager.Current.LoggedInUserId).ToVisiblity());
         }
 
         private void Page_OrientationChanged(object sender, OrientationChangedEventArgs e)
@@ -459,6 +457,11 @@ namespace VKClient.Common.UC
 
         public void Hide(bool leavingPageImmediately = false)
         {
+            this.Hide(leavingPageImmediately, null);
+        }
+
+        private void Hide(bool leavingPageImmediately, Action completed)
+        {
             if (!leavingPageImmediately)
             {
                 this.Page.OrientationChanged -= this.Page_OrientationChanged;
@@ -468,7 +471,12 @@ namespace VKClient.Common.UC
             this.IsShown = false;
             if (!leavingPageImmediately)
                 this.Update();
-            this.imageViewer.Hide((Action)(() => base.Visibility = Visibility.Collapsed), leavingPageImmediately);
+            this.imageViewer.Hide((Action)(() =>
+            {
+                base.Visibility = Visibility.Collapsed;
+                if (completed != null)
+                    completed();
+            }), leavingPageImmediately);
         }
 
         private void Page_BackKeyPress(object sender, CancelEventArgs e)
@@ -493,7 +501,7 @@ namespace VKClient.Common.UC
                 {
                     this.borderLikes.Visibility = Visibility.Collapsed;
                     this.borderComments.Visibility = Visibility.Collapsed;
-                    this.gridGifs.Visibility = Visibility.Visible;
+                    this.gridGifs.Visibility = this.CurrentPhotoVM.IsGifAdded ? Visibility.Visible : Visibility.Collapsed;
                 }
                 else
                 {
@@ -577,7 +585,7 @@ namespace VKClient.Common.UC
                 if (this.CurrentPhotoVM.IsUserVisible)
                     this._elementsVisibilityDict[this.borderMarks] = true;
             }
-            else
+            else if (this.CurrentPhotoVM.IsGifAdded)
                 this._elementsVisibilityDict[this.gridGifs] = true;
             if (isPortrait)
                 this._elementsVisibilityDict[this.borderShare] = true;
@@ -648,6 +656,7 @@ namespace VKClient.Common.UC
                 if (imageInfo.Height == 0.0)
                     imageInfo.Height = (double)photos.Photo.height;
                 imageInfo.Uri = photos.ImageSrc;
+                imageInfo.PreviewUri = photos.PreviewImageSrc;
                 return imageInfo;
             }), this._getImageByIdFunc, (Action<int, bool>)((ind, show) =>
             {
@@ -817,14 +826,6 @@ namespace VKClient.Common.UC
             e.Handled = true;
         }
 
-        private void AddTap(object sender, System.Windows.Input.GestureEventArgs e)
-        {
-            PhotoViewModel currentPhotoVm = this.CurrentPhotoVM;
-            if (currentPhotoVm == null)
-                return;
-            currentPhotoVm.AddDocument();
-        }
-
         private void ShareTap(object sender, System.Windows.Input.GestureEventArgs e)
         {
             this.DoShare();
@@ -880,18 +881,15 @@ namespace VKClient.Common.UC
 
         private void MenuItemSave_OnClick(object sender, RoutedEventArgs e)
         {
+            if (this.CurrentPhotoVM != null && !string.IsNullOrWhiteSpace(this.CurrentPhotoVM.OriginalImageSrc))
+            {
+                ImageHelper.SaveImage(this.CurrentPhotoVM.OriginalImageSrc);
+                return;
+            }
             BitmapImage source = this.imageViewer.CurrentImage.Source as BitmapImage;
             if (source == null || source.PixelWidth == 0)
                 return;
             this.SaveImage(source);
-        }
-
-        private void MenuItemSaveInAlbum_OnClick(object sender, RoutedEventArgs e)
-        {
-            PhotoViewModel currentPhotoVm = this.CurrentPhotoVM;
-            if (currentPhotoVm == null)
-                return;
-            currentPhotoVm.SaveInSavedPhotosAlbum();
         }
 
         [DebuggerNonUserCode]
@@ -908,7 +906,6 @@ namespace VKClient.Common.UC
             this.borderActions = (Border)base.FindName("borderActions");
             this.borderOrientationLock = (Border)base.FindName("borderOrientationLock");
             this.contextMenu = (ContextMenu)base.FindName("contextMenu");
-            this.menuItemSaveInAlbum = (MenuItem)base.FindName("menuItemSaveInAlbum");
             this.borderMore = (Border)base.FindName("borderMore");
             this.gridBottom = (Canvas)base.FindName("gridBottom");
             this.rectBlackBottom = (Image)base.FindName("rectBlackBottom");

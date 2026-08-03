@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Windows;
 using System.Windows.Navigation;
 using VKClient.Audio.Base;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
@@ -59,7 +60,7 @@ namespace VKMessenger.Library
       get
       {
         ChatInfo chatInformation = this._chatInformation;
-        return (chatInformation != null ? chatInformation.chat.photo_200 :  null) ?? "";
+        return (chatInformation != null ? AvatarHelper.Prepare(chatInformation.chat.photo_200) :  null) ?? "";
       }
     }
 

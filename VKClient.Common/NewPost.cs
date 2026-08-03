@@ -55,7 +55,6 @@ namespace VKClient.Common
     internal TextBlock textBlockWatermarkTitle;
     internal NewPostUC ucNewPost;
     internal Border wallRepostContainer;
-    internal CheckBox checkBoxFriendsOnly;
     internal TextBoxPanelControl textBoxPanel;
     private bool _contentLoaded;
 
@@ -187,7 +186,18 @@ namespace VKClient.Common
     private void _appBarButtonAddAttachment_Click(object sender, EventArgs e)
     {
       ((Control) this).Focus();
-      this._pickerUC = AttachmentPickerUC.Show(AttachmentTypes.AttachmentTypesWithPhotoFromGalleryAndLocation, 10, (Action) (() => this.HandleInputParams( null)), this._excludeLocation, this.CommonParameters.IsGroup ? -this.CommonParameters.UserOrGroupId : this.CommonParameters.UserOrGroupId, 0,  null);
+      this._pickerUC = AttachmentPickerUC.Show(GetNewPostAttachmentTypes(), 10, (Action) (() => this.HandleInputParams( null)), true, this.CommonParameters.IsGroup ? -this.CommonParameters.UserOrGroupId : this.CommonParameters.UserOrGroupId, 0,  null);
+    }
+
+    private static List<NamedAttachmentType> GetNewPostAttachmentTypes()
+    {
+      return AttachmentTypes.AttachmentTypesWithPhotoFromGallery
+        .Where(type => type != null &&
+                       type.AttachmentType != AttachmentType.Document &&
+                       type.AttachmentType != AttachmentType.DocumentFromPhone &&
+                       type.AttachmentType != AttachmentType.DocumentMy &&
+                       type.AttachmentType != AttachmentType.DocumentPhoto)
+        .ToList();
     }
 
     private void _appBarButtonAttachLocation_Click(object sender, EventArgs e)
@@ -428,12 +438,7 @@ namespace VKClient.Common
 			{
 				this.WallPostVM.Text = text;
 			}
-			GeoCoordinate geoCoordinate = ParametersRepository.GetParameterForIdAndReset("NewPositionToBeAttached") as GeoCoordinate;
-			if (geoCoordinate != null)
-			{
-				OutboundGeoAttachment attachment = new OutboundGeoAttachment(geoCoordinate.Latitude, geoCoordinate.Longitude);
-				this.WallPostVM.AddAttachment(attachment);
-			}
+			ParametersRepository.GetParameterForIdAndReset("NewPositionToBeAttached");
 			Poll poll = ParametersRepository.GetParameterForIdAndReset("UpdatedPoll") as Poll;
 			if (poll != null)
 			{
@@ -509,99 +514,12 @@ namespace VKClient.Common
 				OutboundDocumentAttachment attachment8 = new OutboundDocumentAttachment(doc);
 				this.WallPostVM.AddAttachment(attachment8);
 			}
-			TimerAttachment timerAttachment = ParametersRepository.GetParameterForIdAndReset("PickedTimer") as TimerAttachment;
-			if (timerAttachment != null)
-			{
-				OutboundTimerAttachment attachment9 = new OutboundTimerAttachment(timerAttachment);
-				IEnumerable<IOutboundAttachment> arg_326_0 = this.WallPostVM.Attachments;
-                Func<IOutboundAttachment, bool> arg_326_1 = new Func<IOutboundAttachment, bool>((a) => { return a.AttachmentId == "timestamp"; });
-				
-				IOutboundAttachment outboundAttachment = Enumerable.FirstOrDefault<IOutboundAttachment>(arg_326_0, arg_326_1);
-				if (outboundAttachment != null)
-				{
-					int index = this.WallPostVM.Attachments.IndexOf(outboundAttachment);
-					this.WallPostVM.RemoveAttachment(outboundAttachment);
-					this.WallPostVM.InsertAttachment(index, attachment9);
-				}
-				else
-				{
-					this.WallPostVM.AddAttachment(attachment9);
-				}
-				this.WallPostVM.FromGroup = true;
-			}
-			FileOpenPickerContinuationEventArgs fileOpenPickerContinuationEventArgs = ParametersRepository.GetParameterForIdAndReset("FilePicked") as FileOpenPickerContinuationEventArgs;
-			if ((fileOpenPickerContinuationEventArgs != null && Enumerable.Any<StorageFile>(fileOpenPickerContinuationEventArgs.Files)) || ParametersRepository.Contains("PickedPhotoDocuments"))
-			{
-				object parameterForIdAndReset = ParametersRepository.GetParameterForIdAndReset("FilePickedType");
-				IReadOnlyList<StorageFile> arg_3DA_0;
-				if (fileOpenPickerContinuationEventArgs == null)
-				{
-					IReadOnlyList<StorageFile> readOnlyList = (List<StorageFile>)ParametersRepository.GetParameterForIdAndReset("PickedPhotoDocuments");
-					arg_3DA_0 = readOnlyList;
-				}
-				else
-				{
-					arg_3DA_0 = fileOpenPickerContinuationEventArgs.Files;
-				}
-				IReadOnlyList<StorageFile> readOnlyList2 = arg_3DA_0;
-				AttachmentType attachmentType;
-				if (parameterForIdAndReset != null && Enum.TryParse<AttachmentType>(parameterForIdAndReset.ToString(), out attachmentType))
-				{
-					using (IEnumerator<StorageFile> enumerator = readOnlyList2.GetEnumerator())
-					{
-						while (enumerator.MoveNext())
-						{
-							StorageFile current = enumerator.Current;
-							if (attachmentType != AttachmentType.VideoFromPhone)
-							{
-								if (attachmentType == AttachmentType.DocumentFromPhone || attachmentType == AttachmentType.DocumentPhoto)
-								{
-									OutboundUploadDocumentAttachment attachment10 = new OutboundUploadDocumentAttachment(current);
-									this.WallPostVM.AddAttachment(attachment10);
-									this.WallPostVM.UploadAttachments();
-								}
-							}
-							else
-							{
-								long groupId = this.WallPostVM.FromGroup ? this.WallPostVM.UserOrGroupId : 0L;
-								OutboundUploadVideoAttachment attachment11 = new OutboundUploadVideoAttachment(current, true, groupId);
-								this.WallPostVM.AddAttachment(attachment11);
-								this.WallPostVM.UploadAttachments();
-							}
-						}
-					}
-				}
-			}
-			List<StorageFile> list3 = ParametersRepository.GetParameterForIdAndReset("ChosenDocuments") as List<StorageFile>;
-			if (list3 != null)
-			{
-				IEnumerable<StorageFile> arg_4D4_0 = list3;
-				Func<StorageFile, OutboundUploadDocumentAttachment> arg_4D4_1 = new Func<StorageFile, OutboundUploadDocumentAttachment>( (chosenDocument)=>new OutboundUploadDocumentAttachment(chosenDocument));
-				using (IEnumerator<OutboundUploadDocumentAttachment> enumerator2 = Enumerable.Select<StorageFile, OutboundUploadDocumentAttachment>(arg_4D4_0, arg_4D4_1).GetEnumerator())
-				{
-					while (enumerator2.MoveNext())
-					{
-						OutboundUploadDocumentAttachment current2 = enumerator2.Current;
-						this.WallPostVM.AddAttachment(current2);
-					}
-				}
-				this.WallPostVM.UploadAttachments();
-			}
-			List<StorageFile> list4 = ParametersRepository.GetParameterForIdAndReset("ChosenVideos") as List<StorageFile>;
-			if (list4 != null)
-			{
-				IEnumerable<StorageFile> arg_550_0 = list4;
-				Func<StorageFile, OutboundUploadVideoAttachment> arg_550_1 = new Func<StorageFile, OutboundUploadVideoAttachment>( (chosenDocument)=> new OutboundUploadVideoAttachment(chosenDocument, true, 0L));
-				using (IEnumerator<OutboundUploadVideoAttachment> enumerator3 = Enumerable.Select<StorageFile, OutboundUploadVideoAttachment>(arg_550_0, arg_550_1).GetEnumerator())
-				{
-					while (enumerator3.MoveNext())
-					{
-						OutboundUploadVideoAttachment current3 = enumerator3.Current;
-						this.WallPostVM.AddAttachment(current3);
-					}
-				}
-				this.WallPostVM.UploadAttachments();
-			}
+			ParametersRepository.GetParameterForIdAndReset("PickedTimer");
+			ParametersRepository.GetParameterForIdAndReset("FilePicked");
+			ParametersRepository.GetParameterForIdAndReset("FilePickedType");
+			ParametersRepository.GetParameterForIdAndReset("PickedPhotoDocuments");
+			ParametersRepository.GetParameterForIdAndReset("ChosenDocuments");
+			ParametersRepository.GetParameterForIdAndReset("ChosenVideos");
 			return false;
 		}
 
@@ -659,24 +577,16 @@ namespace VKClient.Common
       int maxCount;
       if (this.WallPostVM.CanAddMoreAttachments)
       {
-        attachmentTypes = new List<NamedAttachmentType>((IEnumerable<NamedAttachmentType>) AttachmentTypes.AttachmentTypesWithPhotoFromGalleryAndLocation);
+        attachmentTypes = GetNewPostAttachmentTypes();
         if (this.WallPostVM.CanAddPollAttachment)
           attachmentTypes.Add(AttachmentTypes.PollAttachmentType);
-        if (this.WallPostVM.CannAddTimerAttachment)
-          attachmentTypes.Add(AttachmentTypes.TimerAttachmentType);
         maxCount = this.WallPostVM.NumberOfAttAllowedToAdd;
       }
       else
       {
-        if (!this.WallPostVM.CannAddTimerAttachment)
-          return;
-        attachmentTypes = new List<NamedAttachmentType>()
-        {
-          AttachmentTypes.TimerAttachmentType
-        };
-        maxCount = 1;
+        return;
       }
-      this._pickerUC = AttachmentPickerUC.Show(attachmentTypes, maxCount, (Action) (() => this.HandleInputParams( null)), this._excludeLocation, this.CommonParameters.IsGroup ? -this.CommonParameters.UserOrGroupId : this.CommonParameters.UserOrGroupId, this._adminLevel,  null);
+      this._pickerUC = AttachmentPickerUC.Show(attachmentTypes, maxCount, (Action) (() => this.HandleInputParams( null)), true, this.CommonParameters.IsGroup ? -this.CommonParameters.UserOrGroupId : this.CommonParameters.UserOrGroupId, this._adminLevel,  null);
     }
 
     [DebuggerNonUserCode]
@@ -695,7 +605,6 @@ namespace VKClient.Common
       this.textBlockWatermarkTitle = (TextBlock) base.FindName("textBlockWatermarkTitle");
       this.ucNewPost = (NewPostUC) base.FindName("ucNewPost");
       this.wallRepostContainer = (Border) base.FindName("wallRepostContainer");
-      this.checkBoxFriendsOnly = (CheckBox) base.FindName("checkBoxFriendsOnly");
       this.textBoxPanel = (TextBoxPanelControl) base.FindName("textBoxPanel");
     }
   }

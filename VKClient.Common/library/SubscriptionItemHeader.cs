@@ -127,7 +127,7 @@ namespace VKClient.Common.Library
       this.Id = this._user.id;
       this.Title = this._user.Name;
       this.Subtitle = SubscriptionItemHeader.GetSubtitle(this._user, includeCommonFriendsInfo);
-      this.ImageUrl = this._user.photo_max;
+      this.ImageUrl = this._user.UiAvatarSmall;
       this._isVerified = this._user.verified > 0;
       this._canSubscribe = this._user.friend_status == 0 || this._user.friend_status == 2;
       this.TapAction = (Action) (() => Navigator.Current.NavigateToUserProfile(this._user.id, this._user.Name, "", false));
@@ -166,7 +166,7 @@ namespace VKClient.Common.Library
       this.Id = this._group.id;
       this.Title = this._group.name;
       this.Subtitle = SubscriptionItemHeader.GetSubtitle(this._group);
-      this.ImageUrl = this._group.photo_200;
+      this.ImageUrl = this._group.UiAvatarSmall;
       this._isVerified = this._group.verified > 0;
       this._canSubscribe = this._group.is_member == 0;
       this.TapAction = (Action) (() => Navigator.Current.NavigateToGroup(this._group.id, this._group.name, false));

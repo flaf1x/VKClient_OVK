@@ -127,13 +127,17 @@
                         </StackPanel>
 
                     </Grid>
-                    <commonUC:CommentsGenericUC x:Name="ucCommentGeneric" />
+                    <commonUC:CommentsGenericUC x:Name="ucCommentGeneric"
+                                                Visibility="Collapsed"
+                                                IsHitTestVisible="False" />
 
                 </StackPanel>
             </ViewportControl>
 
             <commonUC:NewMessageUC x:Name="ucNewMessage"
-                                   Grid.Row="2" />
+                                   Grid.Row="2"
+                                   Visibility="Collapsed"
+                                   IsHitTestVisible="False" />
 
             <commonUC:MoreActionsUC VerticalAlignment="Top"
                                     HorizontalAlignment="Right"

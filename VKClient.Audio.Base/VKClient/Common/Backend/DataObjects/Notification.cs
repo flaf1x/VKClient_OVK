@@ -1,5 +1,7 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using VKClient.Audio.Base.DataObjects;
 
 namespace VKClient.Common.Backend.DataObjects
@@ -26,6 +28,9 @@ namespace VKClient.Common.Backend.DataObjects
 
         public object feedback { get; set; }
 
+        [JsonIgnore]
+        public long actor_id { get; set; }
+
         //public object reply { get; set; }
 
         public object ParsedParent
@@ -44,6 +49,15 @@ namespace VKClient.Common.Backend.DataObjects
                     case NotificationType.like_post:
                     case NotificationType.copy_post:
                         this._parsedParent = JsonConvert.DeserializeObject<WallPost>(str);
+                        break;
+                    case NotificationType.sent_gift:
+                    case NotificationType.voices_transfer:
+                    case NotificationType.up_rating:
+                        this._parsedParent = JsonConvert.DeserializeObject<User>(str);
+                        break;
+                    case NotificationType.make_you_admin:
+                    case NotificationType.new_posts_in_club:
+                        this._parsedParent = JsonConvert.DeserializeObject<Group>(str);
                         break;
                     case NotificationType.comment_photo:
                     case NotificationType.like_photo:
@@ -83,6 +97,8 @@ namespace VKClient.Common.Backend.DataObjects
             {
                 if (this._parsedFeedback != null)
                     return this._parsedFeedback;
+                if (this.feedback == null)
+                    return null;
                 string str = this.feedback.ToString();
                 switch (this.NotType)
                 {
@@ -103,7 +119,6 @@ namespace VKClient.Common.Backend.DataObjects
                         this._parsedFeedback = JsonConvert.DeserializeObject<WallPost>(str);
                         break;
                     case NotificationType.mention_comments:
-                    case NotificationType.comment_post:
                     case NotificationType.comment_photo:
                     case NotificationType.comment_video:
                     case NotificationType.reply_comment:
@@ -114,6 +129,16 @@ namespace VKClient.Common.Backend.DataObjects
                     case NotificationType.mention_comment_video:
                     case NotificationType.reply_comment_market:
                         this._parsedFeedback = JsonConvert.DeserializeObject<Comment>(str);
+                        break;
+                    case NotificationType.comment_post:
+                        // OpenVK currently returns the commenting user here,
+                        // while the old VK API returned the comment itself.
+                        // Supporting both shapes keeps the whole page alive.
+                        JObject commentFeedback = JObject.Parse(str);
+                        if (commentFeedback["first_name"] != null)
+                          this._parsedFeedback = commentFeedback.ToObject<User>();
+                        else
+                          this._parsedFeedback = commentFeedback.ToObject<Comment>();
                         break;
                     case NotificationType.copy_post:
                     case NotificationType.copy_photo:
@@ -138,6 +163,13 @@ namespace VKClient.Common.Backend.DataObjects
         {
             if (Enum.TryParse<NotificationType>(this.type, out this._nType))
                 return;
+            // Some OpenVK revisions use a short type name for gifts.
+            if (string.Equals(this.type, "gift", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(this.type, "gift_received", StringComparison.OrdinalIgnoreCase))
+            {
+                this._nType = NotificationType.sent_gift;
+                return;
+            }
             this._nType = NotificationType.unknown;
         }
 
@@ -145,7 +177,21 @@ namespace VKClient.Common.Backend.DataObjects
         {
             get
             {
-                return int.Parse(this.date);
+                int result;
+                return int.TryParse(this.date, out result) ? result : 0;
+            }
+        }
+
+        public string UniqueKey
+        {
+            get
+            {
+                long objectId = 0L;
+                WallPost post = this.ParsedParent as WallPost ??
+                                this.ParsedFeedback as WallPost;
+                if (post != null)
+                  objectId = post.id;
+                return string.Concat(this.date ?? "0", ":", this.type ?? "unknown", ":", objectId);
             }
         }
     }

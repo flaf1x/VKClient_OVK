@@ -256,7 +256,7 @@ namespace VKClient.Common.Library
             image.Clip = rectangleGeometry;//image.Clip = ((Geometry)ellipseGeometry);
             this._imageLoggedInUser = image;
             if (this._loggedInUser != null)
-                ImageLoader.SetUriSource(this._imageLoggedInUser, this._loggedInUser.photo_max);
+                ImageLoader.SetUriSource(this._imageLoggedInUser, this._loggedInUser.UiAvatarSmall);
             Canvas canvas = new Canvas();
             canvas.Height = 40.0;
             this._canvasUserImages = canvas;
@@ -341,7 +341,7 @@ namespace VKClient.Common.Library
                         //ellipseGeometry.RadiusY = 20.0;
                         image1.Clip = rectangleGeometry;//image1.Clip = ellipseGeometry;
 
-                        ImageLoader.SetUriSource(image1, user.photo_max);
+                        ImageLoader.SetUriSource(image1, user.UiAvatarSmall);
                         Canvas.SetLeft(image1, (double)num4);
                         Canvas.SetTop(image1, 12.0);
                         this._canvasUserImages.Children.Add(image1);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 using VKClient.Common.Library;
@@ -152,7 +153,7 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
         // ISSUE: reference to a compiler-generated field
         // ISSUE: reference to a compiler-generated field
         // ISSUE: method pointer
-        sectionViewModelList.Add(new MediaListSectionViewModel(CommonResources.Profile_Subscriptions, titleCounter, (MediaListItemViewModelBase) new SubscriptionsMediaListItemViewModel((List<string>) Enumerable.ToList<string>(Enumerable.Select<SubscriptionObj, string>(subscriptions.items, new Func<SubscriptionObj, string>((item)=>{return item.photo_max;})))), (Action) (() =>
+        sectionViewModelList.Add(new MediaListSectionViewModel(CommonResources.Profile_Subscriptions, titleCounter, (MediaListItemViewModelBase) new SubscriptionsMediaListItemViewModel((List<string>) Enumerable.ToList<string>(Enumerable.Select<SubscriptionObj, string>(subscriptions.items, new Func<SubscriptionObj, string>((item)=>{return AvatarHelper.Prepare(item.photo_max);})))), (Action) (() =>
         {
           this.PublishProfileBlockClickEvent(ProfileBlockType.subscriptions);
           Navigator.Current.NavigateToSubscriptions(this._profileData.Id);

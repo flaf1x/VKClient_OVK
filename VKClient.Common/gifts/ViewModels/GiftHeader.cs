@@ -64,7 +64,7 @@ namespace VKClient.Common.Gifts.ViewModels
       this.FromId = giftItem.from_id;
       this.GiftHash = giftItem.gift_hash;
       this.Name = (profile != null ? profile.name :  null) ?? CommonResources.AnonymousGift;
-      this.Photo = profile != null ? profile.photo_max :  null;
+      this.Photo = profile != null ? profile.UiAvatarMedium :  null;
       this.Date = UIStringFormatterHelper.FormatDateTimeForUI(giftItem.date);
       Gift gift = giftItem.gift;
       this.GiftImage = gift != null ? gift.thumb_256 :  null;

@@ -120,17 +120,17 @@
     <Compile Include="PrivacyPage.cs">
       <DependentUpon>privacypage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="VKTelemetryInitializer.cs" />
     <Compile Include="WelcomePage.cs">
       <DependentUpon>welcomepage.xaml</DependentUpon>
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <AppxManifest Include="Package.appxmanifest">
-      <SubType>Designer</SubType>
-    </AppxManifest>
+    <!-- Legacy Store manifest retained as reference only. AppxManifest.xml is
+         the single manifest used by the current OpenVK package. -->
+    <None Include="Package.appxmanifest" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="AppxManifest.xml" />
     <Content Include="AppIcon.png" />
     <Content Include="AppResLib.dll.0419.mui" />
     <None Include="microsoft.system.package.metadata\S-1-5-21-2702878673-795188819-444038987-2781.recovery" />
@@ -172,6 +172,10 @@
       <Project>{3f61632e-1f7a-42c4-bf38-ae07d3e9f383}</Project>
       <Name>VKClient.Audio.Base</Name>
     </ProjectReference>
+    <ProjectReference Include="..\VKClient.Audio\VKClient.Audio.csproj">
+      <Project>{72c5dee2-1dcf-467d-8525-27c8da1f57cc}</Project>
+      <Name>VKClient.Audio</Name>
+    </ProjectReference>
     <ProjectReference Include="..\VKClient.Common\VKClient.Common.csproj">
       <Project>{e174760f-e91e-4bdc-bd36-4f9d54607104}</Project>
       <Name>VKClient.Common</Name>
@@ -198,22 +202,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Facebook.Client">
-      <HintPath>..\libs\Facebook.Client.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.ApplicationInsights">
-      <HintPath>..\libs\Microsoft.ApplicationInsights.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.ApplicationInsights.Extensibility.Windows">
-      <HintPath>..\libs\Microsoft.ApplicationInsights.Extensibility.Windows.dll</HintPath>
-    </Reference>
     <Reference Include="Microsoft.Phone.Controls, Version=8.0.0.0, Culture=neutral, PublicKeyToken=24eec0d8c86cda1e, processorArchitecture=MSIL" />
-    <Reference Include="Microsoft.Phone.Controls.Toolkit, Version=8.0.1.0, Culture=neutral, PublicKeyToken=b772ad94eb9ca604, processorArchitecture=MSIL">
+    <Reference Include="Microsoft.Phone.Controls.Toolkit, Version=8.0.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\libs\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
+      <HintPath>..\libs\Unsigned\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
     </Reference>
     <Reference Include="System.IO.Compression">
-      <HintPath>..\libs\System.IO.Compression.dll</HintPath>
+      <HintPath>$(MSBuildProgramFiles32)\Microsoft SDKs\WindowsPhoneApp\v8.1\Tools\MDILXAPCompile\Framework\System.IO.Compression.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -262,7 +262,7 @@ namespace VKMessenger.Library
                                 {
                                     string str1 = longPollServerUpdateData.user.first_name ?? "";
                                     string str2 = longPollServerUpdateData.user.last_name ?? "";
-                                    string imageSrc = longPollServerUpdateData.user.photo_max ?? "";
+                                    string imageSrc = longPollServerUpdateData.user.UiAvatarSmall ?? "";
                                     MessengerStateManagerInstance.Current.HandleInAppNotification(str1 + " " + str2, ConversationHeader.GetMessageHeaderText(longPollServerUpdateData.message, longPollServerUpdateData.user, (User)null), (long)id, isChat.ToString(), imageSrc);
                                 }
                                 else
@@ -274,7 +274,7 @@ namespace VKMessenger.Library
                                     {
                                         if (res.ResultCode != ResultCode.Succeeded || res.ResultData == null || res.ResultData.Count <= 0)
                                             return;
-                                        MessengerStateManagerInstance.Current.HandleInAppNotification(res.ResultData.First<User>().first_name + " " + res.ResultData.First<User>().last_name, ConversationHeader.GetMessageHeaderText(longPollServerUpdateData.message, res.ResultData.First<User>(), (User)null), (long)id, isChat.ToString(), res.ResultData.First<User>().photo_max);
+                                        MessengerStateManagerInstance.Current.HandleInAppNotification(res.ResultData.First<User>().first_name + " " + res.ResultData.First<User>().last_name, ConversationHeader.GetMessageHeaderText(longPollServerUpdateData.message, res.ResultData.First<User>(), (User)null), (long)id, isChat.ToString(), res.ResultData.First<User>().UiAvatarSmall);
                                     });
                                     instance.GetUsers(userIds, callback);
                                 }
@@ -299,7 +299,7 @@ namespace VKMessenger.Library
                                 }
                                 if (flag)
                                 {
-                                    string imageSrc = longPollServerUpdateData.user.photo_max ?? "";
+                                    string imageSrc = longPollServerUpdateData.user.UiAvatarSmall ?? "";
                                     string messageHeaderText = ConversationHeader.GetMessageHeaderText(longPollServerUpdateData.message, longPollServerUpdateData.user, (User)null);
                                     MessengerStateManagerInstance.Current.HandleInAppNotification(longPollServerUpdateData.message.title, messageHeaderText, (long)id, true.ToString(), imageSrc);
                                 }

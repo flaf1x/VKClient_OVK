@@ -148,13 +148,6 @@ namespace VKClient.Common.Profiles.Shared.Views
       // ISSUE: method pointer
       menuItem4.Click += new RoutedEventHandler( this.MenuItemShare_OnClick);
       menuItems.Add(menuItem4);
-      MenuItem menuItem5 = new MenuItem();
-      string str = CommonResources.Report.ToLowerInvariant() + "...";
-      menuItem5.Header = str;
-      MenuItem menuItem6 = menuItem5;
-      // ISSUE: method pointer
-      menuItem6.Click += new RoutedEventHandler( this.MenuItemReport_OnClick);
-      menuItems.Add(menuItem6);
       this.SetMenu(menuItems);
       this.ShowMenu();
     }

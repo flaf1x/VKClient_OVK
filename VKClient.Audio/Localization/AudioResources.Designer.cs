@@ -419,6 +419,30 @@ namespace VKClient.Audio.Localization {
                 return ResourceManager.GetString("Track_Add", resourceCulture);
             }
         }
+
+        public static string AudioDownloads_DownloadAll {
+            get {
+                return ResourceManager.GetString("AudioDownloads_DownloadAll", resourceCulture);
+            }
+        }
+
+        public static string AudioDownloads_Cancel {
+            get {
+                return ResourceManager.GetString("AudioDownloads_Cancel", resourceCulture);
+            }
+        }
+
+        public static string AudioDownloads_Preparing {
+            get {
+                return ResourceManager.GetString("AudioDownloads_Preparing", resourceCulture);
+            }
+        }
+
+        public static string AudioDownloads_Progress {
+            get {
+                return ResourceManager.GetString("AudioDownloads_Progress", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Ищет локализованную строку, похожую на add to album.

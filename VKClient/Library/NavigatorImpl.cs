@@ -49,6 +49,7 @@ namespace VKClient.Library
         private static readonly Regex _tagReg = new Regex("/tag[0-9]+");
         private static readonly Regex _videosReg = new Regex("/videos[-0-9]+");
         private static readonly Regex _videoReg = new Regex("/video[-0-9]+_[0-9]+");
+        private static readonly Regex _documentReg = new Regex(@"/doc[-0-9]+_[0-9]+(?:\?.*)?$");
         private static readonly Regex _boardReg = new Regex("/board[0-9]+");
         private static readonly Regex _topicReg = new Regex("/topic[-0-9]+_[0-9]+");
         private static readonly Regex _stickersSettingsReg = new Regex("/stickers/settings(\\s|$)");
@@ -84,6 +85,7 @@ namespace VKClient.Library
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._tagReg, NavigatorImpl.NavType.tagPhoto),
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._videosReg, NavigatorImpl.NavType.videos),
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._videoReg, NavigatorImpl.NavType.video),
+      new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._documentReg, NavigatorImpl.NavType.document),
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._boardReg, NavigatorImpl.NavType.board),
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._topicReg, NavigatorImpl.NavType.topic),
       new NavigatorImpl.NavigationTypeMatch(NavigatorImpl._stickersSettingsReg, NavigatorImpl.NavType.stickersSettings),
@@ -156,6 +158,7 @@ namespace VKClient.Library
             {
                 if (!uri.StartsWith("http://", (StringComparison)3) && !uri.StartsWith("https://", (StringComparison)3))
                     uri = "http://" + uri;
+                uri = NavigatorImpl.NormalizeVkLinkToOpenVk(uri);
                 Logger.Instance.Info("Navigator.NavigateToWebUri, uri={0}, forceWebNavigation={1}", uri, forceWebNavigation);
                 bool flag = false;
                 if (!forceWebNavigation)
@@ -172,13 +175,12 @@ namespace VKClient.Library
 
         private string PrepareWebUri(string uri)
         {
-            if (!NavigatorImpl.IsVKUri(uri))
-                return "http://m.vk.com/away.php?to=" + WebUtility.UrlEncode(uri);
             return uri;
         }
 
         public bool GetWithinAppNavigationUri(string uri, bool fromPush = false, Action<bool> customCallback = null)
         {
+            uri = NavigatorImpl.NormalizeVkLinkToOpenVk(uri);
             if (!NavigatorImpl.IsVKUri(uri))
                 return false;
             string uri1 = uri;
@@ -247,6 +249,12 @@ namespace VKClient.Library
                     break;
                 case NavigatorImpl.NavType.video:
                     this.NavigateToVideoWithComments(null, id1, id2, "");
+                    break;
+                case NavigatorImpl.NavType.document:
+                    // Documents do not have an in-app details page. Recognize
+                    // the object so it is not mistaken for a screen name, then
+                    // let NavigateToWebUri open the canonical OpenVK URL.
+                    flag = false;
                     break;
                 case NavigatorImpl.NavType.audios:
                     this.NavigateToAudio(0, Math.Abs(id1), id1 < 0, 0, 0, "");
@@ -327,9 +335,27 @@ namespace VKClient.Library
                 uri = uri.Remove(0, 2);
             if (uri.StartsWith("www.") || uri.StartsWith("new."))
                 uri = uri.Remove(0, 4);
-            if (!uri.StartsWith("vk.com/") && !uri.StartsWith("vkontakte.ru/"))
+            if (!uri.StartsWith("vk.com/") && !uri.StartsWith("vkontakte.ru/") &&
+                !OpenVKInstanceManager.IsCurrentInstanceUrl(uri))
                 return uri.StartsWith("vk.me/");
             return true;
+        }
+
+        private static string NormalizeVkLinkToOpenVk(string uri)
+        {
+            try
+            {
+                if (!uri.StartsWith("http://", (StringComparison)3) && !uri.StartsWith("https://", (StringComparison)3))
+                    return uri;
+                Uri parsed = new Uri(uri, UriKind.Absolute);
+                string host = parsed.Host.ToLowerInvariant();
+                if (host == "vk.com" || host == "m.vk.com" || host == "new.vk.com" || host == "t.vk.com" || host.EndsWith(".vk.com") || host == "vkontakte.ru")
+                    return OpenVKInstanceManager.Current.WebOrigin + parsed.PathAndQuery + parsed.Fragment;
+            }
+            catch (Exception )
+            {
+            }
+            return uri;
         }
 
         private NavigatorImpl.NavType GetNavigationType(string uri, out long id1, out string id1String, out long id2, out string id2String, out string obj, out string objSub)
@@ -702,8 +728,6 @@ namespace VKClient.Library
             if (!pickMode && isGroup)
                 return string.Format("/VKClient.Video;component/VideoCatalog/GroupVideosPage.xaml?OwnerId={0}", -userOrGroupId);
             userOrGroupId = userOrGroupId != 0L ? userOrGroupId : AppGlobalStateManager.Current.LoggedInUserId;
-            if (!pickMode && userOrGroupId == AppGlobalStateManager.Current.LoggedInUserId)
-                return NavigatorImpl.GetNavigateToVideoCatalogString();
             string str = string.Format("/VKClient.Video;component/VideoPage.xaml?PickMode={0}&UserOrGroupId={1}&IsGroup={2}&ForceAllowVideoUpload={3}", pickMode.ToString(), (userOrGroupId == 0L ? AppGlobalStateManager.Current.LoggedInUserId : userOrGroupId), isGroup, forceAllowVideoUpload);
             if (pickMode)
                 str += "&IsPopupNavigation=True";
@@ -1263,11 +1287,6 @@ namespace VKClient.Library
             this.Navigate(string.Format("/VKClient.Common;component/RegistrationPage.xaml?SessionId={0}", Guid.NewGuid().ToString()));
         }
 
-        public void NavigateToFriendsImportFacebook()
-        {
-            this.Navigate("/VKClient.Common;component/FriendsImportFacebookPage.xaml?IsPopupNavigation=True");
-        }
-
         public void NavigateToFriendsImportGmail()
         {
             this.Navigate("/VKClient.Common;component/FriendsImportGmailPage.xaml?IsPopupNavigation=True");
@@ -1559,24 +1578,17 @@ namespace VKClient.Library
 
         public void NavigateToGiftsCatalog(long userOrChatId = 0, bool isChat = false)
         {
-            this.Navigate(string.Format("/VKClient.Common;component/Gifts/Views/GiftsCatalogPage.xaml?UserOrChatId={0}&IsChat={1}", userOrChatId, isChat));
+            // OpenVK does not currently expose a VK-compatible gift catalog.
         }
 
         public void NavigateToGiftsCatalogCategory(string categoryName, string title, long userOrChatId = 0, bool isChat = false)
         {
-            categoryName = HttpUtility.UrlEncode(categoryName);
-            title = HttpUtility.UrlEncode(title);
-            this.Navigate(string.Format("/VKClient.Common;component/Gifts/Views/GiftsCatalogCategoryPage.xaml?CategoryName={0}&Title={1}&UserOrChatId={2}&IsChat={3}", categoryName, title, userOrChatId, isChat));
+            // Gift sending is intentionally unavailable for OpenVK.
         }
 
         public void NavigateToGiftSend(long giftId, string categoryName, string description, string imageUrl, int price, int giftsLeft, List<long> userIds, bool isProduct = false)
         {
-            ParametersRepository.SetParameterForId("Description", description);
-            ParametersRepository.SetParameterForId("ImageUrl", imageUrl);
-            ParametersRepository.SetParameterForId("Price", price);
-            ParametersRepository.SetParameterForId("GiftsLeft", giftsLeft);
-            ParametersRepository.SetParameterForId("UserIds", userIds);
-            this.Navigate(string.Format("/VKClient.Common;component/Gifts/Views/GiftSendPage.xaml?GiftId={0}&CategoryName={1}&IsProduct={2}", giftId, categoryName, isProduct));
+            // Gift sending is intentionally unavailable for OpenVK.
         }
 
         public void NavigateToDiagnostics()
@@ -1664,6 +1676,7 @@ namespace VKClient.Library
             board,
             album,
             video,
+            document,
             audios,
             topic,
             photo,

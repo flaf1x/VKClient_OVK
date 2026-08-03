@@ -190,7 +190,6 @@ namespace VKClient.Common.Framework
 
     void NavigateToRegistrationPage();
 
-    void NavigateToFriendsImportFacebook();
 
     void NavigateToFriendsImportGmail();
 

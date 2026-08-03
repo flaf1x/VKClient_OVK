@@ -157,7 +157,7 @@ namespace VKClient.Video.VideoCatalog
       });
       DataTemplate itemTemplate = dataTemplate;
       Thickness? margin = new Thickness?(new Thickness(0.0, 77.0, 0.0, 0.0));
-      GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>) searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, (Func<SearchParamsUCBase>) (() => (SearchParamsUCBase) new SearchParamsVideoUC()), margin).Show((UIElement) this.gridContent);
+      GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>) searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, null, margin).Show((UIElement) this.gridContent);
     }
 
     private void HandleSearchSelectedItem(object listBox, object selectedItem)

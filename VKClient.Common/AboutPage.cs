@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using VKClient.Audio.Base;
 using VKClient.Common.Framework;
@@ -16,13 +17,16 @@ namespace VKClient.Common
     {
         internal GenericHeaderUC Header;
         internal TextBlock VersionBlock;
+        internal TextBlock PatchVersionBlock;
+        internal Image AboutImage;
         private bool _contentLoaded;
+        private static readonly Random _random = new Random();
 
         public AboutPage()
         {
             this.InitializeComponent();
             this.Header.TextBlockTitle.Text = (CommonResources.Menu_About.ToUpper());
-            this.VersionBlock.Text = (string.Format(CommonResources.About_Version, AppInfo.Version));
+            this.VersionBlock.Text = string.Format(CommonResources.About_Version, "4.12");
         }
 
         protected override void HandleOnNavigatedTo(NavigationEventArgs e)
@@ -33,22 +37,28 @@ namespace VKClient.Common
 
         private void OnFeedbackClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            Navigator.Current.NavigateToGroup(35502680L, null, false);
+            MessageBox.Show("Telegram: t.me/openvkmobile");
         }
 
         private void OnRateClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            new MarketplaceReviewTask().Show();
+            MessageBox.Show("Был бы рад звезде на репозитории Github :3\nhttps://github.com/flaf1x/OpenVK_Mizzle");
+        }
+
+        private void AboutImage_OnTap(object sender, GestureEventArgs e)
+        {
+            string image = _random.Next(100) < 90 ? "AboutAppOVK.png" : "AboutAppDM.png";
+            this.AboutImage.Source = new BitmapImage(new Uri("../Resources/" + image, UriKind.Relative));
         }
 
         private void OnPrivacyClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            Navigator.Current.NavigateToWebUri("https://m.vk.com/privacy", false, false);
+            Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/privacy", false, false);
         }
 
         private void OnTermsClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            Navigator.Current.NavigateToWebUri("https://m.vk.com/terms", false, false);
+            Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/terms", false, false);
         }
 
         [DebuggerNonUserCode]
@@ -60,6 +70,8 @@ namespace VKClient.Common
             Application.LoadComponent(this, new Uri("/VKClient.Common;component/AboutPage.xaml", UriKind.Relative));
             this.Header = (GenericHeaderUC)base.FindName("Header");
             this.VersionBlock = (TextBlock)base.FindName("VersionBlock");
+            this.PatchVersionBlock = (TextBlock)base.FindName("PatchVersionBlock");
+            this.AboutImage = (Image)base.FindName("AboutImage");
         }
     }
 }

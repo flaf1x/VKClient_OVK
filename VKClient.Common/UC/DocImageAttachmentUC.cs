@@ -54,7 +54,7 @@ namespace VKClient.Common.UC
       this.HandleTap(this._docHeader2);
     }
 
-    private async void HandleTap(DocumentHeader docHeader)
+    private void HandleTap(DocumentHeader docHeader)
     {
       if (docHeader.IsGif)
       {
@@ -86,7 +86,6 @@ namespace VKClient.Common.UC
           return false;
         })));
         InplaceGifViewerUC gifViewer = new InplaceGifViewerUC();
-        await AnimationBehavior.ClearGifCacheAsync();
         Navigator.Current.NavigateToImageViewerPhotosOrGifs(index, list, false, false,  null,  null, false, (FrameworkElement) gifViewer, (Action<int>) (ind =>
         {
           Doc document = list[ind].document;

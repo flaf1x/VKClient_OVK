@@ -1888,7 +1888,7 @@
     <value>Приглашения в группы</value>
   </data>
   <data name="Conversation_LastSeenAMomentAgo" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="Relationship_Engaged_Female" xml:space="preserve">
     <value>Помолвлена</value>
@@ -2731,7 +2731,7 @@
     <value>Комментарии, содержащие неприличные слова и выражения, будут удаляться.</value>
   </data>
   <data name="Login_Info_LoggingIn" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="FindFriends_Gmail_Title" xml:space="preserve">
     <value>Gmail</value>
@@ -2857,7 +2857,7 @@
     <value>Ваше сообщение</value>
   </data>
   <data name="PrepositionBeforeYear" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="OneFollowerFrm" xml:space="preserve">
     <value>{0} подписчик</value>
@@ -3490,7 +3490,7 @@
     <value>Зацикливать воспроизведение видеозаписи</value>
   </data>
   <data name="Login_Info_LoggingIn1" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="Conversation_LastSeenTodayFemaleFrm" xml:space="preserve">
     <value>заходила сегодня в {0}</value>
@@ -4570,7 +4570,7 @@
     <value>мои фотографии</value>
   </data>
   <data name="ProgressMessage_LoadingFriendRequests" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="GroupPage_Page" xml:space="preserve">
     <value>страница</value>

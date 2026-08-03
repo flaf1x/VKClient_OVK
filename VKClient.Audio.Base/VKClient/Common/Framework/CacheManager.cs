@@ -306,6 +306,41 @@ namespace VKClient.Common.Framework
             return false;
         }
 
+        public static void ClearCachedData()
+        {
+            try
+            {
+                using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                {
+                    string folder = _cacheFolderName;
+                    if (!store.DirectoryExists(folder))
+                        return;
+                    foreach (string file in store.GetFileNames(folder + "/*"))
+                    {
+                        try { store.DeleteFile(folder + "/" + file); }
+                        catch (Exception ex) { Logger.Instance.Error("CacheManager.ClearCachedData file", ex); }
+                    }
+                    foreach (string directory in store.GetDirectoryNames(folder + "/*"))
+                        DeleteCacheDirectory(store, folder + "/" + directory);
+                    store.DeleteDirectory(folder);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.Error("CacheManager.ClearCachedData failed", ex);
+            }
+            EnsureCacheFolderExists();
+        }
+
+        private static void DeleteCacheDirectory(IsolatedStorageFile store, string directory)
+        {
+            foreach (string file in store.GetFileNames(directory + "/*"))
+                store.DeleteFile(directory + "/" + file);
+            foreach (string child in store.GetDirectoryNames(directory + "/*"))
+                DeleteCacheDirectory(store, directory + "/" + child);
+            store.DeleteDirectory(directory);
+        }
+
         public enum DataType
         {
             CachedData,

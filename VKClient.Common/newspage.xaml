@@ -18,7 +18,7 @@
             <library:NewsfeedSourceTemplateSelector Content="{Binding}">
                 <library:NewsfeedSourceTemplateSelector.FeedTemplate>
                     <DataTemplate>
-                        <uc:NewsfeedTopToggleUC ToggleControlTap="ToggleControl_OnTap" />
+                        <uc:NewsSourceListItemUC />
                     </DataTemplate>
                 </library:NewsfeedSourceTemplateSelector.FeedTemplate>
                 <library:NewsfeedSourceTemplateSelector.GenericTemplate>
@@ -53,44 +53,20 @@
                                Margin="0 -480 0 0" />
 
                     <!--<uc:NewsfeedNewPostUC x:Name="ucNewPost"
-                                          CacheMode="BitmapCache"
-                                          Height="80" />-->
-                    <Grid Height="64">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Tap="StackPanel_Tap_1">
-                            <Border Background="{StaticResource PhoneHeaderBackgroundBrush}" Width="32" Height="32">
-                                <Border.OpacityMask>
-                                    <ImageBrush ImageSource="/Resources/Mod/ic_story_28.png"/>
-                                </Border.OpacityMask>
-                            </Border>
-                            <TextBlock Foreground="{StaticResource PhoneHeaderBackgroundBrush}" Text="История" VerticalAlignment="Center" Margin="10 0 0 0"/>
-                        </StackPanel>
-                        <Border Margin="0 15"  BorderBrush="{StaticResource PhoneHeaderBackgroundBrush}" Grid.Column="1" BorderThickness="1 0 0 0"/>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Border Background="{StaticResource PhoneHeaderBackgroundBrush}" Width="32" Height="32">
-                                <Border.OpacityMask>
-                                    <ImageBrush ImageSource="/Resources/Mod/ic_live_24.png"/>
-                                </Border.OpacityMask>
-                            </Border>
-                            <TextBlock Foreground="{StaticResource PhoneHeaderBackgroundBrush}" Text="Эфир" VerticalAlignment="Center" Margin="10 0 0 0"/>
-                        </StackPanel>
-                        <Border Margin="0 15"  BorderBrush="{StaticResource PhoneHeaderBackgroundBrush}" Grid.Column="3" BorderThickness="1 0 0 0"/>
-                        <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Center" Tap="StackPanel_Tap">
+                                           CacheMode="BitmapCache"
+                                           Height="80" />-->
+                    <Grid Height="64" Visibility="Visible" Opacity="1">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                    Tap="StackPanel_Tap" Visibility="Visible" Opacity="1">
                             <Border Background="{StaticResource PhoneHeaderBackgroundBrush}" Width="32" Height="32">
                                 <Border.OpacityMask>
                                     <ImageBrush ImageSource="/Resources/Profile/NewPost-1080p.png"/>
                                 </Border.OpacityMask>
                             </Border>
-                            <TextBlock Foreground="{StaticResource PhoneHeaderBackgroundBrush}" Text="Запись" VerticalAlignment="Center" Margin="10 0 0 0"/>
+                            <TextBlock Foreground="{StaticResource PhoneHeaderBackgroundBrush}"
+                                       Text="Запись" VerticalAlignment="Center" Margin="10 0 0 0"/>
                         </StackPanel>
-                        </Grid>
+                    </Grid>
 
                     <Rectangle Fill="{StaticResource PhoneNewsDividerBrush}" Height="16" />
 

@@ -100,11 +100,6 @@ namespace VKClient.Common
       this._appBarButtonAddToList.Click+=(new EventHandler(this._appBarButtonAddToList_Click));
       this._appBarButtonSearch.Click+=(new EventHandler(this._appBarButtonSearch_Click));
       this._mainAppBar.Buttons.Add(this._appBarButtonSearch);
-      if (isCurrentUser)
-      {
-        this._appBarButtonAdd.Click+=(new EventHandler(this._appBarButtonAdd_Click));
-        this._mainAppBar.Buttons.Add(this._appBarButtonAdd);
-      }
       this._friendsListAppBar.Buttons.Add(this._appBarButtonCreateList);
     }
 
@@ -228,24 +223,23 @@ namespace VKClient.Common
       }
       base.DataContext = vm;
       vm.LoadFriends();
+      PresentationFrameworkCollection<object> pivotItems = (PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items;
+      if (pivotItems.Contains(this.pivotItemLists))
+        pivotItems.Remove(this.pivotItemLists);
       if (vm.FriendsMode == FriendsViewModel.Mode.Friends)
       {
         if (this._mode == FriendsPageMode.Default)
         {
           if (vm.OwnFriends)
             ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemMutualFriends);
-          else
-            ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemLists);
         }
         if (this._mode == FriendsPageMode.PickAndBack)
         {
-          ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemLists);
           ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemMutualFriends);
         }
       }
       if (vm.FriendsMode == FriendsViewModel.Mode.Lists)
       {
-        ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemLists);
         ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemMutualFriends);
       }
       this.ucPullToRefresh.TrackListBox((ISupportPullToRefresh) this.allFriendsListBox);

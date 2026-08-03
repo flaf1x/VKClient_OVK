@@ -101,11 +101,7 @@ namespace VKClient.Audio.ViewModels
             if (this._addToOffset)
                 ++offset;
             if (this._substractFromOffset)
-            {
                 --offset;
-                --offset;
-                --offset;
-            }
             AudioService.Instance.GetUserAlbums((Action<BackendResult<ListResponse<AudioAlbum>, ResultCode>>)(res =>
             {
                 if (res.ResultCode == ResultCode.Succeeded)
@@ -118,19 +114,6 @@ namespace VKClient.Audio.ViewModels
                         {
                             title = VKClient.Common.Localization.CommonResources.Audio_Cached,
                             album_id = AllAlbumsViewModel.SAVED_ALBUM_ID
-                        });
-                        //
-                        ++res.ResultData.TotalCount;
-                        res.ResultData.Data.Insert(0, new AudioAlbum()
-                        {
-                            title = AudioResources.Recommended,
-                            album_id = AllAlbumsViewModel.RECOMMENDED_ALBUM_ID
-                        });
-                        ++res.ResultData.TotalCount;
-                        res.ResultData.Data.Insert(1, new AudioAlbum()
-                        {
-                            title = AudioResources.Popular,
-                            album_id = AllAlbumsViewModel.POPULAR_ALBUM_ID
                         });
                         this._substractFromOffset = true;
                     }

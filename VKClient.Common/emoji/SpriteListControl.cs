@@ -121,10 +121,20 @@ namespace VKClient.Common.Emoji
     {
       Execute.ExecuteOnUIThread((Action) (() =>
       {
-          if ((Visibility)Application.Current.Resources["PhoneLightThemeVisibility"] == Visibility.Visible && !this.CurrentDataContext.IsRecentStickers)
-          ImageLoader.SetUriSource(this.ImageBackground, this.CurrentDataContext.StickerProduct.base_url + "/background.png?" + VeryLowProfileImageLoader.REQUIRE_CACHING_KEY + "=True");
-        List<IEnumerable<int>> list1 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(this.CurrentDataContext.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountVerticalOrientation));
-        List<IEnumerable<int>> list2 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(this.CurrentDataContext.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountHorizontalOrientation));
+        SpriteListItemData context = this.CurrentDataContext;
+        if (context == null || context.StickerProduct == null ||
+            context.StickerProduct.stickers == null ||
+            context.StickerProduct.stickers.sticker_ids == null)
+        {
+          this.myPanel.ClearItems();
+          ImageLoader.SetUriSource(this.ImageBackground, null);
+          return;
+        }
+        if ((Visibility)Application.Current.Resources["PhoneLightThemeVisibility"] == Visibility.Visible &&
+            !context.IsRecentStickers && !string.IsNullOrWhiteSpace(context.StickerProduct.base_url))
+          ImageLoader.SetUriSource(this.ImageBackground, context.StickerProduct.base_url + "/background.png?" + VeryLowProfileImageLoader.REQUIRE_CACHING_KEY + "=True");
+        List<IEnumerable<int>> list1 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(context.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountVerticalOrientation));
+        List<IEnumerable<int>> list2 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(context.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountHorizontalOrientation));
         List<IVirtualizable> virtualizableList = new List<IVirtualizable>();
         for (int index = 0; index < list1.Count; ++index)
         {
@@ -138,12 +148,12 @@ namespace VKClient.Common.Emoji
               int current = enumerator1.Current;
               List<StickerItemData> stickerItemDataList = verticalStickers;
               StickerItemData stickerItemData = new StickerItemData();
-              stickerItemData.LocalPath = StickersDownloader.Instance.GetLocalPathForStickerId128(this.CurrentDataContext.StickerProduct, current);
-              stickerItemData.LocalPathBig = StickersDownloader.Instance.GetLocalPathForStickerId256(this.CurrentDataContext.StickerProduct, current);
-              stickerItemData.LocalPathExtraBig = StickersDownloader.Instance.GetLocalPathForStickerId512(this.CurrentDataContext.StickerProduct, current);
-              stickerItemData.StickerSetId = this.CurrentDataContext.StickerProduct.id;
+              stickerItemData.LocalPath = StickersDownloader.Instance.GetLocalPathForStickerId128(context.StickerProduct, current);
+              stickerItemData.LocalPathBig = StickersDownloader.Instance.GetLocalPathForStickerId256(context.StickerProduct, current);
+              stickerItemData.LocalPathExtraBig = StickersDownloader.Instance.GetLocalPathForStickerId512(context.StickerProduct, current);
+              stickerItemData.StickerSetId = context.StickerProduct.id;
               stickerItemData.StickerId = current;
-              int num = this.CurrentDataContext.StickerStockItemHeader.IsPurchased ? 1 : (this.CurrentDataContext.IsRecentStickers ? 1 : 0);
+              int num = context.StickerStockItemHeader != null && context.StickerStockItemHeader.IsPurchased ? 1 : (context.IsRecentStickers ? 1 : 0);
               stickerItemData.CanSendSticker = num != 0;
               stickerItemDataList.Add(stickerItemData);
             }
@@ -163,12 +173,12 @@ namespace VKClient.Common.Emoji
                 int current = enumerator2.Current;
                 List<StickerItemData> stickerItemDataList = horizontalStickers;
                 StickerItemData stickerItemData = new StickerItemData();
-                stickerItemData.LocalPath = StickersDownloader.Instance.GetLocalPathForStickerId128(this.CurrentDataContext.StickerProduct, current);
-                stickerItemData.LocalPathBig = StickersDownloader.Instance.GetLocalPathForStickerId256(this.CurrentDataContext.StickerProduct, current);
-                stickerItemData.LocalPathExtraBig = StickersDownloader.Instance.GetLocalPathForStickerId512(this.CurrentDataContext.StickerProduct, current);
-                stickerItemData.StickerSetId = this.CurrentDataContext.StickerProduct.id;
+                stickerItemData.LocalPath = StickersDownloader.Instance.GetLocalPathForStickerId128(context.StickerProduct, current);
+                stickerItemData.LocalPathBig = StickersDownloader.Instance.GetLocalPathForStickerId256(context.StickerProduct, current);
+                stickerItemData.LocalPathExtraBig = StickersDownloader.Instance.GetLocalPathForStickerId512(context.StickerProduct, current);
+                stickerItemData.StickerSetId = context.StickerProduct.id;
                 stickerItemData.StickerId = current;
-                int num = this.CurrentDataContext.StickerStockItemHeader.IsPurchased ? 1 : (this.CurrentDataContext.IsRecentStickers ? 1 : 0);
+                int num = context.StickerStockItemHeader != null && context.StickerStockItemHeader.IsPurchased ? 1 : (context.IsRecentStickers ? 1 : 0);
                 stickerItemData.CanSendSticker = num != 0;
                 stickerItemDataList.Add(stickerItemData);
               }

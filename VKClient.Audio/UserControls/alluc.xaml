@@ -6,6 +6,7 @@
     xmlns:toolkit="clr-namespace:Microsoft.Phone.Controls;assembly=Microsoft.Phone.Controls.Toolkit"
     xmlns:framework="clr-namespace:VKClient.Common.Framework;assembly=VKClient.Common"
     xmlns:localization="clr-namespace:VKClient.Audio.Localization"
+    xmlns:commonLocalization="clr-namespace:VKClient.Common.Localization;assembly=VKClient.Common"
     mc:Ignorable="d"
     FontFamily="{StaticResource PhoneFontFamilyNormal}"
     FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -13,6 +14,7 @@
     d:DesignHeight="480" d:DesignWidth="480">
     <UserControl.Resources>
         <localization:AudioLocalizedStrings x:Key="LocalizedStrings" />
+        <commonLocalization:CommonLocalizedStrings x:Key="CommonLocalizedStrings" />
 
         <DataTemplate x:Key="TrackTemplate">
             <Grid Margin="0 5 8 5" Background="Transparent"
@@ -80,12 +82,14 @@
                 <toolkit:ContextMenuService.ContextMenu>
                     <toolkit:ContextMenu Background="{Binding InvertedOpaqueBG, Source={StaticResource ThemeHelper}}" 
                                          Foreground="{Binding InvertedOpaqueFG, Source={StaticResource ThemeHelper}}"  
-                                         Visibility="{Binding IsMenuEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
-                                         IsEnabled="{Binding IsMenuEnabled}"
                                          IsZoomEnabled="False">
+                        <toolkit:MenuItem Header="{Binding Path=LocalizedResources.download, Source={StaticResource CommonLocalizedStrings}}"
+                                          Click="DownloadTrackItem_Tap"/>
                         <toolkit:MenuItem Header="{Binding Path=LocalizedResources.Edit, Source={StaticResource LocalizedStrings}}"
+                                          Visibility="{Binding IsMenuEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
                                           Click="EditTrackItem_Tap"/>
                         <toolkit:MenuItem Header="{Binding Path=LocalizedResources.Delete, Source={StaticResource LocalizedStrings}}"
+                                          Visibility="{Binding IsMenuEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
                                           Click="DeleteTrackItem_Tap"/>
                     </toolkit:ContextMenu>
                 </toolkit:ContextMenuService.ContextMenu>

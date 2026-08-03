@@ -180,6 +180,13 @@ namespace VKClient.Video
             this.ucCommentGeneric.UCNewComment.TextBoxNewComment.TextChanged += (new TextChangedEventHandler(this.TextBoxNewComment_TextChanged));
             ((ChooserBase<PhotoResult>)this._photoChooserTask).Completed += (new EventHandler<PhotoResult>(this._photoChooserTask_Completed));
             EventAggregator.Current.Subscribe(this);
+            // OpenVK has no usable video comment API. Detach both legacy
+            // controls from the visual tree so no binding or later state
+            // update can make an empty comments block visible again.
+            this.stackPanel.Children.Remove(this.ucCommentGeneric);
+            Panel newMessageParent = this.ucNewMessage.Parent as Panel;
+            if (newMessageParent != null)
+                newMessageParent.Children.Remove(this.ucNewMessage);
         }
 
         public void CreateAppBar()
@@ -191,9 +198,6 @@ namespace VKClient.Video
             this._appBarMenuItemShare.Click += (new EventHandler(this._appBarButtonShare_Click));
             this._appBarButtonEmojiToggle.Click += (new EventHandler(this._appBarButtonEmojiToggle_Click));
             this._appBarMenuItemEdit.Click += (new EventHandler(this._appBarMenuItemEdit_Click));
-            this._appBar.Buttons.Add(this._appBarButtonComment);
-            this._appBar.Buttons.Add(this._appBarButtonEmojiToggle);
-            this._appBar.Buttons.Add(this._appBarButtonAttachments);
             this._appBar.Buttons.Add(this._appBarButtonLikeUnlike);
             this._appBar.MenuItems.Add(this._appBarMenuItemShare);
             this._appBar.MenuItems.Add(this._appBarMenuItemAddDelete);
@@ -320,14 +324,6 @@ namespace VKClient.Video
                 else
                     this._appBar.MenuItems.Add(this._appBarMenuItemEdit);
             }
-            this._appBarButtonComment.IsEnabled = (this.VM.CanComment && this.ReadyToSend);
-            this.ucNewMessage.UpdateSendButton(this._appBarButtonComment.IsEnabled);
-            this._appBarButtonAttachments.IsEnabled = (this.VM.CanComment);
-            int count = this._commentVM.OutboundAttachments.Count;
-            if (count > 0)
-                this._appBarButtonAttachments.IconUri = (new Uri(string.Format("Resources/appbar.attachments-{0}.rest.png", Math.Min(count, 10)), UriKind.Relative));
-            else
-                this._appBarButtonAttachments.IconUri = (new Uri("Resources/attach.png", UriKind.Relative));
         }
 
         private void GridContent_OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -390,13 +386,6 @@ namespace VKClient.Video
                 menuItem2.Click += new RoutedEventHandler((this.mItemAddToMyVideos_Click));
                 menuItems.Add(menuItem2);
             }
-            MenuItem menuItem3 = new MenuItem();
-            string lowerInvariant1 = CommonResources.VideoNew_AddToAlbum.ToLowerInvariant();
-            menuItem3.Header = lowerInvariant1;
-            MenuItem menuItem4 = menuItem3;
-            // ISSUE: method pointer
-            menuItem4.Click += new RoutedEventHandler((this.mItemAddToAlbum_Click));
-            menuItems.Add(menuItem4);
             MenuItem menuItem5 = new MenuItem();
             string lowerInvariant2 = CommonResources.OpenInBrowser.ToLowerInvariant();
             menuItem5.Header = lowerInvariant2;
@@ -411,13 +400,6 @@ namespace VKClient.Video
             // ISSUE: method pointer
             menuItem8.Click += new RoutedEventHandler((this.mItemCopyLink_Click));
             menuItems.Add(menuItem8);
-            MenuItem menuItem9 = new MenuItem();
-            string str = CommonResources.Report.ToLowerInvariant() + "...";
-            menuItem9.Header = str;
-            MenuItem menuItem10 = menuItem9;
-            // ISSUE: method pointer
-            menuItem10.Click += new RoutedEventHandler((this.mItemReport_Click));
-            menuItems.Add(menuItem10);
             if (this.VM.CanRemoveFromMyVideos)
             {
                 MenuItem menuItem1 = new MenuItem();
@@ -440,11 +422,6 @@ namespace VKClient.Video
             }
             this.ucMoreActions.SetMenu(menuItems);
             this.ucMoreActions.ShowMenu();
-        }
-
-        private void mItemAddToAlbum_Click(object sender, RoutedEventArgs e)
-        {
-            Navigator.Current.NavigateToAddVideoToAlbum(this._ownerId, this._videoId);
         }
 
         private void mItemReport_Click(object sender, RoutedEventArgs e)
@@ -538,18 +515,13 @@ namespace VKClient.Video
                     videoContext = ((Page)this).NavigationContext.QueryString["VideoContext"];
                 VKClient.Common.Backend.DataObjects.Video parameterForIdAndReset = ParametersRepository.GetParameterForIdAndReset("Video") as VKClient.Common.Backend.DataObjects.Video;
                 StatisticsActionSource actionSource = (StatisticsActionSource)Enum.Parse(typeof(StatisticsActionSource), ((Page)this).NavigationContext.QueryString["VideoSource"]);
-                this.InitializeCommentVM();
                 VideoCommentsViewModel commentsViewModel = new VideoCommentsViewModel(this._ownerId, this._videoId, accessKey, parameterForIdAndReset, actionSource, videoContext);
                 commentsViewModel.PageLoadInfoViewModel.LoadingStateChangedCallback = new Action(this.OnLoadingStateChanged);
                 base.DataContext = (commentsViewModel);
                 commentsViewModel.Reload(true);
-                this.RestoreUnboundState();
                 this._isInitialized = true;
                 flag = false;
             }
-            if (!flag && (!e.IsNavigationInitiator || e.NavigationMode != NavigationMode.New))
-                WallPostVMCacheManager.TryDeserializeInstance(this._commentVM);
-            this.ProcessInputData();
             this.UpdateAppBar();
         }
 
@@ -559,7 +531,7 @@ namespace VKClient.Video
             {
                 if (this.VM.PageLoadInfoViewModel.LoadingState != PageLoadingState.Loaded)
                     return;
-                this.VM.LoadMoreComments(7, new Action<bool>(this.CommentsAreLoadedCallback));
+                this.UpdateAppBar();
             }));
         }
 
@@ -645,11 +617,6 @@ namespace VKClient.Video
         protected override void HandleOnNavigatedFrom(NavigationEventArgs e)
         {
             base.HandleOnNavigatedFrom(e);
-            if (e.NavigationMode != NavigationMode.Back)
-                WallPostVMCacheManager.RegisterForDelayedSerialization(this._commentVM);
-            if (e.NavigationMode == NavigationMode.Back)
-                WallPostVMCacheManager.ResetInstance();
-            this.SaveUnboundState();
         }
 
         private void SaveUnboundState()

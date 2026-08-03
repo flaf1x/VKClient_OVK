@@ -28,7 +28,6 @@ namespace VKClient.Common
 {
     public class DocumentsPage : PageBase
     {
-        private readonly ApplicationBarIconButton _appBarAddButton;
         private bool _isInitialized;
         private bool _isSearchNow;
         private int _loadedListsCount;
@@ -49,14 +48,6 @@ namespace VKClient.Common
         {
             this.InitializeComponent();
             this.ApplicationBar = ((IApplicationBar)ApplicationBarBuilder.Build(new Color?(), new Color?(), 0.9));
-            ApplicationBarIconButton applicationBarIconButton1 = new ApplicationBarIconButton();
-            Uri uri1 = new Uri("/Resources/appbar.add.rest.png", UriKind.Relative);
-            applicationBarIconButton1.IconUri = uri1;
-            string friendsPageAppBarAdd = CommonResources.FriendsPage_AppBar_Add;
-            applicationBarIconButton1.Text = friendsPageAppBarAdd;
-            this._appBarAddButton = applicationBarIconButton1;
-            this._appBarAddButton.Click += (new EventHandler(DocumentsPage.AppBarAddButton_OnClicked));
-            this.ApplicationBar.Buttons.Add(this._appBarAddButton);
             ApplicationBarIconButton applicationBarIconButton2 = new ApplicationBarIconButton();
             Uri uri2 = new Uri("/Resources/appbar.feature.search.rest.png", UriKind.Relative);
             applicationBarIconButton2.IconUri = uri2;
@@ -78,8 +69,6 @@ namespace VKClient.Common
                     ownerId = long.Parse(((Page)this).NavigationContext.QueryString["OwnerId"]);
                 if (((Page)this).NavigationContext.QueryString.ContainsKey("IsOwnerCommunityAdmined"))
                     isOwnerCommunityAdmined = bool.Parse(((Page)this).NavigationContext.QueryString["IsOwnerCommunityAdmined"]);
-                if (ownerId != AppGlobalStateManager.Current.LoggedInUserId && !isOwnerCommunityAdmined)
-                    this.ApplicationBar.Buttons.Remove(this._appBarAddButton);
                 DocumentsViewModel parentPageViewModel = new DocumentsViewModel(ownerId);
                 parentPageViewModel.Sections.Add(new DocumentsSectionViewModel(parentPageViewModel, ownerId, 0, CommonResources.Header_ShowAll, isOwnerCommunityAdmined, false));
                 parentPageViewModel.LoadSection(0);

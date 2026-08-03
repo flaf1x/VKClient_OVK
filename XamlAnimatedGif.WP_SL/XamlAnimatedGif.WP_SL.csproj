@@ -134,7 +134,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Net.Http">
-      <HintPath>..\libs\System.Net.Http.dll</HintPath>
+      <HintPath>..\libs\Signed\System.Net.Http.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\$(TargetFrameworkIdentifier)\$(TargetFrameworkVersion)\Microsoft.$(TargetFrameworkIdentifier).$(TargetFrameworkVersion).Overrides.targets" />

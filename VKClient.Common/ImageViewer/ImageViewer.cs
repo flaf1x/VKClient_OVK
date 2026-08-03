@@ -512,7 +512,10 @@ namespace VKClient.Common.ImageViewer
         ++VKClient.Common.ImageViewer.ImageViewer._shownImageViewersCount;
       else if (VKClient.Common.ImageViewer.ImageViewer._shownImageViewersCount > 0)
         --VKClient.Common.ImageViewer.ImageViewer._shownImageViewersCount;
-      AccelerometerHelper.Instance.IsActive = (uint) VKClient.Common.ImageViewer.ImageViewer._shownImageViewersCount > 0U;
+      // Rotating the full-screen viewer through the accelerometer kept the
+      // sensor and UI transforms active for the whole viewing session. The
+      // phone can still rotate normal pages; the photo viewer stays stable.
+      AccelerometerHelper.Instance.IsActive = false;
     }
 
     public void Initialize(int totalCount, Func<int, ImageInfo> getImageInfoFunc, Func<int, Image> getImageFunc, Action<int, bool> showHideOriginalImageAction, FrameworkElement currentViewControl = null, Action<int> setDataContextOnCurrentViewControlAction = null)
@@ -578,6 +581,7 @@ namespace VKClient.Common.ImageViewer
         base.IsHitTestVisible = true;
         this.UpdateProgressBarVisibility();
         ImageViewerLowProfileImageLoader.ImageDownloaded += new EventHandler(this.ImageViewerLowProfileImageLoader_ImageDownloaded);
+        ImageViewerLowProfileImageLoader.ImageFailed += new EventHandler(this.ImageViewerLowProfileImageLoader_ImageFailed);
         this.UpdateImagesSources(galleryPhotosMode, new bool?());
         this.SetRenderTransformOnCurrentViewControl();
         if (callback == null)
@@ -590,7 +594,14 @@ namespace VKClient.Common.ImageViewer
 
     private void ImageViewerLowProfileImageLoader_ImageDownloaded(object sender, EventArgs e)
     {
-      this.UpdateProgressBarVisibility();
+      if (sender == null || sender == this.CurrentImage)
+        this.UpdateProgressBarVisibility();
+    }
+
+    private void ImageViewerLowProfileImageLoader_ImageFailed(object sender, EventArgs e)
+    {
+      if (sender == this.CurrentImage)
+        ((UIElement) this._loadingTextBlock).Visibility = Visibility.Collapsed;
     }
 
     private void UpdateProgressBarVisibility()
@@ -606,6 +617,7 @@ namespace VKClient.Common.ImageViewer
         SystemTray.SetIsVisible((DependencyObject) this.Page, this._initialStatusBarVisibility);
       DeviceOrientationHelper.Instance.OrientationChanged -= new EventHandler<DeviceOrientationChangedEventArgs>(this.Instance_OrientationChanged);
       ImageViewerLowProfileImageLoader.ImageDownloaded -= new EventHandler(this.ImageViewerLowProfileImageLoader_ImageDownloaded);
+      ImageViewerLowProfileImageLoader.ImageFailed -= new EventHandler(this.ImageViewerLowProfileImageLoader_ImageFailed);
       if (num != 0)
         VKClient.Common.ImageViewer.ImageViewer.UpdateShownCount(false);
       bool? clockwiseRotation = new bool?();
@@ -1010,6 +1022,15 @@ namespace VKClient.Common.ImageViewer
         VKClient.Common.ImageViewer.ImageViewer.Swap(this._images, 1, 2);
         VKClient.Common.ImageViewer.ImageViewer.Swap(this._images, 0, 1);
       }
+      // Keep the neighbour's bounded preload when it becomes current. Replacing
+      // its URI here cancels an in-flight preview request; several quick swipes
+      // can then leave every current image waiting on a newly restarted load.
+      // OpenVK previews are already capped around 1080 px, which is sufficient
+      // for this viewer and substantially cheaper on Lumia hardware.
+      this.SetFallbackImageSource(this._images[1], this._currentInd);
+      if (string.IsNullOrEmpty(VKClient.Common.ImageViewer.ImageViewer.GetImageSource(this._images[1])))
+        VKClient.Common.ImageViewer.ImageViewer.SetImageSource(
+          this._images[1], this.GetImageSource(this._currentInd, false));
       this.UpdateImagesSources(false, new bool?(next));
       this.UpdateProgressBarVisibility();
     }
@@ -1072,27 +1093,49 @@ namespace VKClient.Common.ImageViewer
       if (!this.ShowNextPrevious)
       {
         if (!keepCurrentAsIs)
+        {
+          this.SetFallbackImageSource(this._images[1], this._currentInd);
           VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[1], this.GetImageSource(this._currentInd, false));
+        }
         VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[0], null);
+        ImageViewerLowProfileImageLoader.SetFallbackUriSource(this._images[0], null);
         VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[2], null);
+        ImageViewerLowProfileImageLoader.SetFallbackUriSource(this._images[2], null);
       }
       else
       {
         if (!keepCurrentAsIs && !movedForvard.HasValue)
+        {
+          this.SetFallbackImageSource(this._images[1], this._currentInd);
           VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[1], this.GetImageSource(this._currentInd, false));
+        }
         int num = !movedForvard.HasValue ? 1 : (!movedForvard.HasValue ? 0 : (movedForvard.Value ? 1 : 0));
         if ((!movedForvard.HasValue ? 1 : (!movedForvard.HasValue ? 0 : (!movedForvard.Value ? 1 : 0))) != 0)
         {
           object imageSource = this.GetImageSource(this._currentInd - 1, true);
           VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[0], null);
+          this.SetFallbackImageSource(this._images[0], this._currentInd - 1);
           VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[0], imageSource);
         }
         if (num == 0)
           return;
         object imageSource1 = this.GetImageSource(this._currentInd + 1, true);
         VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[2], null);
+        this.SetFallbackImageSource(this._images[2], this._currentInd + 1);
         VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[2], imageSource1);
       }
+    }
+
+    private void SetFallbackImageSource(Image image, int ind)
+    {
+      Uri fallbackUri = null;
+      if (ind >= 0 && ind < this._count)
+      {
+        ImageInfo imageInfo = this._getImageInfoFunc(ind);
+        if (imageInfo != null && !string.IsNullOrEmpty(imageInfo.PreviewUri))
+          fallbackUri = imageInfo.PreviewUri.ConvertToUri();
+      }
+      ImageViewerLowProfileImageLoader.SetFallbackUriSource(image, fallbackUri);
     }
 
     private void SetCurrentControlDataContextIfApplicable()
@@ -1109,6 +1152,8 @@ namespace VKClient.Common.ImageViewer
       ImageInfo imageInfo = this._getImageInfoFunc(ind);
       if (imageInfo != null)
       {
+        if (allowBackgroundCreation && !string.IsNullOrEmpty(imageInfo.PreviewUri))
+          return imageInfo.PreviewUri;
         if (!string.IsNullOrEmpty(imageInfo.Uri))
           return imageInfo.Uri;
         if (imageInfo.GetSourceFunc != null)
@@ -1120,8 +1165,11 @@ namespace VKClient.Common.ImageViewer
     private void ResetImageSources()
     {
       VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[0], null);
+      ImageViewerLowProfileImageLoader.SetFallbackUriSource(this._images[0], null);
       VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[1], null);
+      ImageViewerLowProfileImageLoader.SetFallbackUriSource(this._images[1], null);
       VKClient.Common.ImageViewer.ImageViewer.SetImageSource(this._images[2], null);
+      ImageViewerLowProfileImageLoader.SetFallbackUriSource(this._images[2], null);
     }
 
     private void EnsurePrepareImages()

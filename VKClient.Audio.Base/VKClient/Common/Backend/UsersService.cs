@@ -6,10 +6,12 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows;
+using VKClient.Audio.Base.BackendServices;
 using VKClient.Audio.Base.BLExtensions;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Library;
 using VKClient.Common.Backend.DataObjects;
+using VKClient.Common.Library;
 using VKClient.Common.Utils;
 
 namespace VKClient.Common.Backend
@@ -104,82 +106,135 @@ namespace VKClient.Common.Backend
           ResultCode = ResultCode.Succeeded,
           ResultData = new List<User>()
         });
+        return;
       }
-      else
+
+      List<long> requestedIds = userIds
+        .Where(uid => uid != 0L && uid > -2000000000L)
+        .Distinct()
+        .ToList();
+      List<User> resultData = new List<User>();
+      List<long> missingIds = new List<long>();
+      foreach (long userId in requestedIds)
       {
-        List<User> resultData = new List<User>();
-        bool flag = true;
-        foreach (long userId in userIds)
-        {
-          DateTime now = DateTime.Now;
-          if (this.GetCachedUser(userId) != null)
-          {
-            resultData.Add(this._usersCache[userId]);
-          }
-          else
-          {
-            flag = false;
-            break;
-          }
-        }
-        if (flag)
-        {
-          Logger.Instance.Info("Returning {0} users from cache", resultData.Count);
-          callback(new BackendResult<List<User>, ResultCode>(ResultCode.Succeeded, resultData));
-        }
+        User cachedUser = this.GetCachedUser(userId);
+        if (cachedUser != null)
+          resultData.Add(cachedUser);
         else
-        {
-          string allUserIds = userIds.GetCommaSeparated();
-          if (this._callbacksToExecute.ContainsKey(allUserIds))
-          {
-            this._callbacksToExecute[allUserIds].Add(callback);
-          }
-          else
-          {
-            this._callbacksToExecute.Add(allUserIds, new List<Action<BackendResult<List<User>, ResultCode>>>()
-            {
-              callback
-            });
-            Dictionary<string, string> dictionary = new Dictionary<string, string>()
-            {
-              {
-                "user_ids",
-                allUserIds
-              },
-              {
-                "fields",
-                "uid,first_name,last_name,online,online_mobile,photo_max,sex,photo_medium,friend_status"
-              }
-            };
-            VKRequestsDispatcher.Execute<UsersAndGroups>(string.Format("\r\nvar userIds = \"{0}\";\r\nvar groupIds = \"{1}\";\r\n\r\nvar users = [];\r\nvar groups = [];\r\n\r\nif (userIds.length > 0)\r\n{{\r\n   users = API.users.get({{\"user_ids\":userIds, \"fields\":\"uid,first_name,last_name,online,online_mobile,photo_max,sex,photo_medium,friend_status,first_name_dat\" }});\r\n}}\r\n\r\nif (groupIds.length > 0)\r\n{{\r\n   groups = API.groups.getById({{\"group_ids\":groupIds, \"fields\":\"photo_200,is_messages_blocked\"}});\r\n}}\r\n\r\nreturn {{\"users\":users, \"groups\":groups}};", userIds.Where<long>((Func<long, bool>) (uid => uid > 0L)).ToList<long>().GetCommaSeparated(), userIds.Where<long>((Func<long, bool>) (uid =>
-            {
-              if (uid < 0L)
-                return uid > -2000000000L;
-              return false;
-            })).Select<long, long>((Func<long, long>) (uid => -uid)).ToList<long>().GetCommaSeparated()), (Action<BackendResult<UsersAndGroups, ResultCode>>) (res =>
-            {
-              if (res.ResultCode == ResultCode.Succeeded)
-              {
-                foreach (Group group in res.ResultData.groups)
-                {
-                  User user = new User();
-                  user.InitFromGroup(group);
-                  res.ResultData.users.Add(user);
-                }
-                foreach (User user in res.ResultData.users)
-                  this.SetCachedUser(user);
-              }
-              BackendResult<List<User>, ResultCode> backendResult = new BackendResult<List<User>, ResultCode>();
-              backendResult.ResultCode = res.ResultCode;
-              if (res.ResultData != null)
-                backendResult.ResultData = res.ResultData.users;
-              foreach (Action<BackendResult<List<User>, ResultCode>> action in this._callbacksToExecute[allUserIds])
-                action(backendResult);
-              this._callbacksToExecute.Remove(allUserIds);
-            }),  null, false, true, new CancellationToken?());
-          }
-        }
+          missingIds.Add(userId);
       }
+
+      if (missingIds.Count == 0)
+      {
+        Logger.Instance.Info("Returning {0} users from cache", resultData.Count);
+        callback(new BackendResult<List<User>, ResultCode>(ResultCode.Succeeded, resultData));
+        return;
+      }
+
+      string requestKey = missingIds.OrderBy(id => id).ToList().GetCommaSeparated();
+      if (this._callbacksToExecute.ContainsKey(requestKey))
+      {
+        this._callbacksToExecute[requestKey].Add(callback);
+        return;
+      }
+
+      this._callbacksToExecute.Add(requestKey, new List<Action<BackendResult<List<User>, ResultCode>>>()
+      {
+        callback
+      });
+
+      List<long> positiveIds = missingIds.Where(uid => uid > 0L).ToList();
+      List<long> groupIds = missingIds
+        .Where(uid => uid < 0L)
+        .Select(uid => -uid)
+        .ToList();
+
+      Action loadGroups = null;
+      loadGroups = (Action) (() =>
+      {
+        if (groupIds.Count == 0)
+        {
+          this.CompleteGetUsersRequest(requestKey, ResultCode.Succeeded, resultData);
+          return;
+        }
+
+        VKRequestsDispatcher.DispatchRequestToVK<List<Group>>(
+          "groups.getById",
+          new Dictionary<string, string>()
+          {
+            { "group_ids", groupIds.GetCommaSeparated() },
+            { "fields", "photo_50,photo_100,photo_200,photo_max,is_messages_blocked" }
+          },
+          (Action<BackendResult<List<Group>, ResultCode>>) (groupsResult =>
+          {
+            if (groupsResult.ResultCode != ResultCode.Succeeded)
+            {
+              this.CompleteGetUsersRequest(requestKey, groupsResult.ResultCode, null);
+              return;
+            }
+
+            foreach (Group group in groupsResult.ResultData ?? new List<Group>())
+            {
+              User groupUser = new User();
+              groupUser.InitFromGroup(group);
+              resultData.Add(groupUser);
+            }
+            this.CompleteGetUsersRequest(requestKey, ResultCode.Succeeded, resultData);
+          }),
+          (Func<string, List<Group>>) (jsonStr =>
+            JsonConvert.DeserializeObject<GenericRoot<List<Group>>>(jsonStr).response ?? new List<Group>()),
+          false,
+          true,
+          new CancellationToken?(),
+          null);
+      });
+
+      if (positiveIds.Count == 0)
+      {
+        loadGroups();
+        return;
+      }
+
+      VKRequestsDispatcher.DispatchRequestToVK<List<User>>(
+        "users.get",
+        new Dictionary<string, string>()
+        {
+          { "user_ids", positiveIds.GetCommaSeparated() },
+          { "fields", "first_name,last_name,online,online_mobile,photo_50,photo_100,photo_200,photo_max,sex,friend_status,first_name_dat,last_name_dat" }
+        },
+        (Action<BackendResult<List<User>, ResultCode>>) (usersResult =>
+        {
+          if (usersResult.ResultCode != ResultCode.Succeeded)
+          {
+            this.CompleteGetUsersRequest(requestKey, usersResult.ResultCode, null);
+            return;
+          }
+
+          resultData.AddRange(usersResult.ResultData ?? new List<User>());
+          loadGroups();
+        }),
+        (Func<string, List<User>>) (jsonStr =>
+          JsonConvert.DeserializeObject<GenericRoot<List<User>>>(jsonStr).response ?? new List<User>()),
+        false,
+        true,
+        new CancellationToken?(),
+        null);
+    }
+
+    private void CompleteGetUsersRequest(string requestKey, ResultCode resultCode, List<User> users)
+    {
+      if (resultCode == ResultCode.Succeeded && users != null)
+        this.SetCachedUsers(users);
+
+      BackendResult<List<User>, ResultCode> result =
+        new BackendResult<List<User>, ResultCode>(resultCode, users);
+      List<Action<BackendResult<List<User>, ResultCode>>> callbacks;
+      if (!this._callbacksToExecute.TryGetValue(requestKey, out callbacks))
+        return;
+
+      this._callbacksToExecute.Remove(requestKey);
+      foreach (Action<BackendResult<List<User>, ResultCode>> callback in callbacks)
+        callback(result);
     }
 
     public void GetUsersNoCache(List<int> userIds, Action<BackendResult<List<User>, ResultCode>> callback)
@@ -215,6 +270,7 @@ namespace VKClient.Common.Backend
       dictionary.Add("random", random.Next().ToString());
       dictionary.Add("fields", "uid,first_name,last_name,online,online_mobile,photo_max,site,contacts,bdate,photo_max,bdate,sex,first_name_dat");
       dictionary.Add("order", "hints");
+      dictionary.Add("count", "5000");
       string methodName = "friends.get";
       Dictionary<string, string> parameters = dictionary;
       Action<BackendResult<List<User>, ResultCode>> callback1 = (Action<BackendResult<List<User>, ResultCode>>) (res =>
@@ -233,38 +289,50 @@ namespace VKClient.Common.Backend
 
     public void GetFriendsWithRequests(Action<BackendResult<AllFriendsList, ResultCode>> callback)
     {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>()
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
       {
         {
-          "requests_count",
-          "1"
+          "fields",
+          "uid,first_name,last_name,online,online_mobile,photo_max,photo_100,photo_200,sex,friend_status"
         },
         {
-          "requests_offset",
-          "0"
-        },
-        {
-          "without_friends",
-          "0"
-        },
-        {
-          "requests_only",
-          "0"
-        },
-        {
-          "suggested_only",
-          "0"
+          "count",
+          "5000"
         }
       };
-      string methodName = "execute.getFriendsWithRequests";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<AllFriendsList, ResultCode>> callback1 = (Action<BackendResult<AllFriendsList, ResultCode>>) (result => callback(result));
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<AllFriendsList>(methodName, parameters, callback1, (Func<string, AllFriendsList>) (jsonString => JsonConvert.DeserializeObject<GenericRoot<AllFriendsList>>(jsonString).response), num1 != 0, num2 != 0, cancellationToken, null);
+
+      VKRequestsDispatcher.DispatchRequestToVK<List<User>>("friends.get", parameters,
+        (Action<BackendResult<List<User>, ResultCode>>) (friendsResult =>
+        {
+          if (friendsResult.ResultCode != ResultCode.Succeeded)
+          {
+            callback(new BackendResult<AllFriendsList, ResultCode>(
+              friendsResult.ResultCode));
+            return;
+          }
+
+          this.GetFriendRequests(false, 0, 100,
+            (Action<BackendResult<FriendRequests, ResultCode>>) (requestsResult =>
+            {
+              callback(new BackendResult<AllFriendsList, ResultCode>(
+                ResultCode.Succeeded,
+                new AllFriendsList()
+                {
+                  friends = friendsResult.ResultData ?? new List<User>(),
+                  requests = requestsResult.ResultCode == ResultCode.Succeeded
+                    ? requestsResult.ResultData
+                    : new FriendRequests()
+                }));
+            }));
+        }),
+        (Func<string, List<User>>) (jsonString =>
+        {
+          VKList<User> response =
+            JsonConvert.DeserializeObject<GenericRoot<VKList<User>>>(jsonString).response;
+          return response != null && response.items != null
+            ? response.items
+            : new List<User>();
+        }), false, true, new CancellationToken?(), null);
     }
 
     public void GetFriends(long uid, long lid, Action<BackendResult<List<User>, ResultCode>> callback)
@@ -272,6 +340,7 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters.Add("fields", "uid,first_name,last_name,online, online_mobile,photo_max");
       parameters.Add("order", "hints");
+      parameters.Add("count", "5000");
       if (uid != 0L)
         parameters["user_id"] = uid.ToString();
       if (lid != 0L)
@@ -284,35 +353,42 @@ namespace VKClient.Common.Backend
       if (userId < 0L)
         callback(new BackendResult<UserStatus, ResultCode>(ResultCode.Succeeded, new UserStatus()));
       else
-        VKRequestsDispatcher.DispatchRequestToVK<UserStatus>("messages.getLastActivity", new Dictionary<string, string>()
-        {
+        VKRequestsDispatcher.DispatchRequestToVK<UserStatus>(
+          "users.get",
+          new Dictionary<string, string>()
           {
-            "user_id",
-            userId.ToString()
-          }
-        }, callback,  null, false, true, new CancellationToken?(),  null);
+            { "user_ids", userId.ToString() },
+            { "fields", "online,last_seen" }
+          },
+          callback,
+          (Func<string, UserStatus>) (jsonStr =>
+          {
+            List<User> users =
+              JsonConvert.DeserializeObject<GenericRoot<List<User>>>(jsonStr).response;
+            User user = users != null ? users.FirstOrDefault() : null;
+            return user != null && user.last_seen != null
+              ? new UserStatus()
+              {
+                online = user.online,
+                time = user.last_seen.time,
+                platform = user.last_seen.platform
+              }
+              : new UserStatus();
+          }),
+          false,
+          true,
+          new CancellationToken?(),
+          null);
     }
 
     public void AddFriend(long userId, Action<BackendResult<OwnCounters, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<OwnCounters>("execute", new Dictionary<string, string>()
-      {
-        {
-          "code",
-          string.Format("var uid = {0};\r\n\r\nAPI.friends.add({{\"user_id\": uid}});\r\n\r\nreturn API.getCounters();", userId)
-        }
-      }, callback, new Func<string, OwnCounters>(CountersDeserializerHelper.Deserialize), false, true, new CancellationToken?(),  null);
+      this.FriendAddDelete(userId, true, callback);
     }
 
     public void DeleteFriend(long userId, Action<BackendResult<OwnCounters, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<OwnCounters>("execute", new Dictionary<string, string>()
-      {
-        {
-          "code",
-          string.Format("var uid = {0};\r\n\r\nAPI.friends.delete({{\"user_id\": uid}});\r\n\r\nreturn API.getCounters();", userId)
-        }
-      }, callback, new Func<string, OwnCounters>(CountersDeserializerHelper.Deserialize), false, true, new CancellationToken?(),  null);
+      this.FriendAddDelete(userId, false, callback);
     }
 
     public void SearchUsers(string searchString, int offset, int count, Action<BackendResult<VKList<User>, ResultCode>> callback)
@@ -333,7 +409,7 @@ namespace VKClient.Common.Backend
         },
         {
           "fields",
-          "uid, first_name, last_name, online, online_mobile, photo_max, phone, photo_medium"
+          "screen_name,online,last_seen,photo_50,photo_100,photo_200,photo_max,city,country,friend_status"
         }
       }, callback,  null, false, true, new CancellationToken?(),  null);
     }
@@ -411,50 +487,141 @@ namespace VKClient.Common.Backend
 
     public void GetProfileInfo(long userId, Action<BackendResult<UserData, ResultCode>> callback)
     {
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      string index1 = "userId";
-      string str1 = userId.ToString();
-      parameters[index1] = str1;
-      string index2 = "func_v";
-      string str2 = "3";
-      parameters[index2] = str2;
-      VKRequestsDispatcher.DispatchRequestToVK<UserData>("execute.getProfileInfo", parameters, callback, (Func<string, UserData>) (jsonStr =>
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
       {
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "relatives", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "wallData", true);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "Groups", false);
-        jsonStr = VKRequestsDispatcher.FixArrayToObject(jsonStr, "personal");
-        jsonStr = VKRequestsDispatcher.FixArrayToObject(jsonStr, "occupation");
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "photos", true);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "subscriptions", true);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "gifts", true);
-        int resultCount;
-        jsonStr = VKRequestsDispatcher.GetArrayCountAndRemove(jsonStr, "wall", out resultCount);
-        VKRequestsDispatcher.GenericRoot<UserData> genericRoot = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<UserData>>(jsonStr);
-        if (genericRoot.response.user.counters.docs == 0)
-          genericRoot.response.user.counters.docs = genericRoot.response.docsCount;
-        return genericRoot.response;
-      }), false, true, new CancellationToken?(),  null);
+        { "user_ids", userId.ToString() },
+        { "fields", "photo_max,photo_50,photo_100,photo_200,online,last_seen,sex,screen_name,status,activity,bdate,city,country,home_town,interests,music,movies,tv,books,games,quotes,about,site,contacts,relation,relatives,counters,friend_status,can_post,can_write_private_message,is_favorite,is_subscribed,verified,wall_default,occupation,career,education" }
+      };
+
+      VKRequestsDispatcher.DispatchRequestToVK<UserData>("users.get", parameters, (Action<BackendResult<UserData, ResultCode>>) (profileResult =>
+      {
+        if (profileResult.ResultCode != ResultCode.Succeeded || profileResult.ResultData == null)
+        {
+          callback(profileResult);
+          return;
+        }
+
+        UserData profileData = profileResult.ResultData;
+        Action loadGiftPreviews = (Action) (() =>
+          GiftsService.Instance.Get(userId, 3, 0, (Action<BackendResult<GiftsResponse, ResultCode>>) (giftsResult =>
+          {
+            if (giftsResult.ResultCode == ResultCode.Succeeded &&
+                giftsResult.ResultData != null && giftsResult.ResultData.gifts != null)
+            {
+              profileData.gifts = giftsResult.ResultData.gifts;
+              if (profileData.user != null && profileData.user.counters != null &&
+                  profileData.user.counters.gifts == 0)
+                profileData.user.counters.gifts = profileData.gifts.count;
+            }
+            callback(profileResult);
+          })));
+
+        this.GetSubscriptions(userId, (Action<BackendResult<UsersAndGroups, ResultCode>>) (subscriptionsResult =>
+        {
+          if (subscriptionsResult.ResultCode == ResultCode.Succeeded &&
+              subscriptionsResult.ResultData != null)
+          {
+            List<Group> groups = subscriptionsResult.ResultData.groups ?? new List<Group>();
+            List<User> users = subscriptionsResult.ResultData.users ?? new List<User>();
+            profileData.subscriptions = new VKList<SubscriptionObj>()
+            {
+              count = groups.Count + users.Count,
+              items = groups.Select(group => new SubscriptionObj()
+              {
+                type = "group",
+                id = group.id,
+                name = group.name,
+                photo_max = group.photo_max ?? group.photo_200 ?? group.photo_100 ?? group.photo_50
+              }).Concat(users.Select(user => new SubscriptionObj()
+              {
+                type = "profile",
+                id = user.id,
+                first_name = user.first_name,
+                last_name = user.last_name,
+                name = user.Name,
+                photo_max = user.photo_max ?? user.photo_200 ?? user.photo_100 ?? user.photo_50
+              })).ToList()
+            };
+            if (profileData.user != null && profileData.user.counters != null)
+            {
+              if (profileData.user.counters.groups == 0)
+                profileData.user.counters.groups = groups.Count;
+              if (profileData.user.counters.subscriptions == 0)
+                profileData.user.counters.subscriptions = users.Count;
+            }
+          }
+          loadGiftPreviews();
+        }));
+      }), (Func<string, UserData>) (jsonStr =>
+      {
+        List<User> users = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<List<User>>>(jsonStr).response;
+        User user = users != null && users.Count > 0 ? users[0] : new User();
+        if (user.counters == null)
+          user.counters = new Counters();
+        if (string.IsNullOrEmpty(user.activity))
+          user.activity = user.status;
+
+        return new UserData()
+        {
+          user = user,
+          city = user.city,
+          full_gen = user,
+          friend = new FriendStatus() { uid = user.id, friend_status = (FriendshipStatus) user.friend_status },
+          randomMutualFriends = new List<User>(),
+          relatives = new List<User>(),
+          followers = new VKList<User>() { items = new List<User>() },
+          subscriptions = new VKList<SubscriptionObj>() { items = new List<SubscriptionObj>() },
+          gifts = new VKList<GiftItemData>() { items = new List<GiftItemData>() },
+          photos = new VKList<Photo>() { items = new List<Photo>() },
+          videos = new List<Video>(),
+          products = new List<Product>(),
+          audios = new List<AudioObj>(),
+          topics = new List<Topic>(),
+          areFriendsStatus = user.friend_status
+        };
+      }), false, true, new CancellationToken?(), null);
     }
 
     public void FriendAddDelete(long userId, bool add, Action<BackendResult<OwnCounters, ResultCode>> callback)
     {
-      string str = add ? "friends.add" : "friends.delete";
-      VKRequestsDispatcher.DispatchRequestToVK<OwnCounters>("execute", new Dictionary<string, string>()
-      {
+      string method = add ? "friends.add" : "friends.delete";
+      VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>(method,
+        new Dictionary<string, string>() { { "user_id", userId.ToString() } },
+        result =>
         {
-          "code",
-          string.Format("var uid = {0};\r\n\r\nAPI.{1}({{\"user_id\": uid}});\r\n\r\nreturn API.getCounters();", userId, str)
-        }
-      }, callback, new Func<string, OwnCounters>(CountersDeserializerHelper.Deserialize), false, true, new CancellationToken?(),  null);
+          if (result.ResultCode != ResultCode.Succeeded)
+          {
+            callback(new BackendResult<OwnCounters, ResultCode>(result.ResultCode));
+            return;
+          }
+          // OpenVK does not return counters from friends.add/delete. Fetch
+          // them separately instead of relying on the legacy execute script.
+          AccountService.Instance.GetCounters(counters =>
+          {
+            if (counters.ResultCode == ResultCode.Succeeded)
+              callback(counters);
+            else
+              callback(new BackendResult<OwnCounters, ResultCode>(ResultCode.Succeeded, new OwnCounters()));
+          });
+        }, jsonStr => new ResponseWithId(), false, true, new CancellationToken?(), null);
     }
 
     public void GetFriendsAndMutual(long userId, Action<BackendResult<FriendsAndMutualFriends, ResultCode>> callback)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      string str = string.Format("var uid= {0};\r\nvar friends=API.friends.get({{\"user_id\":uid, \"order\":\"hints\", \"fields\":\"uid,first_name,last_name,online, online_mobile,photo_max\"}}).items;\r\nvar mutualFriends = API.friends.getMutual({{\"target_uid\": uid}});\r\n\r\nreturn {{\"friends\" : friends, \"mutualFriends\": mutualFriends}};", userId);
-      parameters["code"] = str;
-      VKRequestsDispatcher.DispatchRequestToVK<FriendsAndMutualFriends>("execute", parameters, callback,  null, false, true, new CancellationToken?(),  null);
+      parameters["user_id"] = userId.ToString();
+      parameters["fields"] = "uid,first_name,last_name,online,online_mobile,photo_max";
+      parameters["count"] = "5000";
+      VKRequestsDispatcher.DispatchRequestToVK<FriendsAndMutualFriends>("friends.get", parameters, callback,
+        (Func<string, FriendsAndMutualFriends>) (jsonStr =>
+        {
+          VKList<User> response = JsonConvert.DeserializeObject<GenericRoot<VKList<User>>>(jsonStr).response;
+          return new FriendsAndMutualFriends()
+          {
+            friends = response != null && response.items != null ? response.items : new List<User>(),
+            mutualFriends = new List<long>()
+          };
+        }), false, true, new CancellationToken?(), null);
     }
 
     public void GetFriendsAndLists(Action<BackendResult<FriendsAndLists, ResultCode>> callback)
@@ -501,6 +668,7 @@ namespace VKClient.Common.Backend
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["list_id"] = lid.ToString();
       parameters["fields"] = "uid,first_name,last_name,online, online_mobile,photo_max";
+      parameters["count"] = "5000";
       VKRequestsDispatcher.DispatchRequestToVK<List<User>>("friends.get", parameters, callback, UsersService._deserializeUsersFunc, false, true, new CancellationToken?(),  null);
     }
 
@@ -534,30 +702,30 @@ namespace VKClient.Common.Backend
 
     public void GetFriendRequests(bool areSuggestedFriends, int offset, int count, Action<BackendResult<FriendRequests, ResultCode>> callback)
     {
+      if (areSuggestedFriends)
+      {
+        callback(new BackendResult<FriendRequests, ResultCode>(
+          ResultCode.Succeeded,
+          new FriendRequests() { are_suggested_friends = true }));
+        return;
+      }
+
       Dictionary<string, string> dictionary = new Dictionary<string, string>()
       {
         {
-          "requests_count",
+          "count",
           count.ToString()
         },
         {
-          "requests_offset",
+          "offset",
           offset.ToString()
         },
         {
-          "without_friends",
-          "1"
-        },
-        {
-          "requests_only",
-          !areSuggestedFriends ? "1" : "0"
-        },
-        {
-          "suggested_only",
-          areSuggestedFriends ? "1" : "0"
+          "fields",
+          "uid,first_name,last_name,online,online_mobile,photo_50,photo_100,photo_200,photo_max,sex,friend_status"
         }
       };
-      string methodName = "execute.getFriendsWithRequests";
+      string methodName = "friends.getRequests";
       Dictionary<string, string> parameters = dictionary;
       Action<BackendResult<FriendRequests, ResultCode>> callback1 = callback;
       int num1 = 0;
@@ -565,7 +733,27 @@ namespace VKClient.Common.Backend
       CancellationToken? cancellationToken = new CancellationToken?();
       // ISSUE: variable of the null type
       
-      VKRequestsDispatcher.DispatchRequestToVK<FriendRequests>(methodName, parameters, callback1, (Func<string, FriendRequests>) (jsonStr => JsonConvert.DeserializeObject<GenericRoot<FriendRequests>>(jsonStr).response), num1 != 0, num2 != 0, cancellationToken, null);
+      VKRequestsDispatcher.DispatchRequestToVK<FriendRequests>(methodName, parameters, callback1,
+        (Func<string, FriendRequests>) (jsonStr =>
+        {
+          VKList<User> response =
+            JsonConvert.DeserializeObject<GenericRoot<VKList<User>>>(jsonStr).response;
+          List<User> profiles = response != null && response.items != null
+            ? response.items
+            : new List<User>();
+          int total = response != null ? response.count : profiles.Count;
+          return new FriendRequests()
+          {
+            count = total,
+            menu_counter = total,
+            profiles = profiles,
+            requests = profiles.Select(user => new FriendRequest()
+            {
+              user_id = user.uid
+            }).ToList(),
+            are_suggested_friends = false
+          };
+        }), num1 != 0, num2 != 0, cancellationToken, null);
     }
 
     public void GetLists(Action<BackendResult<List<FriendsList>, ResultCode>> callback)
@@ -585,32 +773,66 @@ namespace VKClient.Common.Backend
 
     public void GetProfileBasicInfo(long userId, Action<BackendResult<UserData, ResultCode>> callback)
     {
-      string code = string.Format("var u = {0};\r\nvar full = API.users.get({{\"user_ids\":u, \"fields\":\"uid,first_name,last_name,photo_max,online, online_mobile,can_write_private_message,last_seen, can_post,activity,counters,wall_comments,sex\"}});\r\nvar friend_state = API.friends.areFriends({{\"user_ids\":u}})[0];\r\nreturn {{\"User\": full[0], \"friend\": friend_state}};", userId);
-      Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      Action<BackendResult<UserData, ResultCode>> callback1 = callback;
-      // ISSUE: variable of the null type
-      
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      VKRequestsDispatcher.Execute<UserData>(code, callback1, null, num1 != 0, num2 != 0, cancellationToken);
+      this.GetProfileInfo(userId, callback);
     }
 
     public void GetSubscriptions(long uid, Action<BackendResult<UsersAndGroups, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<UsersAndGroups>("execute.getSubscriptions", new Dictionary<string, string>()
+      VKRequestsDispatcher.DispatchRequestToVK<UsersAndGroups>("groups.get", new Dictionary<string, string>()
       {
+        { "user_id", uid.ToString() },
+        { "count", "5000" },
+        { "offset", "0" },
+        { "extended", "1" },
+        { "fields", "photo_50,photo_100,photo_200,screen_name,is_member" }
+      }, (Action<BackendResult<UsersAndGroups, ResultCode>>) (groupsResult =>
+      {
+        if (groupsResult.ResultCode != ResultCode.Succeeded ||
+            groupsResult.ResultData == null ||
+            uid != AppGlobalStateManager.Current.LoggedInUserId)
         {
-          "user_id",
-          uid.ToString()
+          callback(groupsResult);
+          return;
         }
-      }, callback, (Func<string, UsersAndGroups>) (jsonStr =>
+
+        // OpenVK exposes outgoing subscriptions to people through
+        // friends.getRequests(out=1). Its count is currently incorrect, so
+        // the item list is authoritative.
+        VKRequestsDispatcher.DispatchRequestToVK<VKList<User>>(
+          "friends.getRequests",
+          new Dictionary<string, string>()
+          {
+            { "out", "1" },
+            { "count", "100" },
+            { "offset", "0" },
+            { "fields", "photo_50,photo_100,photo_200,photo_max,screen_name,online" }
+          },
+          (Action<BackendResult<VKList<User>, ResultCode>>) (usersResult =>
+          {
+            if (usersResult.ResultCode == ResultCode.Succeeded &&
+                usersResult.ResultData != null)
+              groupsResult.ResultData.users =
+                usersResult.ResultData.items ?? new List<User>();
+            callback(groupsResult);
+          }),
+          (Func<string, VKList<User>>) (jsonStr =>
+          {
+            VKList<User> response =
+              JsonConvert.DeserializeObject<GenericRoot<VKList<User>>>(jsonStr).response;
+            return response ?? new VKList<User>();
+          }),
+          false,
+          true,
+          new CancellationToken?(),
+          null);
+      }), (Func<string, UsersAndGroups>) (jsonStr =>
       {
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "users", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "pages", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "groups", false);
-        return JsonConvert.DeserializeObject<GenericRoot<UsersAndGroups>>(jsonStr).response;
-      }), false, true, new CancellationToken?(),  null);
+        VKList<Group> response = JsonConvert.DeserializeObject<GenericRoot<VKList<Group>>>(jsonStr).response;
+        return new UsersAndGroups()
+        {
+          groups = response != null && response.items != null ? response.items : new List<Group>()
+        };
+      }), false, true, new CancellationToken?(), null);
     }
 
     public void GetUsersForTile(long uid, Action<BackendResult<List<User>, ResultCode>> callback)

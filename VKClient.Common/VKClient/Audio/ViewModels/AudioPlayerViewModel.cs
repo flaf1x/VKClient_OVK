@@ -295,7 +295,9 @@ namespace VKClient.Audio.ViewModels
             get
             {
                 AudioObj fromBackgroundAudio = this.GetCurrentTrackFromBackgroundAudio();
-                if (fromBackgroundAudio == null || fromBackgroundAudio.owner_id == AppGlobalStateManager.Current.LoggedInUserId)
+                if (fromBackgroundAudio == null)
+                    return false;
+                if (fromBackgroundAudio.owner_id == AppGlobalStateManager.Current.LoggedInUserId || fromBackgroundAudio.added)
                     return false;
                 return !AudioPlayerViewModel._addedTracks.Contains(fromBackgroundAudio.UniqueId);
             }

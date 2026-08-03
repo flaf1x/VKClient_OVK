@@ -86,12 +86,12 @@ namespace VKClient.Common.UC.Registration
 
     private void TermsClick(object sender, RoutedEventArgs e)
     {
-      Navigator.Current.NavigateToWebUri("https://vk.com/terms", true, false);
+      Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/terms", true, false);
     }
 
     private void PrivacyClick(object sender, RoutedEventArgs e)
     {
-      Navigator.Current.NavigateToWebUri("https://vk.com/privacy", true, false);
+      Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/privacy", true, false);
     }
 
     private void textBoxFirstName_KeyDown(object sender, KeyEventArgs e)

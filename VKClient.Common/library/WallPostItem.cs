@@ -227,7 +227,7 @@ namespace VKClient.Common.Library
         {
             get
             {
-                return this._wallPost.CanReport();
+                return false;
             }
         }
 
@@ -277,8 +277,26 @@ namespace VKClient.Common.Library
                 this._wallPost = WallPostItem.GetWallPostFromNewsItem(wallPostWithInfo.NewsItem);
             if (wallPostWithInfo.WallPost != null)
                 this._wallPost = wallPostWithInfo.WallPost;
-            this._users = wallPostWithInfo.Profiles;
-            this._groups = wallPostWithInfo.Groups;
+            this._wallPost = this._wallPost ?? new WallPost();
+            this._wallPost.comments = this._wallPost.comments ?? new Comments();
+            this._wallPost.likes = this._wallPost.likes ?? new Likes();
+            this._wallPost.reposts = this._wallPost.reposts ?? new Reposts();
+            this._wallPost.attachments = (this._wallPost.attachments ?? new List<Attachment>())
+                .Where(attachment => attachment != null)
+                .ToList();
+            foreach (Attachment attachment in this._wallPost.attachments)
+            {
+                if (attachment.type == "poll" && attachment.poll != null)
+                    attachment.poll.answers = (attachment.poll.answers ?? new List<Answer>())
+                        .Where(answer => answer != null)
+                        .ToList();
+            }
+            this._users = (wallPostWithInfo.Profiles ?? new List<User>())
+                .Where(user => user != null)
+                .ToList();
+            this._groups = (wallPostWithInfo.Groups ?? new List<Group>())
+                .Where(group => group != null)
+                .ToList();
             this._preview = preview;
             this.AdminLevel = 0;
             if (this.IsGroupPost)
@@ -776,7 +794,7 @@ namespace VKClient.Common.Library
                 if (user == null)
                     return;
                 name = user.Name;
-                pic = user.photo_max;
+                pic = user.UiAvatarSmall;
                 isMale = user.sex != 1;
             }
             else
@@ -785,7 +803,7 @@ namespace VKClient.Common.Library
                 if (group == null || group.name == null)
                     return;
                 name = group.name;
-                pic = group.photo_200;
+                pic = group.UiAvatarSmall;
                 isMale = true;
             }
         }
@@ -878,26 +896,6 @@ namespace VKClient.Common.Library
                 MenuItem menuItem2 = menuItem1;
                 // ISSUE: method pointer
                 menuItem2.Click += new RoutedEventHandler(this.goToOriginal_Click);
-                menuItemList.Add(menuItem2);
-            }
-            if (this.IgnoreNewsfeedItemCallback != null && this.GetIgnoreItemData() != null)
-            {
-                MenuItem menuItem1 = new MenuItem();
-                string lowerInvariant = CommonResources.HideThisPost.ToLowerInvariant();
-                menuItem1.Header = lowerInvariant;
-                MenuItem menuItem2 = menuItem1;
-                // ISSUE: method pointer
-                menuItem2.Click += new RoutedEventHandler(this.HidePostItem_OnClick);
-                menuItemList.Add(menuItem2);
-            }
-            if (!this.CanDelete && this.HideSourceItemsCallback != null)
-            {
-                MenuItem menuItem1 = new MenuItem();
-                string hideFromNews = CommonResources.HideFromNews;
-                menuItem1.Header = hideFromNews;
-                MenuItem menuItem2 = menuItem1;
-                // ISSUE: method pointer
-                menuItem2.Click += new RoutedEventHandler(this.HideFromNewsMenuItem_OnClick);
                 menuItemList.Add(menuItem2);
             }
             if (this.CanReport)
@@ -1032,7 +1030,7 @@ namespace VKClient.Common.Library
 
         private void CopyLinkMI_OnClick(object sender, RoutedEventArgs e)
         {
-            Clipboard.SetText(string.Format("https://vk.com/wall{0}_{1}", this.WallPost.to_id, this.WallPost.id));
+            Clipboard.SetText(string.Format("https://openvk.org/wall{0}_{1}", this.WallPost.to_id, this.WallPost.id));
         }
 
         private void HideFromNewsMenuItem_OnClick(object sender, RoutedEventArgs e)

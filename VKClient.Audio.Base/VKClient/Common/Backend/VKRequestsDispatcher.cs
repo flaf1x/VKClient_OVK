@@ -15,8 +15,6 @@ namespace VKClient.Common.Backend
     public static class VKRequestsDispatcher
     {
         private static readonly bool USE_HTTP = false;
-        public static readonly string _requestBaseUriFrm = "api.vk.com/method/{0}";
-        public static readonly string _loginUri = "api.vk.com/oauth/token";
         private static readonly string _errorPrefixGeneral = "{\"error\":{\"error_code\":";
         private static readonly string _errorPrefixFailed = "{\"failed";
         private static readonly string _errorPrefixCaptchaNeeded = "{\"error\":\"need_captcha\"";
@@ -30,9 +28,7 @@ namespace VKClient.Common.Backend
         {
             get
             {
-                if (!string.IsNullOrEmpty(AppGlobalStateManager.Current.GlobalState.BaseDomain))
-                    return AppGlobalStateManager.Current.GlobalState.BaseDomain + "/method/{0}";
-                return VKRequestsDispatcher._requestBaseUriFrm;
+                return OpenVKInstanceManager.Current.ApiOrigin + "/method/{0}";
             }
         }
 
@@ -40,9 +36,7 @@ namespace VKClient.Common.Backend
         {
             get
             {
-                if (!string.IsNullOrEmpty(AppGlobalStateManager.Current.GlobalState.BaseLoginDomain))
-                    return AppGlobalStateManager.Current.GlobalState.BaseLoginDomain + "/oauth/token";
-                return VKRequestsDispatcher._loginUri;
+                return OpenVKInstanceManager.Current.ApiOrigin + "/token";
             }
         }
 
@@ -87,23 +81,19 @@ namespace VKClient.Common.Backend
         {
             Dictionary<string, string> dictionary1 = new Dictionary<string, string>();
             dictionary1["grant_type"] = "password";
-            dictionary1["client_id"] = VKConstants.ApplicationID;
-            dictionary1["client_secret"] = VKConstants.ApplicationSecretKey;
+            dictionary1["client_name"] = VKConstants.OpenVKClientName;
             dictionary1["username"] = login;
             dictionary1["password"] = password;
-            dictionary1["2fa_supported"] = "1";
-            dictionary1["device_id"] = AppGlobalStateManager.Current.GlobalState.DeviceId;
             
             if (!string.IsNullOrEmpty(code))
                 dictionary1["code"] = code;
-            else if (forceSms)
-                dictionary1["force_sms"] = "1";
-            dictionary1["scope"] = "notify, friends, photos, audio, video, docs, notes, pages, status, wall, groups, messages, notifications, stats, market";
-            if (VKRequestsDispatcher.USE_HTTP)
+            VKRequestsDispatcher.DoDispatch<AutorizationData>(VKRequestsDispatcher.LoginUri, "", dictionary1, callback, new Func<string, AutorizationData>(json =>
             {
-                dictionary1["scope"] = dictionary1["scope"] + ", nohttps";
-            }
-            VKRequestsDispatcher.DoDispatch<AutorizationData>(VKRequestsDispatcher.LoginUri, "", dictionary1, callback, new Func<string, AutorizationData>(JsonConvert.DeserializeObject<AutorizationData>), false, true, cancellationToken, null);
+                AutorizationData authorizationData = JsonConvert.DeserializeObject<AutorizationData>(json);
+                if (authorizationData != null)
+                    authorizationData.secret = null;
+                return authorizationData;
+            }), false, true, cancellationToken, null);
         }
 
         public static void Execute<T>(string code, Action<BackendResult<T, ResultCode>> callback, Func<string, T> customDesFunc = null, bool lowPriority = false, bool pageDataRequest = true, CancellationToken? cancellationToken = null) where T : class
@@ -127,7 +117,7 @@ namespace VKClient.Common.Backend
                 parameters["access_token"] = VKRequestsDispatcher._autorizationData.access_token;
             VKRequestsDispatcher.AddLangParameter(parameters);
             AutorizationData autorizationData2 = VKRequestsDispatcher._autorizationData;
-            if (!string.IsNullOrEmpty(autorizationData2 != null ? autorizationData2.secret : null))
+            if (!IsOpenVKRequest(baseUrl) && !string.IsNullOrEmpty(autorizationData2 != null ? autorizationData2.secret : null))
             {
                 if (parameters.ContainsKey("sig"))
                     parameters.Remove("sig");
@@ -137,7 +127,7 @@ namespace VKClient.Common.Backend
                 string str2 = VKRequestsDispatcher.HashString("/method/" + methodName + str1 + VKRequestsDispatcher._autorizationData.secret);
                 parameters["sig"] = str2.ToLower();
             }
-            JsonWebRequest.SendHTTPRequestAsync(!VKRequestsDispatcher.USE_HTTP ? "https://" + baseUrl : "http://" + baseUrl, parameters, (Action<JsonResponseData>)(jsonResp =>
+            JsonWebRequest.SendHTTPRequestAsync(VKRequestsDispatcher.GetAbsoluteUrl(baseUrl), parameters, (Action<JsonResponseData>)(jsonResp =>
             {
                 if (jsonResp.IsSucceeded)
                 {
@@ -156,11 +146,29 @@ namespace VKClient.Common.Backend
 
         private static void DoDispatch<R>(string baseUrl, string methodName, Dictionary<string, string> parameters, Action<BackendResult<R, ResultCode>> callback, Func<string, R> customDeserializationFunc = null, bool lowPriority = false, bool pageDataRequest = true, CancellationToken? cancellationToken = null, Action confirmationRequiredHandler = null)
         {
+            if (IsOpenVKRequest(baseUrl) &&
+                string.Equals(methodName, "photos.get", StringComparison.OrdinalIgnoreCase) &&
+                parameters.ContainsKey("album_id"))
+            {
+                string albumId = parameters["album_id"];
+                int separator = string.IsNullOrEmpty(albumId) ? -1 : albumId.LastIndexOf('_');
+                if (separator >= 0 && separator + 1 < albumId.Length)
+                    parameters["album_id"] = albumId.Substring(separator + 1);
+            }
+            if (IsOpenVKRequest(baseUrl) &&
+                string.Equals(methodName, "groups.get", StringComparison.OrdinalIgnoreCase))
+            {
+                const string photoFields = "photo_50,photo_100,photo_200,photo_max";
+                if (!parameters.ContainsKey("fields") || string.IsNullOrWhiteSpace(parameters["fields"]))
+                    parameters["fields"] = photoFields;
+                else
+                    parameters["fields"] = parameters["fields"] + "," + photoFields;
+            }
             parameters["v"] = VKConstants.API_VERSION;
             if (!string.IsNullOrEmpty(VKRequestsDispatcher._autorizationData != null ? VKRequestsDispatcher._autorizationData.access_token : null))
                 parameters["access_token"] = VKRequestsDispatcher._autorizationData.access_token;
             VKRequestsDispatcher.AddLangParameter(parameters);
-            if (!string.IsNullOrEmpty(VKRequestsDispatcher._autorizationData != null ? VKRequestsDispatcher._autorizationData.secret : null))
+            if (!IsOpenVKRequest(baseUrl) && !string.IsNullOrEmpty(VKRequestsDispatcher._autorizationData != null ? VKRequestsDispatcher._autorizationData.secret : null))
             {
                 if (parameters.ContainsKey("sig"))
                     parameters.Remove("sig");
@@ -170,19 +178,44 @@ namespace VKClient.Common.Backend
                 string str2 = VKRequestsDispatcher.HashString("/method/" + methodName + str1 + VKRequestsDispatcher._autorizationData.secret);
                 parameters["sig"] = str2.ToLower();
             }
-            JsonWebRequest.SendHTTPRequestAsync(!VKRequestsDispatcher.USE_HTTP ? "https://" + baseUrl : "http://" + baseUrl, parameters, (Action<JsonResponseData>)(jsonResp =>
+            JsonWebRequest.SendHTTPRequestAsync(VKRequestsDispatcher.GetAbsoluteUrl(baseUrl), parameters, (Action<JsonResponseData>)(jsonResp =>
             {
                 BackendResult<R, ResultCode> backendResult = new BackendResult<R, ResultCode>(ResultCode.CommunicationFailed);
                 if (jsonResp.IsSucceeded)
                 {
-                    VKRequestsDispatcher.ResultData resultFromJson = VKRequestsDispatcher.GetResultFromJson(JObject.Parse(jsonResp.JsonString));
+                    string responseJson = jsonResp.JsonString;
+                    if (IsOpenVKRequest(baseUrl))
+                        responseJson = OpenVKResponseAdapter.Adapt(methodName, responseJson);
+
+                    TraceOpenVkResponse(methodName, responseJson);
+
+                    JObject responseObject;
+                    try
+                    {
+                        responseObject = JObject.Parse(responseJson);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Instance.Error("Invalid JSON response for method " + (methodName ?? ""), ex);
+                        backendResult.ResultCode = ResultCode.DeserializationError;
+                        VKRequestsDispatcher.InvokeCallback((Action)(() =>
+                        {
+                            if (callback != null)
+                                callback(backendResult);
+                        }), cancellationToken);
+                        return;
+                    }
+
+                    VKRequestsDispatcher.ResultData resultFromJson = VKRequestsDispatcher.GetResultFromJson(responseObject);
+                    if (string.IsNullOrEmpty(methodName) && resultFromJson.ResultCode == (ResultCode)28)
+                        resultFromJson.ResultCode = ResultCode.WrongUsernameOrPassword;
                     backendResult.ResultCode = resultFromJson.ResultCode;
                     backendResult.Error = resultFromJson.error;
                     if (backendResult.ResultCode == ResultCode.UserAuthorizationFailed)
                     {
                         if (!string.IsNullOrEmpty(VKRequestsDispatcher._autorizationData != null ? VKRequestsDispatcher._autorizationData.access_token : null))
                         {
-                            Logger.Instance.Error("RECEIVED AUTHORIZATION FAILURE!!! JSON STR = " + jsonResp.JsonString ?? "");
+                            Logger.Instance.Error("Received authorization failure for method " + (methodName ?? ""));
                             LogoutRequestHandler.InvokeLogoutRequest();
                         }
                     }
@@ -273,14 +306,14 @@ namespace VKClient.Common.Backend
                             List<ExecuteError> executeErrorList = null;
                             R r;
                             if (customDeserializationFunc != null)
-                                r = customDeserializationFunc(jsonResp.JsonString);
+                                r = customDeserializationFunc(responseJson);
                             else if (typeof(R) == typeof(VKClient.Common.Backend.DataObjects.ResponseWithId))
                             {
-                                r = JsonConvert.DeserializeObject<R>(jsonResp.JsonString);
+                                r = JsonConvert.DeserializeObject<R>(responseJson);
                             }
                             else
                             {
-                                VKRequestsDispatcher.GenericRoot<R> genericRoot = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<R>>(jsonResp.JsonString);
+                                VKRequestsDispatcher.GenericRoot<R> genericRoot = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<R>>(responseJson);
                                 r = genericRoot.response;
                                 executeErrorList = genericRoot.execute_errors;
                             }
@@ -289,10 +322,14 @@ namespace VKClient.Common.Backend
                         }
                         catch (Exception ex)
                         {
-                            Logger.Instance.Error("Error during deserialization", ex);
+                            Logger.Instance.Error("Error during deserialization for method " + (methodName ?? ""), ex);
                             backendResult.ResultCode = ResultCode.DeserializationError;
                         }
                     }
+                }
+                else if (ShouldTraceOpenVkMethod(methodName))
+                {
+                    Logger.Instance.Diagnostic("API TRACE " + (methodName ?? "<login>") + ": communication failed");
                 }
                 if (backendResult.ResultCode == ResultCode.CaptchaRequired || backendResult.ResultCode == ResultCode.ValidationRequired || (backendResult.ResultCode == ResultCode.ConfirmationRequired || backendResult.ResultCode == ResultCode.NotEnoughMoney))
                     return;
@@ -305,6 +342,21 @@ namespace VKClient.Common.Backend
                     action(backendResult1);
                 }), cancellationToken);
             }), true, lowPriority, pageDataRequest);
+        }
+
+        private static bool ShouldTraceOpenVkMethod(string methodName)
+        {
+            return !string.IsNullOrEmpty(methodName);
+        }
+
+        private static void TraceOpenVkResponse(string methodName, string responseJson)
+        {
+            if (!ShouldTraceOpenVkMethod(methodName))
+                return;
+            string text = responseJson ?? "<null>";
+            if (text.Length > 1200)
+                text = text.Substring(0, 1200) + "...";
+            Logger.Instance.Diagnostic("API TRACE " + methodName + " len=" + (responseJson == null ? 0 : responseJson.Length) + " " + text);
         }
 
         private static void ProcessValidationResponse<R>(ValidationUserResponse valResp, string baseUrl, string methodName, Dictionary<string, string> parameters, Action<BackendResult<R, ResultCode>> callback, Func<string, R> customDeserializationFunc = null, bool lowPriority = false, bool pageDataRequest = true, CancellationToken? cancellationToken = null)
@@ -352,6 +404,19 @@ namespace VKClient.Common.Backend
             if (!(lang != ""))
                 return;
             parameters["lang"] = lang;
+        }
+
+        private static bool IsOpenVKRequest(string baseUrl)
+        {
+            return !string.IsNullOrEmpty(baseUrl) && OpenVKInstanceManager.IsCurrentInstanceUrl(baseUrl);
+        }
+
+        private static string GetAbsoluteUrl(string baseUrl)
+        {
+            if (baseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return baseUrl;
+            return (!VKRequestsDispatcher.USE_HTTP ? "https://" : "http://") + baseUrl;
         }
 
         private static string HashString(string strToHash)
@@ -428,6 +493,17 @@ namespace VKClient.Common.Backend
             };
             try
             {
+                JToken topLevelErrorCode = jObject["error_code"];
+                if (topLevelErrorCode != null)
+                {
+                    VKRequestsDispatcher.Error error = jObject.ToObject<VKRequestsDispatcher.Error>();
+                    resultData.error = error;
+                    resultData.ResultCode = (ResultCode)error.error_code;
+                    resultData.captcha_sid = error.captcha_sid;
+                    resultData.captcha_img = error.captcha_img;
+                    resultData.redirect_uri = error.redirect_uri;
+                    return resultData;
+                }
                 JToken jtoken1 = jObject["error"];
                 if (jtoken1 != null)
                 {

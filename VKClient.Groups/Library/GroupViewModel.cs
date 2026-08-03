@@ -34,6 +34,7 @@ namespace VKClient.Groups.Library
         private readonly string _prefetchedName = "";
         private long _gid;
         private Group _group;
+        private GroupData _groupData;
         private readonly GenericCollectionViewModel<WallData, IVirtualizable> _wallVM;
         private bool _isLoading;
         private bool _loaded;
@@ -176,7 +177,7 @@ namespace VKClient.Groups.Library
             {
                 if (this._group == null)
                     return "";
-                return this._group.photo_200;
+                return this._group.UiAvatarMedium;
             }
         }
 
@@ -369,6 +370,7 @@ namespace VKClient.Groups.Library
                         this._loaded = true;
                         if (res.ResultCode == ResultCode.Succeeded)
                         {
+                            this._groupData = res.ResultData;
                             this._group = res.ResultData.group;
                             this.ReadData();
                             this.LoadWallData(reload, suppressLoading);
@@ -471,7 +473,7 @@ namespace VKClient.Groups.Library
                 this.ReadActionButtons();
                 this.ReadNavigateButtons();
                 this.ReadInfoRows();
-                this.GroupMembershipInfo = new GroupMembershipInfo(null);
+                this.GroupMembershipInfo = new GroupMembershipInfo(this._groupData);
             });
         }
 
@@ -484,7 +486,7 @@ namespace VKClient.Groups.Library
                 ((Collection<InformationRow>)this._infoRows).Add((InformationRow)new WebLinkInformationRow(this._group.link));
             if (string.IsNullOrEmpty(this._group.screen_name))
                 return;
-            ((Collection<InformationRow>)this._infoRows).Add((InformationRow)new WebLinkInformationRow("https://vk.com/" + this._group.screen_name));
+            ((Collection<InformationRow>)this._infoRows).Add((InformationRow)new WebLinkInformationRow("https://openvk.org/" + this._group.screen_name));
         }
 
         private void ReadNavigateButtons()
@@ -651,7 +653,7 @@ namespace VKClient.Groups.Library
                 if (!string.IsNullOrEmpty(this._group.place.countryName))
                     str2 = str2 + ", " + this._group.place.countryName;
             }
-            return str2;
+            return str2.Replace("\u00e2\u20ac\u201d", "—");
         }
 
         public void GetData(GenericCollectionViewModel<WallData, IVirtualizable> caller, int offset, int count, Action<BackendResult<WallData, ResultCode>> callback)
@@ -732,7 +734,7 @@ namespace VKClient.Groups.Library
             string smallPhoto = "";
             if (this._group != null && this._group.photo_200 != null)
             {
-                smallPhoto = this._group.photo_200;
+                smallPhoto = this._group.UiAvatarMedium;
             }
             string name = "";
             if (!string.IsNullOrWhiteSpace(this._prefetchedName))

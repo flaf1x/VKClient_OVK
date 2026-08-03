@@ -90,7 +90,10 @@ namespace VKClient.Common.Profiles.Users.ViewModels
         public void GetData(GenericCollectionViewModel<List<Group>, GroupHeader> caller, int offset, int count, Action<BackendResult<List<Group>, ResultCode>> callback)
         {
             if (offset > 0)
+            {
                 callback(new BackendResult<List<Group>, ResultCode>(ResultCode.Succeeded, new List<Group>()));
+                return;
+            }
             this._asyncHelper.RunAction((Action<BackendResult<UsersAndGroups, ResultCode>>)(response =>
             {
                 if (response.ResultCode != ResultCode.Succeeded)
@@ -106,7 +109,10 @@ namespace VKClient.Common.Profiles.Users.ViewModels
         public void GetData(GenericCollectionViewModel<UsersAndGroups, UserGroupHeader> caller, int offset, int count, Action<BackendResult<UsersAndGroups, ResultCode>> callback)
         {
             if (offset > 0)
+            {
                 callback(new BackendResult<UsersAndGroups, ResultCode>(ResultCode.Succeeded, new UsersAndGroups()));
+                return;
+            }
             this._asyncHelper.RunAction((Action<BackendResult<UsersAndGroups, ResultCode>>)(response =>
             {
                 if (response.ResultCode != ResultCode.Succeeded)

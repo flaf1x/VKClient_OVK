@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -33,31 +34,25 @@ namespace VKClient.Common.Backend
 
     public void RegisterDevice(string deviceId, string token, string deviceModelViewable, string systemVersion, string appVersion, string settings, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["token"] = token;
-      parameters["device_id"] = deviceId;
-      parameters["device_model"] = deviceModelViewable;
-      parameters["system_version"] = systemVersion;
-      parameters["app_version"] = appVersion;
-      if (!string.IsNullOrEmpty(settings))
-        parameters["settings"] = settings;
-      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Common.Backend.DataObjects.ResponseWithId>("account.registerDevice", parameters, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?(),  null);
+      // OpenVK has no mobile push registration endpoint. Complete locally to
+      // prevent the original retry loop from treating this as connectivity loss.
+      callback(new BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>(
+        ResultCode.Succeeded,
+        new VKClient.Common.Backend.DataObjects.ResponseWithId() { response = 1 }));
     }
 
     public void UnregisterDevice(string deviceId, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["device_id"] = deviceId;
-      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Common.Backend.DataObjects.ResponseWithId>("account.unregisterDevice", parameters, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?(),  null);
+      callback(new BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>(
+        ResultCode.Succeeded,
+        new VKClient.Common.Backend.DataObjects.ResponseWithId() { response = 1 }));
     }
 
     public void SetPushSettings(string deviceId, string key, string value, string key2, string value2, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
-      string format = "API.account.setPushSettings({{\"device_id\":\"{0}\", \"key\":\"{1}\", \"value\":\"{2}\"}});";
-      string code = string.Format(format, deviceId, key, value);
-      if (!string.IsNullOrWhiteSpace(key2) && !string.IsNullOrWhiteSpace(value2))
-        code = code + Environment.NewLine + string.Format(format, deviceId, key2, value2);
-      VKRequestsDispatcher.Execute<VKClient.Common.Backend.DataObjects.ResponseWithId>(code, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?());
+      callback(new BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>(
+        ResultCode.Succeeded,
+        new VKClient.Common.Backend.DataObjects.ResponseWithId() { response = 1 }));
     }
 
     public void CheckShortName(string shortName, Action<BackendResult<CheckNameResponse, ResultCode>> callback)
@@ -173,13 +168,13 @@ namespace VKClient.Common.Backend
     public void BanUser(long user_id, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["user_id"] = user_id.ToString();
-      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Common.Backend.DataObjects.ResponseWithId>("account.banUser", parameters, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?(),  null);
+      parameters["owner_id"] = user_id.ToString();
+      VKRequestsDispatcher.DispatchRequestToVK<VKClient.Common.Backend.DataObjects.ResponseWithId>("account.ban", parameters, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?(),  null);
     }
 
     public void UnbanUsers(List<long> user_ids, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
-      string format = "API.account.unbanUser({{\"user_id\":{0}}});";
+      string format = "API.account.unban({{\"owner_id\":{0}}});";
       string code = "";
       foreach (long userId in user_ids)
         code = code + string.Format(format, userId) + Environment.NewLine;
@@ -188,23 +183,10 @@ namespace VKClient.Common.Backend
 
     public void StatsTrackEvents(List<AppEventBase> appEvents, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
     {
-      List<AppEventBase> appEventBaseList1 = new List<AppEventBase>();
-      List<AppEventBase> appEventBaseList2 = new List<AppEventBase>();
-      foreach (AppEventBase appEvent in appEvents)
-      {
-        if (appEvent is AppEventAdImpression)
-          appEventBaseList2.Add(appEvent);
-        else
-          appEventBaseList1.Add(appEvent);
-      }
-      string format1 = "API.stats.trackEvents({{events:\"{0}\"}});";
-      string format2 = "API.adsint.registerAdEvents({{events:\"{0}\"}});";
-      string code = "";
-      if (appEventBaseList2.Count > 0)
-        code += string.Format(format2, JsonConvert.SerializeObject(appEventBaseList2).Replace("\"", "\\\""));
-      if (appEventBaseList1.Count > 0)
-        code += string.Format(format1, JsonConvert.SerializeObject(appEventBaseList1).Replace("\"", "\\\""));
-      VKRequestsDispatcher.Execute<VKClient.Common.Backend.DataObjects.ResponseWithId>(code, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>) (jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, new CancellationToken?());
+      if (callback != null)
+        callback(new BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>(
+          ResultCode.Succeeded,
+          new VKClient.Common.Backend.DataObjects.ResponseWithId()));
     }
 
     public void InternalGetNotifications(string device, string os, string appVersion, string locale, Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback)
@@ -237,7 +219,7 @@ namespace VKClient.Common.Backend
 
     public void GetCounters(Action<BackendResult<OwnCounters, ResultCode>> callback)
     {
-      string methodName = "getCounters";
+      string methodName = "account.getCounters";
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       Action<BackendResult<OwnCounters, ResultCode>> callback1 = callback;
       int num1 = 0;
@@ -250,97 +232,80 @@ namespace VKClient.Common.Backend
 
     public void GetBaseData(PhoneAppInfo phoneAppInfo, Action<BackendResult<AccountBaseData, ResultCode>> callback, bool loadStickersInfo = false)
     {
-      ThemeSettings themeSettings = ThemeSettingsManager.GetThemeSettings();
-      Color color = ((SolidColorBrush) Application.Current.Resources["PhoneBackgroundBrush"]).Color;
-      // ISSUE: explicit reference operation
-      string str1 = (int) ((Color) @color).R == 0 ? "dark" : "light";
-      string str2 = "";
-      switch (themeSettings.BackgroundSettings)
-      {
-        case 0:
-          str2 = "system";
-          break;
-        case 2:
-          str2 = "dark";
-          break;
-        case 3:
-          str2 = "light";
-          break;
-      }
       Dictionary<string, string> parameters = new Dictionary<string, string>()
       {
         {
-          "userId",
-          AppGlobalStateManager.Current.LoggedInUserId.ToString()
-        },
-        {
-          "device",
-          phoneAppInfo.Device
-        },
-        {
-          "os",
-          phoneAppInfo.OS
-        },
-        {
-          "version",
-          phoneAppInfo.AppVersion
-        },
-        {
-          "locale",
-          phoneAppInfo.Locale
-        },
-        {
-          "themeBackgroundMode",
-          str2
-        },
-        {
-          "themeActiveBackground",
-          str1
-        },
-        {
-          "func_v",
-          "5"
+          "fields",
+          "photo_50,photo_100,photo_200,photo_max,exports,country,city,sex,status,activity,bdate,first_name_gen,last_name_gen,verified,counters,online,last_seen,screen_name"
         }
       };
-      if (loadStickersInfo)
-        parameters["loadStickers"] = "1";
-      VKRequestsDispatcher.DispatchRequestToVK<AccountBaseData>("execute.getBaseData", parameters, callback, (Func<string, AccountBaseData>) (jsonStr =>
+
+      VKRequestsDispatcher.DispatchRequestToVK<AccountBaseData>("execute.getUserInfo", parameters, callback, (Func<string, AccountBaseData>) (jsonStr =>
       {
-        jsonStr = jsonStr.Replace("\"OwnCounters\":[]", "\"OwnCounters\":{}");
-        jsonStr = jsonStr.Replace("\"exports\":[]", "\"exports\":{}");
-        return JsonConvert.DeserializeObject<GenericRoot<AccountBaseData>>(jsonStr).response;
+        JObject response = JObject.Parse(jsonStr)["response"] as JObject;
+        if (response == null)
+          return new AccountBaseData()
+          {
+            User = new User(),
+            OwnCounters = new OwnCounters(),
+            Info = new AccountBaseInfo(),
+            NewsData = new NewsFeedData()
+          };
+
+        AccountBaseInfo info = response["info"] != null
+          ? response["info"].ToObject<AccountBaseInfo>()
+          : new AccountBaseInfo();
+        JObject profilerSettings = response["info"] != null
+          ? response["info"]["profiler_settings"] as JObject
+          : null;
+        if (info.settings == null && profilerSettings != null && profilerSettings["settings"] != null)
+          info.settings = profilerSettings["settings"].ToObject<List<AccountBaseInfoSettingsEntry>>();
+
+        User profile = response["profile"] != null
+          ? response["profile"].ToObject<User>()
+          : new User();
+        if (profile.id == 0L)
+          profile.id = VKRequestsDispatcher.AuthData.user_id;
+
+        return new AccountBaseData()
+        {
+          User = profile,
+          OwnCounters = response["counters"] != null ? response["counters"].ToObject<OwnCounters>() : new OwnCounters(),
+          NewsData = response["newsfeed"] != null ? response["newsfeed"].ToObject<NewsFeedData>() : new NewsFeedData(),
+          Info = info,
+          time = response["time"] != null ? response["time"].Value<int>() : 0,
+          GamesSectionEnabled = 0,
+          DebugDisabled = 1
+        };
       }), true, true, new CancellationToken?(),  null);
     }
 
     public void GetIntermediateData(Action<BackendResult<AccountIntermediateData, ResultCode>> callback)
     {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>()
-      {
-        {
-          "func_v",
-          "2"
-        }
-      };
-      string methodName = "execute.getIntermediateData";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<AccountIntermediateData, ResultCode>> callback1 = callback;
-      int num1 = 1;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<AccountIntermediateData>(methodName, parameters, callback1, (Func<string, AccountIntermediateData>) (jsonStr => JsonConvert.DeserializeObject<GenericRoot<AccountIntermediateData>>(jsonStr).response), num1 != 0, num2 != 0, cancellationToken, null);
+      VKRequestsDispatcher.DispatchRequestToVK<AccountIntermediateData>(
+        "account.setOnline",
+        new Dictionary<string, string>(),
+        callback,
+        (Func<string, AccountIntermediateData>) (jsonStr => new AccountIntermediateData()),
+        true,
+        true,
+        new CancellationToken?(),
+        null);
     }
 
     public void ResolveScreenName(string name, Action<BackendResult<ResolvedData, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<ResolvedData>("execute.resolveScreenName", new Dictionary<string, string>()
+      VKRequestsDispatcher.DispatchRequestToVK<ResolvedData>("utils.resolveScreenName", new Dictionary<string, string>()
       {
         {
-          "name",
+          "screen_name",
           name
         }
-      }, callback,  null, false, true, new CancellationToken?(),  null);
+      }, callback, jsonStr =>
+      {
+        ResolvedObject resolved = JsonConvert.DeserializeObject<GenericRoot<ResolvedObject>>(jsonStr).response;
+        return new ResolvedData() { resolvedObject = resolved };
+      }, false, true, new CancellationToken?(), null);
     }
 
     public void StatusSet(string text, string audio, long groupId, Action<BackendResult<long, ResultCode>> callback)

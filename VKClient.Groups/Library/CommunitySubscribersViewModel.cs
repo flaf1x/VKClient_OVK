@@ -48,17 +48,24 @@ namespace VKClient.Groups.Library
                 return (Func<CommunitySubscribers, ListWithCount<LinkHeader>>)(list =>
                 {
                     ListWithCount<LinkHeader> listWithCount = new ListWithCount<LinkHeader>();
-                    listWithCount.TotalCount = list.subscribers.count;
-                    if (list.managers != null && list.managers.Any<User>())
+                    VKList<User> subscribers = list != null ? list.subscribers : null;
+                    if (subscribers == null)
+                      subscribers = new VKList<User>();
+                    if (subscribers.items == null)
+                      subscribers.items = new List<User>();
+                    listWithCount.TotalCount = subscribers.count;
+                    if (list != null && list.managers != null && list.managers.Any<User>())
                         this.Managers = list.managers;
-                    if (list.contacts != null && list.contacts.Any<GroupContact>())
+                    if (list != null && list.contacts != null && list.contacts.Any<GroupContact>())
                         this._contacts = list.contacts;
                     CommunityManagementRole currentUserRole = CommunityManagementRole.Unknown;
                     User user1 = this.Managers.FirstOrDefault<User>((Func<User, bool>)(m => m.id == AppGlobalStateManager.Current.LoggedInUserId));
                     if (user1 != null)
                         currentUserRole = user1.Role;
-                    foreach (User user2 in list.subscribers.items)
+                    foreach (User user2 in subscribers.items)
                     {
+                        if (user2 == null)
+                            continue;
                         User user = user2;
                         User user3 = this.Managers.FirstOrDefault<User>((Func<User, bool>)(m => m.id == user.id));
                         if (user3 != null)

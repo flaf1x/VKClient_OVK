@@ -85,26 +85,6 @@ namespace VKClient.Common.Library.VirtItems
     private List<MenuItem> GenerateMenuItems()
     {
       List<MenuItem> menuItemList = new List<MenuItem>();
-      if (this.HideSourceItemsCallback != null)
-      {
-        MenuItem menuItem1 = new MenuItem();
-        string hideFromNews = CommonResources.HideFromNews;
-        menuItem1.Header = hideFromNews;
-        MenuItem menuItem2 = menuItem1;
-        // ISSUE: method pointer
-        menuItem2.Click += new RoutedEventHandler( this.hideFromNewsMenuItem_Click);
-        menuItemList.Add(menuItem2);
-      }
-      if (this._ignoreNewsfeedItemCallback != null && this.GetIgnoreItemData() != null)
-      {
-        MenuItem menuItem1 = new MenuItem();
-        string lowerInvariant = ((string) CommonResources.HideThisPost).ToLowerInvariant();
-        menuItem1.Header = lowerInvariant;
-        MenuItem menuItem2 = menuItem1;
-        // ISSUE: method pointer
-        menuItem2.Click += new RoutedEventHandler( this.HidePostItem_OnClick);
-        menuItemList.Add(menuItem2);
-      }
       return menuItemList;
     }
 

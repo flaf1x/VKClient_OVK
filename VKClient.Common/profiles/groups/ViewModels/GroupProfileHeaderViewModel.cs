@@ -34,7 +34,7 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
                 return;
             this.Name = group.name;
             this.Description = group.GroupType == GroupType.Event ? CommonResources.Event : group.activity;
-            this.ProfileImageUrl = group.photo_200;
+            this.ProfileImageUrl = group.UiAvatarLarge;
             this.VerifiedVisibility = groupData.IsVerified.ToVisiblity();
             CoverImage coverImage = groupData.CoverImage;
             if (coverImage != null)
@@ -43,7 +43,7 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
                 if (!string.IsNullOrEmpty(this.CoverImageUrl))
                     this.CoverImageVisibility = Visibility.Visible;
             }
-            this.HasAvatar = ProfileHeaderViewModelBase.IsValidAvatarUrl(group.photo_200);
+            this.HasAvatar = ProfileHeaderViewModelBase.IsValidAvatarUrl(group.UiAvatarLarge);
             this.DataVisibility = Visibility.Visible;
         }
 

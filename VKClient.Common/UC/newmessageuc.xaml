@@ -222,7 +222,8 @@
 
                     </ScrollViewer>
 
-                    <Grid Width="64"
+                    <Grid x:Name="gridAddAttachment"
+                          Width="64"
                           Height="72"
                           framework:MetroInMotion.Tilt="2.1"
                           Background="Transparent"

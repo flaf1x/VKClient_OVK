@@ -94,6 +94,8 @@ namespace VKClient.Common.Backend.DataObjects
 
     public int content_restricted { get; set; }
 
+    public bool added { get; set; }
+
     public override string ToString()
     {
       return string.Format("audio{0}_{1}", this.owner_id, this.id);
@@ -101,7 +103,7 @@ namespace VKClient.Common.Backend.DataObjects
 
     public void Write(BinaryWriter writer)
     {
-      writer.Write(2);
+      writer.Write(3);
       writer.Write(this.aid);
       writer.Write(this.owner_id);
       writer.WriteString(this.artist);
@@ -110,6 +112,7 @@ namespace VKClient.Common.Backend.DataObjects
       writer.WriteString(this.url);
       writer.Write(this.album_id);
       writer.Write(this.lyrics_id);
+      writer.Write(this.added);
     }
 
     public void Read(BinaryReader reader)
@@ -126,6 +129,9 @@ namespace VKClient.Common.Backend.DataObjects
       if (num1 < num2)
         return;
       this.lyrics_id = reader.ReadInt64();
+      if (num1 < 3)
+        return;
+      this.added = reader.ReadBoolean();
     }
   }
 }

@@ -31,8 +31,8 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
       this.Data = this._domain;
       if (string.IsNullOrEmpty(this._domain))
         return;
-      this._webLink = "vk.com/" + this._domain;
-      this.NavigationAction = (Action) (() => Navigator.Current.NavigateToWebUri(this._webLink, true, false));
+      this._webLink = "openvk.org/" + this._domain;
+      this.NavigationAction = (Action) (() => Navigator.Current.NavigateToWebUri(this._webLink, false, false));
     }
 
     public string GetData()

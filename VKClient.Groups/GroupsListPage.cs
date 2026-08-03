@@ -31,8 +31,6 @@ namespace VKClient.Groups
     private bool _isInitialized;
     private long _excludedId;
     private ApplicationBarIconButton _appBarButtonSearch;
-    private ApplicationBarIconButton _appBarButtonGlobe;
-    private ApplicationBarIconButton _appBarButtonCreate;
     private ApplicationBar _defaultAppBar;
     private DialogService _dialogService;
     private bool _pickManaged;
@@ -70,18 +68,6 @@ namespace VKClient.Groups
       string pageAppBarSearch = CommonResources.FriendsPage_AppBar_Search;
       applicationBarIconButton1.Text=(pageAppBarSearch);
       this._appBarButtonSearch = applicationBarIconButton1;
-      ApplicationBarIconButton applicationBarIconButton2 = new ApplicationBarIconButton();
-      Uri uri2 = new Uri("/Resources/New/globe.png", UriKind.Relative);
-      applicationBarIconButton2.IconUri=(uri2);
-      string lowerInvariant1 = CommonResources.RecommendedGroups_Recommendations.ToLowerInvariant();
-      applicationBarIconButton2.Text=(lowerInvariant1);
-      this._appBarButtonGlobe = applicationBarIconButton2;
-      ApplicationBarIconButton applicationBarIconButton3 = new ApplicationBarIconButton();
-      Uri uri3 = new Uri("/Resources/appbar.add.rest.png", UriKind.Relative);
-      applicationBarIconButton3.IconUri=(uri3);
-      string lowerInvariant2 = CommonResources.NewFriendsList_Create.ToLowerInvariant();
-      applicationBarIconButton3.Text=(lowerInvariant2);
-      this._appBarButtonCreate = applicationBarIconButton3;
       ApplicationBar applicationBar = new ApplicationBar();
       Color appBarBgColor = VKConstants.AppBarBGColor;
       applicationBar.BackgroundColor=(appBarBgColor);
@@ -104,14 +90,7 @@ namespace VKClient.Groups
     private void BuildAppBar()
     {
       this._appBarButtonSearch.Click+=(new EventHandler(this._appBarButtonSearch_Click));
-      this._appBarButtonGlobe.Click+=(new EventHandler(this._appBarButtonGlobe_Click));
-      this._appBarButtonCreate.Click+=(new EventHandler(GroupsListPage._appBarButtonCreate_Click));
       this._defaultAppBar.Buttons.Add((object) this._appBarButtonSearch);
-    }
-
-    private void _appBarButtonGlobe_Click(object sender, EventArgs e)
-    {
-      Navigator.Current.NavigateToGroupRecommendations(0, "");
     }
 
     private void UpdateAppBar()
@@ -120,10 +99,6 @@ namespace VKClient.Groups
         return;
       this.ApplicationBar=((IApplicationBar) this._defaultAppBar);
       this._defaultAppBar.Opacity=(0.9);
-      if (this._pickManaged || this._shareContentDataProvider != null || this._ownerId != 0L && this._ownerId != AppGlobalStateManager.Current.LoggedInUserId || this._defaultAppBar.Buttons.Contains((object) this._appBarButtonGlobe))
-        return;
-      this._defaultAppBar.Buttons.Add((object) this._appBarButtonGlobe);
-      this._defaultAppBar.Buttons.Add((object) this._appBarButtonCreate);
     }
 
     private void _appBarButtonSearch_Click(object sender, EventArgs e)
@@ -159,11 +134,6 @@ namespace VKClient.Groups
         CurrentCommunitySource.Source = CommunityOpenSource.Search;
     }
 
-
-    private static void _appBarButtonCreate_Click(object sender, EventArgs e)
-    {
-      Navigator.Current.NavigateToCommunityCreation();
-    }
 
     private void GroupsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

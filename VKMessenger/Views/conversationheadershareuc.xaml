@@ -12,6 +12,12 @@
                                     d:DesignHeight="74"
                                     d:DesignWidth="480">
 
+    <virtItems:UserControlVirtualizable.Resources>
+        <Style TargetType="Image">
+            <Setter Property="Stretch" Value="UniformToFill" />
+        </Style>
+    </virtItems:UserControlVirtualizable.Resources>
+
     <Grid Height="74"
           framework:MetroInMotion.Tilt="1.5"
           Background="Transparent">

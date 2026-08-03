@@ -13,6 +13,12 @@
                                     d:DesignHeight="101"
                                     d:DesignWidth="480">
 
+    <virtItems:UserControlVirtualizable.Resources>
+        <Style TargetType="Image">
+            <Setter Property="Stretch" Value="UniformToFill" />
+        </Style>
+    </virtItems:UserControlVirtualizable.Resources>
+
     <Grid Height="102"
           Background="Transparent">
         <toolkit:ContextMenuService.ContextMenu>

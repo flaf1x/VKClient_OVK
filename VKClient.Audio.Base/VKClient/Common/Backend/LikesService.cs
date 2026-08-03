@@ -1,6 +1,8 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using VKClient.Audio.Base.Events;
 using VKClient.Common.Backend.DataObjects;
@@ -52,16 +54,83 @@ namespace VKClient.Common.Backend
 
     public void GetLikesList(LikeObjectType type, long owner_id, long item_id, int count, int offset, bool onlyCopies, bool onlyFriends, Action<BackendResult<LikesList, ResultCode>> callback)
     {
-      string str = string.Format("var count = {0};\r\nvar offset= {1};\r\nvar owner_id={2};\r\nvar item_id= {3};\r\nvar type = \"{4}\";\r\n\r\n\r\nvar likesAll = API.likes.getList({{\"type\":type,\r\n\"owner_id\": owner_id, \"item_id\":item_id, \"count\":count, \"offset\":offset, \"filter\":\"{5}\", \"friends_only\":{6} }});\r\n\r\nvar userOrGroupIds = likesAll.items;\r\n\r\nvar userIds = [];\r\nvar groupIds = [];\r\n\r\nvar i = 0;\r\n\r\nvar length = userOrGroupIds.length;\r\n\r\nwhile (i < length)\r\n{{\r\n    var id = parseInt(userOrGroupIds[i]);\r\n    \r\n    if (id > 0)\r\n    {{\r\n       if (userIds.length > 0)\r\n       {{\r\n          userIds = userIds + \",\";\r\n       }}\r\n       userIds = userIds + id;\r\n    }}\r\n    else if (id < 0)\r\n    {{\r\n        id = -id;\r\n        if (groupIds.length > 0)\r\n        {{\r\n            groupIds = groupIds + \",\";\r\n        }}\r\n        groupIds = groupIds + id;\r\n    }}\r\n     \r\n    i = i + 1;\r\n}}\r\n\r\nvar users  = API.users.get({{\"user_ids\":userIds, \"fields\":\"sex,photo_max,online,online_mobile\" }});\r\nvar groups = API.groups.getById({{\"group_ids\":groupIds}});\r\n\r\nreturn {{\"AllCount\": likesAll.count, \"All\":users, \"AllGroups\":groups, \"AllIds\" : userOrGroupIds}};", count, offset, owner_id, item_id, type.ToString(), (onlyCopies ? "copies" : "likes"), (onlyFriends ? 1 : 0));
+      // OpenVK exposes a VK-compatible direct endpoint, but does not run the
+      // legacy multi-call execute script used by the original client.
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["code"] = str;
-      VKRequestsDispatcher.DispatchRequestToVK<LikesList>("execute", parameters, callback, (Func<string, LikesList>) (jsonStr =>
+      parameters["type"] = type.ToString();
+      parameters["owner_id"] = owner_id.ToString();
+      parameters["item_id"] = item_id.ToString();
+      parameters["count"] = count.ToString();
+      parameters["offset"] = offset.ToString();
+      parameters["filter"] = onlyCopies ? "copies" : "likes";
+      parameters["friends_only"] = onlyFriends ? "1" : "0";
+      parameters["extended"] = "1";
+
+      VKRequestsDispatcher.DispatchRequestToVK<LikesList>("likes.getList", parameters,
+        result =>
+        {
+          if (result.ResultCode != ResultCode.Succeeded || result.ResultData == null)
+          {
+            callback(result);
+            return;
+          }
+
+          List<long> missingUserIds = result.ResultData.AllIds
+            .Where(id => id > 0L && !result.ResultData.All.Any(user => user.uid == id))
+            .ToList();
+          if (missingUserIds.Count == 0)
+          {
+            callback(result);
+            return;
+          }
+
+          // Extended responses are expected, but older OpenVK installations
+          // can still return only ids. Resolve those ids before the list VM
+          // receives the result.
+          UsersService.Instance.GetUsers(missingUserIds, usersResult =>
+          {
+            if (usersResult.ResultCode == ResultCode.Succeeded && usersResult.ResultData != null)
+              result.ResultData.All.AddRange(usersResult.ResultData);
+            callback(result);
+          });
+        },
+        jsonStr => ParseLikesList(jsonStr), false, true, new CancellationToken?(), null);
+    }
+
+    private static LikesList ParseLikesList(string jsonStr)
+    {
+      JObject root = JObject.Parse(jsonStr);
+      JObject response = root["response"] as JObject ?? new JObject();
+      LikesList result = new LikesList()
       {
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "All", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "AllGroups", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "AllIds", false);
-        return JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<LikesList>>(jsonStr).response;
-      }), false, true, new CancellationToken?(),  null);
+        AllCount = (int?) response["count"] ?? 0,
+        All = new List<User>(),
+        AllGroups = new List<Group>(),
+        AllIds = new List<long>()
+      };
+
+      JArray items = response["items"] as JArray ?? new JArray();
+      foreach (JToken item in items)
+      {
+        if (item.Type == JTokenType.Integer)
+        {
+          result.AllIds.Add((long) item);
+          continue;
+        }
+
+        JObject profile = item as JObject;
+        if (profile == null)
+          continue;
+        long id = (long?) profile["id"] ?? 0L;
+        if (id == 0L)
+          continue;
+        result.AllIds.Add(id);
+        if (profile["first_name"] != null || profile["last_name"] != null)
+          result.All.Add(profile.ToObject<User>());
+        else if (profile["name"] != null)
+          result.AllGroups.Add(profile.ToObject<Group>());
+      }
+      return result;
     }
   }
 }

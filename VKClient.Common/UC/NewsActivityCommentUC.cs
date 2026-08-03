@@ -51,7 +51,7 @@ namespace VKClient.Common.UC
         if (user != null)
         {
           this._userName = user.Name;
-          string photoMax = user.photo_max;
+          string photoMax = user.UiAvatarSmall;
           if (!string.IsNullOrEmpty(photoMax))
             this._userPhotoUri = new Uri(photoMax);
         }
@@ -62,7 +62,7 @@ namespace VKClient.Common.UC
         if (group != null)
         {
           this._userName = group.name;
-          string photo200 = group.photo_200;
+          string photo200 = group.UiAvatarSmall;
           if (!string.IsNullOrEmpty(photo200))
             this._userPhotoUri = new Uri(photo200);
         }

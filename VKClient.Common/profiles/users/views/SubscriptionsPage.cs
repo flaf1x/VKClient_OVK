@@ -19,6 +19,8 @@ namespace VKClient.Common.Profiles.Users.Views
     private SubscriptionsViewModel _viewModel;
     internal GenericHeaderUC ucHeader;
     internal Pivot pivot;
+    internal PivotItem pivotItemPages;
+    internal PivotItem pivotItemGroups;
     internal ExtendedLongListSelector listPages;
     internal ExtendedLongListSelector listGroups;
     private bool _contentLoaded;
@@ -29,15 +31,10 @@ namespace VKClient.Common.Profiles.Users.Views
       this.ucHeader.TextBlockTitle.Text = CommonResources.SubscriptionsPage_OwnSubscriptionsTitle;
       this.ucHeader.OnHeaderTap = (Action) (() =>
       {
-        switch (this.pivot.SelectedIndex)
-        {
-          case 0:
-            this.listPages.ScrollToTop();
-            break;
-          case 1:
-            this.listGroups.ScrollToTop();
-            break;
-        }
+        if (this.pivot.SelectedItem == this.pivotItemPages)
+          this.listPages.ScrollToTop();
+        else if (this.pivot.SelectedItem == this.pivotItemGroups)
+          this.listGroups.ScrollToTop();
       });
     }
 
@@ -46,8 +43,15 @@ namespace VKClient.Common.Profiles.Users.Views
       base.HandleOnNavigatedTo(e);
       if (this._isInitialized)
         return;
-      this._viewModel = new SubscriptionsViewModel(long.Parse(((Page) this).NavigationContext.QueryString["UserId"]));
-      this._viewModel.LoadData(false,  null);
+      long userId = long.Parse(((Page) this).NavigationContext.QueryString["UserId"]);
+      bool isOwnPage = userId == AppGlobalStateManager.Current.LoggedInUserId;
+      if (!isOwnPage && this.pivot.Items.Contains(this.pivotItemPages))
+        this.pivot.Items.Remove(this.pivotItemPages);
+      this._viewModel = new SubscriptionsViewModel(userId);
+      if (isOwnPage)
+        this._viewModel.LoadData(false, null);
+      else
+        this._viewModel.GroupsVM.LoadData(false, false, null, false);
       base.DataContext = this._viewModel;
       this._isInitialized = true;
     }
@@ -82,6 +86,8 @@ namespace VKClient.Common.Profiles.Users.Views
       Application.LoadComponent(this, new Uri("/VKClient.Common;component/Profiles/Users/Views/SubscriptionsPage.xaml", UriKind.Relative));
       this.ucHeader = (GenericHeaderUC) base.FindName("ucHeader");
       this.pivot = (Pivot) base.FindName("pivot");
+      this.pivotItemPages = (PivotItem) base.FindName("pivotItemPages");
+      this.pivotItemGroups = (PivotItem) base.FindName("pivotItemGroups");
       this.listPages = (ExtendedLongListSelector) base.FindName("listPages");
       this.listGroups = (ExtendedLongListSelector) base.FindName("listGroups");
     }

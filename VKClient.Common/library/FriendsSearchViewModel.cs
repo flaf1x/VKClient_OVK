@@ -84,20 +84,7 @@ namespace VKClient.Common.Library
       this.FriendsImportProviders = new List<SubscriptionItemHeader>()
       {
         new SubscriptionItemHeader(CommonResources.FindFriends_Gmail_Title, CommonResources.FindFriends_Gmail_Subtitle, "/Resources/FindFriends/FindFriendsGmail.png", "#ffef5350".GetColor(), (Action) (() => GmailFriendsImportProvider.Instance.Login())),
-        new SubscriptionItemHeader(CommonResources.FindFriends_Facebook_Title, CommonResources.FindFriends_Facebook_Subtitle, "/Resources/FindFriends/FindFriendsFacebook.png", "#ff3f61ab".GetColor(), (Action) (() => FacebookFriendsImportProvider.Instance.Login())),
         new SubscriptionItemHeader(CommonResources.FindFriends_Twitter_Title, CommonResources.FindFriends_Twitter_Subtitle, "/Resources/FindFriends/FindFriendsTwitter.png", "#ff42a5f5".GetColor(), (Action) (() => TwitterFriendsImportProvider.Instance.Login())),
-        new SubscriptionItemHeader(CommonResources.FindFriends_Nearby_Title, CommonResources.FindFriends_Nearby_Subtitle, "/Resources/FindFriends/FindFriendsNearby.png", "#ffb5b9bd".GetColor(), (Action) (() =>
-        {
-          if (!AppGlobalStateManager.Current.GlobalState.AllowUseLocationQuestionAsked || !AppGlobalStateManager.Current.GlobalState.AllowUseLocation)
-          {
-            bool flag = MessageBox.Show(CommonResources.MapAttachment_AllowUseLocation, CommonResources.AccessToLocation, (MessageBoxButton) 1) == MessageBoxResult.OK;
-            AppGlobalStateManager.Current.GlobalState.AllowUseLocationQuestionAsked = true;
-            AppGlobalStateManager.Current.GlobalState.AllowUseLocation = flag;
-          }
-          if (!AppGlobalStateManager.Current.GlobalState.AllowUseLocation)
-            return;
-          Navigator.Current.NavigateToUsersSearchNearby();
-        })),
         new SubscriptionItemHeader(((string) CommonResources.FindFriends_Search_Title).ToLowerInvariant(), ((string) CommonResources.FindFriends_Search_Subtitle).ToLowerInvariant(), "/Resources/FindFriends/FindFriendsSearch.png", "#ff5888b7".GetColor(), (Action) (() => Navigator.Current.NavigateToUsersSearch("")))
       };
       if (this._mode != FriendsSearchMode.Default)

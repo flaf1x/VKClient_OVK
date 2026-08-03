@@ -117,8 +117,6 @@ namespace VKClient.Common.Stickers.Views
         ((UIElement) this.textBlockDescription).Visibility = Visibility.Visible;
         this.textBlockDescription.Text = description;
       }
-      if (this._stockItemHeader.Price > 0 && (this._stockItemHeader.CanPurchaseFor || this._stockItemHeader.IsChat))
-        ((UIElement) this.gridSendAsAGift).Visibility = Visibility.Visible;
       this._currentPage = (PhoneApplicationPage) FramePageUtils.CurrentPage;
       Content content = Application.Current.Host.Content;
       this._pageHeightPortrait = content.ActualHeight;

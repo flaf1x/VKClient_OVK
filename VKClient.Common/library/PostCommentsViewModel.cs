@@ -262,6 +262,19 @@ namespace VKClient.Common.Library
     public PostCommentsViewModel(NewsItemDataWithUsersAndGroupsInfo wallPostData, long postId, long ownerId, MyVirtualizingPanel2 panel, Action loadedCallback, Action<CommentItem> replyCommentAction, long knownPollId, long knownPollOwnerId)
     {
       this._wallPostData = wallPostData;
+      if (this._wallPostData != null)
+      {
+        this._wallPostData.Profiles = this._wallPostData.Profiles ?? new List<User>();
+        this._wallPostData.Groups = this._wallPostData.Groups ?? new List<Group>();
+        if (this._wallPostData.WallPost != null)
+        {
+          this._wallPostData.WallPost.comments = this._wallPostData.WallPost.comments ?? new Comments();
+          this._wallPostData.WallPost.likes = this._wallPostData.WallPost.likes ?? new Likes();
+          this._wallPostData.WallPost.reposts = this._wallPostData.WallPost.reposts ?? new Reposts();
+          this._wallPostData.WallPost.attachments = this._wallPostData.WallPost.attachments ?? new List<Attachment>();
+          this._wallPostData.WallPost.copy_history = this._wallPostData.WallPost.copy_history ?? new List<WallPost>();
+        }
+      }
       this._postId = postId;
       this._ownerId = ownerId;
       this._panel = panel;
@@ -335,13 +348,28 @@ namespace VKClient.Common.Library
 
     private void UpdateCanSomethingProperties()
     {
-      this.CanComment = this._wallPostData != null && this._wallPostData.WallPost.comments.can_post == 1;
-      this.CanRepost = this._wallPostData != null && (this._wallPostData.WallPost.reposts.user_reposted == 1 || this._wallPostData.WallPost.likes.can_publish == 1);
-      this.CanRepostCommunity = this._wallPostData != null && this._wallPostData.WallPost.CanRepostToCommunity();
-      this.CanLike = this._wallPostData != null && (this._wallPostData.WallPost.likes.can_like == 1 || this._wallPostData.WallPost.likes.user_likes == 1);
-      this.Liked = this._wallPostData != null && this._wallPostData.WallPost.likes.user_likes == 1;
-      this.CanPin = this._wallPostData != null && this._wallPostData.WallPost.CanPin(this._wallPostData.Groups);
-      this.CanUnpin = this._wallPostData != null && this._wallPostData.WallPost.CanUnpin(this._wallPostData.Groups);
+      WallPost wallPost = this._wallPostData != null ? this._wallPostData.WallPost : null;
+      if (wallPost == null)
+      {
+        this.CanComment = false;
+        this.CanRepost = false;
+        this.CanRepostCommunity = false;
+        this.CanLike = false;
+        this.Liked = false;
+        this.CanPin = false;
+        this.CanUnpin = false;
+        return;
+      }
+      wallPost.comments = wallPost.comments ?? new Comments();
+      wallPost.likes = wallPost.likes ?? new Likes();
+      wallPost.reposts = wallPost.reposts ?? new Reposts();
+      this.CanComment = wallPost.comments.can_post == 1;
+      this.CanRepost = wallPost.reposts.user_reposted == 1 || wallPost.likes.can_publish == 1;
+      this.CanRepostCommunity = wallPost.CanRepostToCommunity();
+      this.CanLike = wallPost.likes.can_like == 1 || wallPost.likes.user_likes == 1;
+      this.Liked = wallPost.likes.user_likes == 1;
+      this.CanPin = wallPost.CanPin(this._wallPostData.Groups);
+      this.CanUnpin = wallPost.CanUnpin(this._wallPostData.Groups);
     }
 
     public bool CanPostComment(string text, List<IOutboundAttachment> attachments, StickerItemData stickerItemData = null)
@@ -486,7 +514,9 @@ namespace VKClient.Common.Library
 
     private void LoadMoreCommentsInBuffer(Action<bool> completionCallback)
     {
-      int num = this._commentsCount != -1 ? this._countToReload : this._countToLoad;
+      // OpenVK implements offset as a page index. Keep a stable page size;
+      // the UI still reveals only _countToLoad comments on the first pass.
+      int num = this._countToReload;
       bool flag = this._wallPostData == null;
       LikeObjectType likeObjectType = LikeObjectType.post;
       if (this._wallPostData != null && this._wallPostData.WallPost != null)
@@ -502,6 +532,24 @@ namespace VKClient.Common.Library
         }
         else
         {
+          if (res.ResultData == null)
+          {
+            completionCallback(false);
+            return;
+          }
+
+          // If the post came from the feed, WallService skips wall.getById
+          // and returns a placeholder WallPost with zero likes. Preserve the
+          // real post so opening comments cannot zero the feed's like block.
+          if (!flag && this._wallPostData != null && this._wallPostData.WallPost != null)
+          {
+            WallPost sourceWallPost = this._wallPostData.WallPost;
+            sourceWallPost.likes = sourceWallPost.likes ?? new Likes();
+            res.ResultData.WallPost = sourceWallPost;
+            res.ResultData.LikesAll = res.ResultData.LikesAll ?? new LikesInfo();
+            res.ResultData.LikesAll.count = sourceWallPost.likes.count;
+          }
+
           if (this._commentsCount == -1)
           {
             EventAggregator.Current.Publish(new WallCommentsLikesUpdated()
@@ -542,12 +590,15 @@ namespace VKClient.Common.Library
           if (this._wallResponseData.WallPost.to_id == 0L && this._wallPostData != null)
             this._wallResponseData.WallPost = this._wallPostData.WallPost;
           completionCallback(true);
-          if (!this._wallPostData.WallPost.IsNotExist)
+          WallPost loadedWallPost = this._wallPostData != null
+            ? this._wallPostData.WallPost
+            : this._wallResponseData.WallPost;
+          if (loadedWallPost == null || !loadedWallPost.IsNotExist)
             return;
           MessageBox.Show(CommonResources.WallPostIsNotAvailable, CommonResources.Error, (MessageBoxButton) 0);
           Navigator.Current.GoBack();
         }
-      }))), this.PollId, this.PollOwnerId, likeObjectType);
+      }))), this.PollId, this.PollOwnerId, likeObjectType, this._wallPostData != null ? this._wallPostData.WallPost : null);
     }
 
     private void LoadCommentsFromBuffer()

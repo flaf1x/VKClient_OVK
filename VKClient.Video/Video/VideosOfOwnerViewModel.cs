@@ -256,6 +256,7 @@ namespace VKClient.Video
             {
                 this._loadAddedVideos = caller == this._allVideosVM;
                 if (this._loadAddedVideos && offset == 0)
+                {
                     VideoService.Instance.GetVideoData(this.OwnerId, (Action<BackendResult<VideosData, ResultCode>>)(res =>
                     {
                         if (res.ResultCode == ResultCode.Succeeded)
@@ -268,6 +269,8 @@ namespace VKClient.Video
                         VKList<VKClient.Common.Backend.DataObjects.Video> resultData = res.ResultData == null || res.ResultData.AddedVideos == null ? (VKList<VKClient.Common.Backend.DataObjects.Video>)null : res.ResultData.AddedVideos;
                         callback(new BackendResult<VKList<VKClient.Common.Backend.DataObjects.Video>, ResultCode>(res.ResultCode, resultData));
                     }));
+                    return;
+                }
                 VideoService.Instance.GetVideos(this.UserOrGroupId, this.IsGroup, offset, count, callback, this._loadAddedVideos ? 0L : -1L, true);
             }
             else

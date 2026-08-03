@@ -154,7 +154,7 @@
     <value>Убедитесь, что на телефоне настроены точные дата и время, и доступно интернет соединение.</value>
   </data>
   <data name="Login_Info_LoggingIn" xml:space="preserve">
-    <value />
+    <value></value>
   </data>
   <data name="MainPage_Menu_Groups" xml:space="preserve">
     <value>группы</value>

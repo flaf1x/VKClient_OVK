@@ -55,7 +55,7 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
             {
                 if (this._invitedByUser == null)
                     return "";
-                return this._invitedByUser.photo_max;
+                return this._invitedByUser.UiAvatarSmall;
             }
         }
 
@@ -203,7 +203,7 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
                     case GroupType.PublicPage:
                         return CommonResources.Group_Follow;
                     case GroupType.Event:
-                        return CommonResources.Group_Join + "...";
+                        return CommonResources.Group_Join;
                     default:
                         return "";
                 }
@@ -431,6 +431,12 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
                             break;
                         }
                 }
+                // OpenVK events only support joined/not joined. The original
+                // VK "Maybe" turnout state is not present in OpenVK.
+                list.RemoveAll(item => string.Equals(
+                    item.Header as string,
+                    CommonResources.EventMaybe,
+                    StringComparison.Ordinal));
                 return list;
             }
         }
@@ -440,9 +446,7 @@ namespace VKClient.Common.Profiles.Groups.ViewModels
         {
             get
             {
-                if (this._group.MembershipType == GroupMembershipType.NotAMember)
-                    return this._group.GroupType == GroupType.Event;
-                return true;
+                return false;
             }
         }
 

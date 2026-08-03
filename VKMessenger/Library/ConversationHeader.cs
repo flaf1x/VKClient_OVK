@@ -79,7 +79,8 @@ namespace VKMessenger.Library
         {
             get
             {
-                return (SolidColorBrush)Application.Current.Resources[((!this.AreNotificationsDisabled ? "Phone" : "PhoneMuted" + "ConversationNewMessagesCountBackgroundBrush"))];
+                string prefix = !this.AreNotificationsDisabled ? "Phone" : "PhoneMuted";
+                return (SolidColorBrush)Application.Current.Resources[prefix + "ConversationNewMessagesCountBackgroundBrush"];
             }
         }
 
@@ -287,12 +288,12 @@ namespace VKMessenger.Library
             get
             {
                 if (this._message.@out == 1)
-                    return AppGlobalStateManager.Current.GlobalState.LoggedInUser.photo_max;
+                    return AppGlobalStateManager.Current.GlobalState.LoggedInUser.UiAvatarSmall;
                 if (this.IsChat)
                 {
                     User user = this.User;
                     if (user != null)
-                        return user.photo_max;
+                        return user.UiAvatarSmall;
                 }
                 return "";
             }
@@ -533,7 +534,7 @@ namespace VKMessenger.Library
             List<long> chatParticipantsIds = new List<long>();
             if (this._message.chat_id != 0)
             {
-                defaultAvatar = this._message.photo_200;
+                defaultAvatar = VKClient.Audio.Base.Utils.AvatarHelper.Prepare(this._message.photo_200);
                 chatParticipantsIds = this._message.chat_active_str.ParseCommaSeparated();
                 this.IsOnline = false;
                 this.IsOnlineMobile = false;
@@ -548,7 +549,7 @@ namespace VKMessenger.Library
                 if (user != null)
                 {
                     this.UITitle = this.FormatTitleForUser(user);
-                    defaultAvatar = user.photo_max;
+                    defaultAvatar = user.UiAvatarSmall;
                     if (user.id < 0L && user.id > -2000000000L)
                         this.IsMessagesFromGroupDenied = user.is_messages_blocked == 1;
                 }
@@ -701,6 +702,11 @@ namespace VKMessenger.Library
                     break;
             }
             return flag;
+        }
+
+        internal SearchConversationHeader ToSearchHeader()
+        {
+            return new SearchConversationHeader(this._message, this._associatedUsers);
         }
 
         public void DisableEnableNotifications(Action<bool> resultCallback)

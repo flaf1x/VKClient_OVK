@@ -157,10 +157,20 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
       {
         return (Action<MediaListItemViewModelBase>) (vm =>
         {
-            List<Photo> list = (List<Photo>)Enumerable.ToList<Photo>(Enumerable.Select<MediaListItemViewModelBase, Photo>(this._items, (Func<MediaListItemViewModelBase, Photo>)(item => ((PhotoMediaListItemViewModel)item).Photo)));
-          int val1 = this._items.IndexOf(vm);
+          List<Photo> list = (List<Photo>)Enumerable.ToList<Photo>(Enumerable.Select<MediaListItemViewModelBase, Photo>(this._items, (Func<MediaListItemViewModelBase, Photo>)(item => ((PhotoMediaListItemViewModel)item).Photo)));
+          Photo selectedPhoto = (vm as PhotoMediaListItemViewModel) != null
+            ? ((PhotoMediaListItemViewModel) vm).Photo
+            : null;
+          int val1 = selectedPhoto == null
+            ? -1
+            : list.FindIndex(photo =>
+                photo.id == selectedPhoto.id &&
+                photo.owner_id == selectedPhoto.owner_id);
           this.PublishProfileBlockClickEvent(ProfileBlockType.photos);
-          ImageViewerDecoratorUC.ShowPhotosFromProfile(this._profileData.Id, this._isGroup, Math.Max(val1, 0), list, true);
+          // OpenVK instances do not expose VK's synthetic profile-photo
+          // album consistently. Keep the viewer on the profile photos that
+          // are already loaded instead of paging through photos.getAll.
+          ImageViewerDecoratorUC.ShowPhotosFromProfile(this._profileData.Id, this._isGroup, Math.Max(val1, 0), list, false);
         });
       }
     }

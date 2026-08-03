@@ -135,7 +135,7 @@ namespace VKClient.Video
         });
         DataTemplate itemTemplate = dataTemplate;
         Thickness? margin = new Thickness?(new Thickness(0.0, 77.0, 0.0, 0.0));
-        GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>)searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, (Func<SearchParamsUCBase>)(() => (SearchParamsUCBase)new SearchParamsVideoUC()), margin).Show((UIElement)this.mainPivot);
+        GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>)searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, null, margin).Show((UIElement)this.mainPivot);
     }
 
     private void HandleSearchSelectedItem(object listBox, object selectedItem)
@@ -212,12 +212,8 @@ namespace VKClient.Video
 
     private void UpdateAppBar()
     {
-      int num = this.CommonParameters.UserOrGroupId != AppGlobalStateManager.Current.LoggedInUserId && !this._forceAllowVideoUpload || (this._albumId != 0L || this.mainPivot.SelectedItem == this.pivotItemAlbums) ? 0 : (!this._pickMode ? 1 : 0);
-      if (num != 0 && !this._appBar.Buttons.Contains(this._addVideoButton))
-        this._appBar.Buttons.Insert(0, this._addVideoButton);
-      if (num != 0 || !this._appBar.Buttons.Contains(this._addVideoButton))
-        return;
-      this._appBar.Buttons.Remove(this._addVideoButton);
+      if (this._appBar.Buttons.Contains(this._addVideoButton))
+        this._appBar.Buttons.Remove(this._addVideoButton);
     }
 
     private void UpdatePageHeaderForAlbum(long albumId, string albumName)

@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Navigation;
 using VKClient.Audio.Base.Events;
+using VKClient.Audio.Base.AudioCache;
 using VKClient.Audio.Base.Library;
 using VKClient.Audio.Library;
 using VKClient.Audio.Localization;
@@ -25,6 +26,7 @@ using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 using VKClient.Common.Framework.CodeForFun;
 using VKClient.Common.Library;
+using VKClient.Common.Library.Events;
 using VKClient.Common.Localization;
 using VKClient.Common.UC;
 using VKClient.Common.Utils;
@@ -34,7 +36,7 @@ using Windows.Storage.Pickers;
 
 namespace VKClient.Audio
 {
-    public class AudioPage : PageBase
+    public class AudioPage : PageBase, IHandle<AudioDownloadQueueProgress>, IHandle
     {
         private bool _isInitialized;
         private AudioPage.PageMode _pageMode;
@@ -44,13 +46,13 @@ namespace VKClient.Audio
         private ApplicationBar _appBarMultiselect;
         private ApplicationBar _appBarAlbums;
         private ApplicationBarIconButton _appBarButtonAudioPlayer;
-        private ApplicationBarIconButton _appBarButtonAddAudio;
         private ApplicationBarIconButton _appBarButtonSearchAudio;
         private ApplicationBarIconButton _appBarButtonEdit;
         private ApplicationBarIconButton _appBarButtonMoveToAlbum;
         private ApplicationBarIconButton _appBarButtonDelete;
         private ApplicationBarIconButton _appBarButtonCancel;
         private ApplicationBarIconButton _appBarButtonAddNewAlbum;
+        private ApplicationBarMenuItem _appBarMenuItemDownloadAll;
         private DialogService _dialogService;
         internal Grid LayoutRoot;
         internal GenericHeaderUC ucHeader;
@@ -60,6 +62,9 @@ namespace VKClient.Audio
         internal PivotItem pivotItemAlbums;
         internal AlbumsUC allAlbums;
         internal PullToRefreshUC ucPullToRefresh;
+        internal Border downloadProgressPanel;
+        internal TextBlock downloadProgressText;
+        internal ProgressBar downloadProgressBar;
         private bool _contentLoaded;
 
         private AllAudioViewModel ViewModel
@@ -106,15 +111,16 @@ namespace VKClient.Audio
         public AudioPage()
         {
             this._appBarButtonAudioPlayer = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.nowplaying.rest.png", UriKind.Relative), Text = AudioResources.AppBar_NowPlaying };
-            this._appBarButtonAddAudio = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.add.rest.png", UriKind.Relative), Text = CommonResources.AppBar_Add };
             this._appBarButtonSearchAudio = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.feature.search.rest.png", UriKind.Relative), Text = AudioResources.AppBar_Search };
             this._appBarButtonEdit = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.manage.rest.png", UriKind.Relative), Text = AudioResources.Edit };
             this._appBarButtonMoveToAlbum = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.movetofolder.rest.png", UriKind.Relative), Text = AudioResources.AddToAlbum };
             this._appBarButtonDelete = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.delete.rest.png", UriKind.Relative), Text = AudioResources.Delete };
             this._appBarButtonCancel = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.cancel.rest.png", UriKind.Relative), Text = CommonResources.AppBar_Cancel };
             this._appBarButtonAddNewAlbum = new ApplicationBarIconButton() { IconUri = new Uri("/Resources/appbar.add.rest.png", UriKind.Relative), Text = AudioResources.AppBar_Add };
+            this._appBarMenuItemDownloadAll = new ApplicationBarMenuItem(AudioResources.AudioDownloads_DownloadAll);
 
             this.InitializeComponent();
+            EventAggregator.Current.Subscribe(this);
             this.ucHeader.OnHeaderTap = new Action(this.HandleHeaderTap);
             this.ucPullToRefresh.TrackListBox(this.allAudio.ListAudios);
             this.ucPullToRefresh.TrackListBox(this.allAlbums.ListAllAlbums);
@@ -315,11 +321,12 @@ namespace VKClient.Audio
                 this.Initialize();
                 this.BuildAppBar();
                 this.PerformInitialLoad();
-                this.allAudio.IsInPickMode = this.CommonParameters.PickMode;
+                this.allAudio.IsInPickMode = this._pageMode == AudioPage.PageMode.PickAudio;
                 this.UpdateAppBar();
                 this._isInitialized = true;
             }
             this.ProcessInputParameters();
+            this.Handle(AudioCacheManager.Instance.BulkDownloadProgress);
             CurrentMediaSource.AudioSource = this.CommonParameters.IsGroup ? StatisticsActionSource.audios_group : StatisticsActionSource.audios_user;
             FileOpenPickerContinuationEventArgs parameterForIdAndReset = ParametersRepository.GetParameterForIdAndReset("FilePicked") as FileOpenPickerContinuationEventArgs;
             if (parameterForIdAndReset == null || !((IEnumerable<StorageFile>)parameterForIdAndReset.Files).Any<StorageFile>())
@@ -395,11 +402,6 @@ namespace VKClient.Audio
                 if (!this.IsOwnAudio)
                     this._appBarAlbums.Buttons.Remove(this._appBarButtonAddNewAlbum);
             }
-            if (this.mainPivot.SelectedItem == this.pivotItemAudio && this._appBarAudio != null && (!this._appBarAudio.Buttons.Contains(this._appBarButtonAddAudio) && this.ViewModel.AlbumId == 0L))
-                this._appBarAudio.Buttons.Insert(0, this._appBarButtonAddAudio);
-            if (this.mainPivot.SelectedItem == this.pivotItemAudio && this.ViewModel.AlbumId == 0L || (this._appBarAudio == null || !this._appBarAudio.Buttons.Contains(this._appBarButtonAddAudio)))
-                return;
-            this._appBarAudio.Buttons.Remove(this._appBarButtonAddAudio);
         }
 
         private void BuildAppBar()
@@ -411,14 +413,14 @@ namespace VKClient.Audio
             applicationBar1.ForegroundColor = appBarFgColor1;
             this._appBarAudio = applicationBar1;
             this._appBarAudio.Opacity = 0.9;
-            if (this.ViewModel.UserOrGroupId == AppGlobalStateManager.Current.LoggedInUserId && this._albumId == 0L && this._pageMode == AudioPage.PageMode.Default)
-            {
-                this._appBarButtonAddAudio.Click += (new EventHandler(this.addAudio_Click));
-                this._appBarAudio.Buttons.Add(this._appBarButtonAddAudio);
-            }
             this._appBarButtonSearchAudio.Click += (new EventHandler(this.searchAudio_Click));
             this._appBarAudio.Buttons.Add(this._appBarButtonSearchAudio);
             this._appBarButtonEdit.Click += (new EventHandler(this._appBarButtonEdit_Click));
+            if (this.IsOwnAudio && this._albumId == 0L && this._pageMode == AudioPage.PageMode.Default)
+            {
+                this._appBarMenuItemDownloadAll.Click += new EventHandler(this._appBarMenuItemDownloadAll_Click);
+                this._appBarAudio.MenuItems.Add(this._appBarMenuItemDownloadAll);
+            }
             ApplicationBar applicationBar2 = new ApplicationBar();
             Color appBarBgColor2 = VKConstants.AppBarBGColor;
             applicationBar2.BackgroundColor = appBarBgColor2;
@@ -519,6 +521,45 @@ namespace VKClient.Audio
             this.EnableSearch();
         }
 
+        private void _appBarMenuItemDownloadAll_Click(object sender, EventArgs e)
+        {
+            this.downloadProgressPanel.Visibility = Visibility.Visible;
+            this.downloadProgressBar.IsIndeterminate = true;
+            this.downloadProgressText.Text = AudioResources.AudioDownloads_Preparing;
+            this.ViewModel.DownloadAll(res => Execute.ExecuteOnUIThread(() =>
+            {
+                this.downloadProgressBar.IsIndeterminate = false;
+                if (res.ResultCode != ResultCode.Succeeded)
+                {
+                    this.downloadProgressPanel.Visibility = Visibility.Collapsed;
+                    ExtendedMessageBox.ShowSafe(CommonResources.GenericErrorText);
+                }
+            }));
+        }
+
+        private void DownloadProgressPanel_OnTap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            e.Handled = true;
+            AudioCacheManager.Instance.CancelBulkDownload();
+            this.downloadProgressPanel.Visibility = Visibility.Collapsed;
+        }
+
+        public void Handle(AudioDownloadQueueProgress message)
+        {
+            Execute.ExecuteOnUIThread(() =>
+            {
+                if (this.downloadProgressPanel == null || message == null)
+                    return;
+                this.downloadProgressBar.IsIndeterminate = false;
+                this.downloadProgressBar.Value = message.Progress;
+                this.downloadProgressText.Text = string.Format(AudioResources.AudioDownloads_Progress,
+                    message.Completed, message.Total);
+                this.downloadProgressPanel.Visibility = message.IsActive
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            });
+        }
+
         private void EnableSearch()
         {
             this._dialogService = new DialogService
@@ -567,6 +608,9 @@ namespace VKClient.Audio
             this.pivotItemAlbums = (PivotItem)base.FindName("pivotItemAlbums");
             this.allAlbums = (AlbumsUC)base.FindName("allAlbums");
             this.ucPullToRefresh = (PullToRefreshUC)base.FindName("ucPullToRefresh");
+            this.downloadProgressPanel = (Border)base.FindName("downloadProgressPanel");
+            this.downloadProgressText = (TextBlock)base.FindName("downloadProgressText");
+            this.downloadProgressBar = (ProgressBar)base.FindName("downloadProgressBar");
         }
 
         private enum PageMode

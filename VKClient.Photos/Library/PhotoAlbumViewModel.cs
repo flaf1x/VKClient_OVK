@@ -550,8 +550,9 @@ namespace VKClient.Photos.Library
             ImagePreprocessor.PreprocessImage(photoDataStream, VKConstants.ResizedImageSize, true, (Action<ImagePreprocessResult>)(pres =>
             {
                 Stream stream = pres.Stream;
-                byte[] numArray = new byte[stream.Length];
-                stream.Read(numArray, 0, (int)stream.Length);
+                if (stream.CanSeek)
+                    stream.Position = 0L;
+                byte[] numArray = ImagePreprocessor.ReadFully(stream);
                 stream.Close();
                 this.SetInProgress(true, "");
                 PhotosService.Current.UploadPhotoToAlbum(this._albumId, this._isGroup ? this._userOrGroupId : 0, numArray, (Action<BackendResult<Photo, ResultCode>>)(res =>

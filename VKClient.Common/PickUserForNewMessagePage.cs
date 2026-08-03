@@ -28,7 +28,6 @@ namespace VKClient.Common
     private DialogService _dialogService;
     private bool _groupViewOpened;
     private readonly ApplicationBarIconButton _appBarButtonSearch;
-    private readonly ApplicationBarIconButton _appBarButtonEnableSelection;
     private readonly ApplicationBarIconButton _appBarButtonCheck;
     private readonly ApplicationBarIconButton _appBarButtonCancel;
     private ApplicationBar _mainAppBar;
@@ -77,23 +76,17 @@ namespace VKClient.Common
       applicationBarIconButton1.Text = pageAppBarSearch;
       this._appBarButtonSearch = applicationBarIconButton1;
       ApplicationBarIconButton applicationBarIconButton2 = new ApplicationBarIconButton();
-      Uri uri2 = new Uri("/Resources/appbar.manage.rest.png", UriKind.Relative);
-      applicationBarIconButton2.IconUri = uri2;
-      string barSelectSeveral = CommonResources.AppBar_SelectSeveral;
-      applicationBarIconButton2.Text = barSelectSeveral;
-      this._appBarButtonEnableSelection = applicationBarIconButton2;
-      ApplicationBarIconButton applicationBarIconButton3 = new ApplicationBarIconButton();
       Uri uri3 = new Uri("/Resources/check.png", UriKind.Relative);
-      applicationBarIconButton3.IconUri = uri3;
+      applicationBarIconButton2.IconUri = uri3;
       string chatEditAppBarSave = CommonResources.ChatEdit_AppBar_Save;
-      applicationBarIconButton3.Text = chatEditAppBarSave;
-      this._appBarButtonCheck = applicationBarIconButton3;
-      ApplicationBarIconButton applicationBarIconButton4 = new ApplicationBarIconButton();
+      applicationBarIconButton2.Text = chatEditAppBarSave;
+      this._appBarButtonCheck = applicationBarIconButton2;
+      ApplicationBarIconButton applicationBarIconButton3 = new ApplicationBarIconButton();
       Uri uri4 = new Uri("/Resources/appbar.cancel.rest.png", UriKind.Relative);
-      applicationBarIconButton4.IconUri = uri4;
+      applicationBarIconButton3.IconUri = uri4;
       string appBarCancel = CommonResources.AppBar_Cancel;
-      applicationBarIconButton4.Text = appBarCancel;
-      this._appBarButtonCancel = applicationBarIconButton4;
+      applicationBarIconButton3.Text = appBarCancel;
+      this._appBarButtonCancel = applicationBarIconButton3;
       // ISSUE: explicit constructor call
       //base.\u002Ector();
       this.InitializeComponent();
@@ -109,20 +102,12 @@ namespace VKClient.Common
       this._mainAppBar = ApplicationBarBuilder.Build(new Color?(), new Color?(), 0.9);
       this._selectionAppBar = ApplicationBarBuilder.Build(new Color?(), new Color?(), 0.9);
       this._mainAppBar.Buttons.Add(this._appBarButtonSearch);
-      this._mainAppBar.Buttons.Add(this._appBarButtonEnableSelection);
       this._selectionAppBar.Buttons.Add(this._appBarButtonCheck);
       this._selectionAppBar.Buttons.Add(this._appBarButtonCancel);
       this._appBarButtonSearch.Click+=(new EventHandler(this.AppBarButtonSearch_Click));
-      this._appBarButtonEnableSelection.Click+=(new EventHandler(this.AppBarButtonEnableSelection_Click));
       this._appBarButtonCheck.Click+=(new EventHandler(this.AppBarButtonCheck_Click));
       this._appBarButtonCancel.Click+=(new EventHandler(this.AppBarButtonCancel_Click));
       this.ApplicationBar = ((IApplicationBar) this._mainAppBar);
-    }
-
-    private void AppBarButtonEnableSelection_Click(object sender, EventArgs e)
-    {
-      this.PickUserVM.IsInSelectionMode = true;
-      this.UpdateAppBar();
     }
 
     private void AppBarButtonCancel_Click(object sender, EventArgs e)
@@ -152,8 +137,6 @@ namespace VKClient.Common
         this.ApplicationBar = ((IApplicationBar) this._mainAppBar);
       if (this.PickUserVM.PickUserMode == PickUserMode.PickForPartner)
         this.ApplicationBar = ( null);
-      if (this.PickUserVM.PickUserMode == PickUserMode.PickWithSearch || this.PickUserVM.PickUserMode == PickUserMode.PickForPrivacy || this.PickUserVM.PickUserMode == PickUserMode.PickForStickerPackGift)
-        this._mainAppBar.Buttons.Remove(this._appBarButtonEnableSelection);
       this._appBarButtonCheck.IsEnabled = (this.PickUserVM.SelectedCount > 0);
     }
 
@@ -200,18 +183,8 @@ namespace VKClient.Common
             goto label_8;
           }
         }
-        if (queryString.ContainsKey("CreateChat"))
-        {
-          string str1 = queryString["CreateChat"];
-          flag = true;
-          string str2 = flag.ToString();
-          if (str1 == str2)
-          {
-            this._createChat = true;
-            if (queryString.ContainsKey("InitialUserId"))
-              this._initialUserId = long.Parse(queryString["InitialUserId"]);
-          }
-        }
+        // OpenVK's messages.createChat is intentionally not exposed by this
+        // client. The picker remains available for a direct conversation.
 label_8:
         PickUserMode mode = PickUserMode.PickForMessage;
         if (queryString.ContainsKey("PickMode"))
@@ -322,8 +295,6 @@ label_8:
           ParametersRepository.SetParameterForId("SelectedLists", lists);
         ((Page) this).NavigationService.GoBackSafe();
       }
-      else if (this._createChat || users.Count > 1)
-          this.CreateChatAndProceed((List<long>)Enumerable.ToList<long>(Enumerable.Select<User, long>(users, (Func<User, long>)(u => u.uid))));
       else
         Navigator.Current.NavigateToConversation(((User) Enumerable.First<User>(users)).uid, false, true, "", 0, false);
     }

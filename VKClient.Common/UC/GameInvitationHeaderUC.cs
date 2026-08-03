@@ -82,7 +82,7 @@ namespace VKClient.Common.UC
       Game game = newValue.Game;
       User user = newValue.User;
       ((FrameworkElement) invitationHeaderUc.UserIconImage).Tag = user;
-      ImageLoader.SetUriSource(invitationHeaderUc.UserIconImage, user.photo_max);
+      ImageLoader.SetUriSource(invitationHeaderUc.UserIconImage, user.UiAvatarSmall);
       ((FrameworkElement) invitationHeaderUc.GameIconImage).Tag = game;
       ImageLoader.SetUriSource(invitationHeaderUc.GameIconImage, game.icon_150);
       invitationHeaderUc.GameTitleTextBlock.Text = game.title;

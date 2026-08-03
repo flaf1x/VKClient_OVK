@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VKClient.Audio.Base.DataObjects;
@@ -31,7 +32,9 @@ namespace VKClient.Common.Backend
 
     public void GetNewsFeed(NewsFeedGetParams parameters, Action<BackendResult<NewsFeedData, ResultCode>> callback)
     {
-      string methodName = "execute.getNewsfeed";
+      // OpenVK exposes the feed through the public VK-compatible method.
+      // execute.getNewsfeed is a private method of the original VK mobile API.
+      string methodName = "newsfeed.get";
       Dictionary<string, string> paramDict = new Dictionary<string, string>()
       {
         {
@@ -43,7 +46,9 @@ namespace VKClient.Common.Backend
           new AdvertisingDeviceInfo().ToJsonString()
         }
       };
-      paramDict["fields"] = "sex,online,photo_50,photo_100,photo_200,is_friend";
+      // OpenVK returns this property in the extended feed profiles only when
+      // it is requested explicitly; the feed header uses it directly.
+      paramDict["fields"] = "sex,online,photo_50,photo_100,photo_200,is_friend,verified";
       if (!string.IsNullOrEmpty(parameters.from))
         paramDict["start_from"] = parameters.from;
       bool? nullable;
@@ -57,6 +62,7 @@ namespace VKClient.Common.Backend
       {
         paramDict["filters"] = "photo,photo_tag,wall_photo";
         paramDict["max_photos"] = "10";
+        paramDict["extended"] = "1";
         if (parameters.source_ids.NotNullAndHasAtLeastOneNonNullElement())
         {
           paramDict["source_ids"] = parameters.source_ids.GetCommaSeparated();
@@ -70,6 +76,7 @@ namespace VKClient.Common.Backend
       else
       {
         paramDict["filters"] = "post,photo,photo_tag";
+        paramDict["extended"] = "1";
         long num1 = parameters.NewsListId - -10L;
         long num2 = 3;
         if ((ulong) num1 <= (ulong) num2)
@@ -91,7 +98,7 @@ namespace VKClient.Common.Backend
               else
                 goto label_16;
             case 1:
-              paramDict["recommended"] = "1";
+              methodName = "newsfeed.getGlobal";
               goto label_16;
             case 2:
               paramDict["source_ids"] = "friends,following";
@@ -147,6 +154,23 @@ label_16:
         List<int> resultCounts2;
         jsonStr = VKRequestsDispatcher.GetArrayCountsAndRemove(jsonStr, "photo_tags", out resultCounts2);
         NewsFeedData response = JsonConvert.DeserializeObject<GenericRoot<NewsFeedData>>(jsonStr).response;
+        if (response == null)
+          response = new NewsFeedData();
+        if (response.items == null)
+          response.items = new List<NewsItem>();
+        if (response.profiles == null)
+          response.profiles = new List<User>();
+        if (response.groups == null)
+          response.groups = new List<Group>();
+        // OpenVK paginates with next_from and does not expose a total count.
+        // Keep the legacy collection open while a continuation token exists;
+        // otherwise it sees count == first page size and stops after 20 items.
+        if (!string.IsNullOrEmpty(response.next_from))
+          response.count = int.MaxValue;
+        else if (response.count == 0)
+          response.count = response.items.Count;
+        if (string.IsNullOrEmpty(response.feed_type))
+          response.feed_type = NewsFeedType.recent.ToString();
         NewsFeedType result1;
         if (Enum.TryParse<NewsFeedType>(response.feed_type, out result1))
           response.FeedType = new NewsFeedType?(result1);
@@ -166,22 +190,17 @@ label_16:
 
     public void GetNewsComments(int startTime, int endTime, int count, string fromStr, Action<BackendResult<NewsFeedData, ResultCode>> callback)
     {
-      string str = string.Format("    \r\n                    var comments = API.newsfeed.getComments({{ last_comments_count: 3, allow_group_comments: 1{0}{1}{2}{3} }});\r\n\r\n                    var response = \r\n                    {{\r\n                        items: [],\r\n                        profiles: comments.profiles,\r\n                        groups: comments.groups,\r\n                        next_from: comments.next_from\r\n                    }};\r\n\r\n                    var i = 0;\r\n                    while (i < comments.items.length)\r\n                    {{\r\n                        var item = comments.items[i];\r\n    \r\n                        if (item.type == \"video\")\r\n                            item.views = {{ count: item.views }};\r\n\r\n                        response.items.push(item);\r\n                        i = i + 1;\r\n                    }}\r\n\r\n                    return response;\r\n                ", (startTime > 0 ? string.Format(", start_time: {0}", startTime) : ""), (endTime > 0 ? string.Format(", end_time: {0}", endTime) : ""), (count > 0 ? string.Format(", count: {0}", count) : ""), (!string.IsNullOrWhiteSpace(fromStr) ? string.Format(", start_from: {0}", fromStr) : ""));
-      string methodName = "execute";
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters.Add("code", str);
-      Action<BackendResult<NewsFeedData, ResultCode>> callback1 = callback;
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<NewsFeedData>(methodName, parameters, callback1, (Func<string, NewsFeedData>) (jsonString =>
-      {
-        jsonString = VKRequestsDispatcher.FixFalseArray(jsonString, "profiles", false);
-        jsonString = VKRequestsDispatcher.FixFalseArray(jsonString, "groups", false);
-        return JsonConvert.DeserializeObject<GenericRoot<NewsFeedData>>(jsonString).response;
-      }), num1 != 0, num2 != 0, cancellationToken, null);
+      // newsfeed.getComments is not implemented by OpenVK. Keep the comments
+      // pivot stable and empty while notifications.get remains functional.
+      callback(new BackendResult<NewsFeedData, ResultCode>(
+        ResultCode.Succeeded,
+        new NewsFeedData()
+        {
+          items = new List<NewsItem>(),
+          profiles = new List<User>(),
+          groups = new List<Group>(),
+          count = 0
+        }));
     }
 
     public void GetNotifications(int startTime, int endTime, int offset, string fromStr, int count, Action<BackendResult<NotificationData, ResultCode>> callback)
@@ -200,27 +219,273 @@ label_16:
       parameters["fields"] = "sex,photo_50,photo_100,online,screen_name,first_name_dat,last_name_dat,first_name_gen,last_name_gen";
       Dictionary<string, string> dictionary = parameters;
       dictionary["fields"] = dictionary["fields"] + ",is_closed,type,is_admin,is_member,photo_200";
-      VKRequestsDispatcher.DispatchRequestToVK<NotificationData>("notifications.get", parameters, callback, (Func<string, NotificationData>) (jsonStr =>
-      {
-        int resultCount = 0;
-        jsonStr = VKRequestsDispatcher.GetArrayCountAndRemove(jsonStr, "items", out resultCount);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "profiles", false);
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "groups", false);
-        NotificationData response = JsonConvert.DeserializeObject<GenericRoot<NotificationData>>(jsonStr).response;
-        response.TotalCount = resultCount;
-        List<Notification> notificationList = new List<Notification>();
-        foreach (Notification notification in response.items)
+      VKRequestsDispatcher.DispatchRequestToVK<NotificationData>(
+        "notifications.get",
+        parameters,
+        (Action<BackendResult<NotificationData, ResultCode>>) (result =>
         {
-          notification.UpdateNotificationType();
-          object parsedFeedback = notification.ParsedFeedback;
-          object parsedParent = notification.ParsedParent;
-          if (notification.NotType == NotificationType.unknown)
-            notificationList.Add(notification);
+          if (result.ResultCode != ResultCode.Succeeded || result.ResultData == null)
+          {
+            callback(result);
+            return;
+          }
+          this.AssignKnownNotificationActors(result.ResultData);
+          List<int> missingActorIndexes = result.ResultData.items
+            .Select((notification, index) => new { notification, index })
+            .Where(item => item.notification.actor_id == 0L &&
+                           this.NeedsResolvedActor(item.notification.NotType))
+            .Select(item => item.index)
+            .ToList();
+          this.ResolveNotificationActors(
+            result, offset, missingActorIndexes, 0, callback);
+        }),
+        (Func<string, NotificationData>) this.DeserializeNotifications,
+        false, true, new CancellationToken?(), null);
+    }
+
+    public void FetchNotifications(string lastId, Action<BackendResult<NotificationData, ResultCode>> callback)
+    {
+      Dictionary<string, string> parameters = new Dictionary<string, string>();
+      parameters["last_id"] = string.IsNullOrWhiteSpace(lastId) ? "0" : lastId;
+      VKRequestsDispatcher.DispatchRequestToVK<NotificationData>(
+        "notifications.fetch",
+        parameters,
+        (Action<BackendResult<NotificationData, ResultCode>>) (result =>
+        {
+          if (result.ResultCode != ResultCode.Succeeded ||
+              result.ResultData == null ||
+              result.ResultData.items == null ||
+              result.ResultData.items.Count == 0)
+          {
+            callback(result);
+            return;
+          }
+
+          this.AssignKnownNotificationActors(result.ResultData);
+          this.ResolveFetchedNotificationActorProfiles(result, callback);
+        }),
+        (Func<string, NotificationData>) this.DeserializeNotifications,
+        false, true, new CancellationToken?(), null);
+    }
+
+    private void ResolveFetchedNotificationActorProfiles(
+      BackendResult<NotificationData, ResultCode> fetchResult,
+      Action<BackendResult<NotificationData, ResultCode>> callback)
+    {
+      NotificationData data = fetchResult.ResultData;
+      List<long> missingActorIds = data.items
+        .Select(item => item.actor_id)
+        .Where(actorId => actorId != 0L &&
+          !data.profiles.Any(user => user.uid == actorId) &&
+          !(actorId < 0L && data.groups.Any(group => group.id == -actorId)))
+        .Distinct()
+        .ToList();
+
+      if (missingActorIds.Count == 0)
+      {
+        if (data.items.Any(item => item.actor_id == 0L))
+          this.EnrichNewestFetchedNotification(fetchResult, callback);
+        else
+          callback(fetchResult);
+        return;
+      }
+
+      UsersService.Instance.GetUsers(missingActorIds,
+        (Action<BackendResult<List<User>, ResultCode>>) (usersResult =>
+        {
+          if (usersResult.ResultCode == ResultCode.Succeeded &&
+              usersResult.ResultData != null)
+          {
+            foreach (User user in usersResult.ResultData)
+              if (!data.profiles.Any(existing => existing.uid == user.uid))
+                data.profiles.Add(user);
+          }
+          callback(fetchResult);
+        }));
+    }
+
+    private void EnrichNewestFetchedNotification(
+      BackendResult<NotificationData, ResultCode> fetchResult,
+      Action<BackendResult<NotificationData, ResultCode>> callback)
+    {
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      {
+        { "count", "1" },
+        { "fields", "sex,photo_50,photo_100,photo_200,photo_max,screen_name" }
+      };
+      VKRequestsDispatcher.DispatchRequestToVK<NotificationData>(
+        "notifications.get",
+        parameters,
+        (Action<BackendResult<NotificationData, ResultCode>>) (snapshot =>
+        {
+          if (snapshot.ResultCode == ResultCode.Succeeded &&
+              snapshot.ResultData != null &&
+              snapshot.ResultData.items != null &&
+              snapshot.ResultData.items.Count > 0)
+          {
+            this.AssignKnownNotificationActors(snapshot.ResultData);
+            Notification fetched = fetchResult.ResultData.items
+              .OrderByDescending(item => item.Date)
+              .FirstOrDefault();
+            Notification full = snapshot.ResultData.items[0];
+            if (fetched != null && full != null &&
+                fetched.Date == full.Date &&
+                string.Equals(fetched.type, full.type, StringComparison.OrdinalIgnoreCase))
+            {
+              fetched.parent = full.parent;
+              fetched.feedback = full.feedback;
+              fetched.UpdateNotificationType();
+              fetched.actor_id = full.actor_id;
+
+              User actor = snapshot.ResultData.profiles.FirstOrDefault();
+              Group actorGroup = snapshot.ResultData.groups.FirstOrDefault();
+              if (fetched.actor_id == 0L)
+              {
+                if (actor != null)
+                  fetched.actor_id = actor.uid;
+                else if (actorGroup != null)
+                  fetched.actor_id = -actorGroup.id;
+              }
+
+              foreach (User user in snapshot.ResultData.profiles)
+                if (!fetchResult.ResultData.profiles.Any(existing => existing.uid == user.uid))
+                  fetchResult.ResultData.profiles.Add(user);
+              foreach (Group group in snapshot.ResultData.groups)
+                if (!fetchResult.ResultData.groups.Any(existing => existing.id == group.id))
+                  fetchResult.ResultData.groups.Add(group);
+            }
+          }
+          callback(fetchResult);
+        }),
+        (Func<string, NotificationData>) this.DeserializeNotifications,
+        false, true, new CancellationToken?(), null);
+    }
+
+    private NotificationData DeserializeNotifications(string jsonStr)
+    {
+      int resultCount = 0;
+      jsonStr = VKRequestsDispatcher.GetArrayCountAndRemove(jsonStr, "items", out resultCount);
+      jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "profiles", false);
+      jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "groups", false);
+      NotificationData response =
+        JsonConvert.DeserializeObject<GenericRoot<NotificationData>>(jsonStr).response ??
+        new NotificationData();
+      response.items = response.items ?? new List<Notification>();
+      response.profiles = response.profiles ?? new List<User>();
+      response.groups = response.groups ?? new List<Group>();
+      response.TotalCount = resultCount == 0 ? response.items.Count : resultCount;
+      foreach (Notification notification in response.items)
+        notification.UpdateNotificationType();
+      return response;
+    }
+
+    private void AssignKnownNotificationActors(NotificationData data)
+    {
+      foreach (Notification notification in data.items)
+      {
+        if (notification.NotType == NotificationType.copy_post ||
+            notification.NotType == NotificationType.copy_photo ||
+            notification.NotType == NotificationType.copy_video)
+          continue;
+
+        User user = notification.ParsedFeedback as User ??
+                    notification.ParsedParent as User;
+        if (user != null)
+        {
+          notification.actor_id = user.uid;
+          continue;
         }
-        foreach (Notification notification in notificationList)
-          response.items.Remove(notification);
-        return response;
-      }), false, true, new CancellationToken?(),  null);
+        Group group = notification.ParsedParent as Group;
+        if (group != null)
+        {
+          notification.actor_id = -group.id;
+          continue;
+        }
+        List<FeedbackUser> feedbackUsers =
+          notification.ParsedFeedback as List<FeedbackUser>;
+        if (feedbackUsers != null && feedbackUsers.Count > 0)
+        {
+          notification.actor_id = feedbackUsers[0].owner_id;
+          continue;
+        }
+        Comment comment = notification.ParsedFeedback as Comment;
+        if (comment != null && comment.from_id != 0L)
+        {
+          notification.actor_id = comment.from_id;
+          continue;
+        }
+        WallPost post = notification.ParsedFeedback as WallPost ??
+                        notification.ParsedParent as WallPost;
+        if (post != null)
+          notification.actor_id = post.from_id;
+      }
+    }
+
+    private bool NeedsResolvedActor(NotificationType type)
+    {
+      switch (type)
+      {
+        case NotificationType.copy_post:
+        case NotificationType.copy_photo:
+        case NotificationType.copy_video:
+        case NotificationType.comment_photo:
+        case NotificationType.comment_video:
+        case NotificationType.wall_publish:
+        case NotificationType.new_posts_in_club:
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    private void ResolveNotificationActors(
+      BackendResult<NotificationData, ResultCode> result,
+      int pageOffset,
+      List<int> indexes,
+      int position,
+      Action<BackendResult<NotificationData, ResultCode>> callback)
+    {
+      if (position >= indexes.Count)
+      {
+        callback(result);
+        return;
+      }
+
+      int itemIndex = indexes[position];
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      {
+        { "count", "1" },
+        { "offset", (pageOffset + itemIndex).ToString() },
+        { "fields", "sex,photo_50,photo_100,photo_200,photo_max,screen_name" }
+      };
+      VKRequestsDispatcher.DispatchRequestToVK<NotificationData>(
+        "notifications.get",
+        parameters,
+        (Action<BackendResult<NotificationData, ResultCode>>) (singleResult =>
+        {
+          if (singleResult.ResultCode == ResultCode.Succeeded &&
+              singleResult.ResultData != null)
+          {
+            User actor = singleResult.ResultData.profiles.FirstOrDefault();
+            Group actorGroup = singleResult.ResultData.groups.FirstOrDefault();
+            if (actor != null)
+            {
+              result.ResultData.items[itemIndex].actor_id = actor.uid;
+              if (!result.ResultData.profiles.Any(user => user.uid == actor.uid))
+                result.ResultData.profiles.Add(actor);
+            }
+            else if (actorGroup != null)
+            {
+              result.ResultData.items[itemIndex].actor_id = -actorGroup.id;
+              if (!result.ResultData.groups.Any(group => group.id == actorGroup.id))
+                result.ResultData.groups.Add(actorGroup);
+            }
+          }
+          this.ResolveNotificationActors(
+            result, pageOffset, indexes, position + 1, callback);
+        }),
+        (Func<string, NotificationData>) this.DeserializeNotifications,
+        false, true, new CancellationToken?(), null);
     }
 
     public void Search(string searchStr, int count, int startTime, int endTime, string startFrom, Action<BackendResult<NewsFeedData, ResultCode>> callback)
@@ -232,8 +497,8 @@ label_16:
         parameters["start_time"] = startTime.ToString();
       if (endTime > 0)
         parameters["end_time"] = endTime.ToString();
-      if (!string.IsNullOrWhiteSpace("startFrom"))
-        parameters["start_from"] = startFrom.ToString();
+      if (!string.IsNullOrWhiteSpace(startFrom))
+        parameters["start_from"] = startFrom;
       parameters["extended"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<NewsFeedData>("newsfeed.search", parameters, callback, (Func<string, NewsFeedData>) (jsonStr =>
       {

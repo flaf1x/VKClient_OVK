@@ -98,22 +98,12 @@
                                Fill="{StaticResource PhoneActiveAreaBackgroundBrush}" />
 
 
-                    <CheckBox IsChecked="{Binding FriendsOnly, Mode=TwoWay}"
-                              Visibility="{Binding OwnPostVisibility}"
-                              Margin="0 -4 0 -8"
-                              x:Name="checkBoxFriendsOnly"
-                              Content="{Binding LocalizedResources.NewPost_FriendsOnly, Source={StaticResource LocStr}}" />
-
                     <!-- Social networks publishing -->
                     <StackPanel Orientation="Horizontal">
 
                         <uc:PublishSocialUC Type="Twitter"
                                             Visibility="{Binding TwitterVisibility}"
                                             IsChecked="{Binding PublishOnTwitter, Mode=TwoWay}" />
-
-                        <uc:PublishSocialUC Type="Facebook"
-                                            Visibility="{Binding FacebookVisibility}"
-                                            IsChecked="{Binding PublishOnFacebook, Mode=TwoWay}" />
 
                     </StackPanel>
 

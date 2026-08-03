@@ -1,9 +1,12 @@
 using Microsoft.Phone.Tasks;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using VKClient.Audio.Base.AudioCache;
 using VKClient.Audio.Base.Events;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
@@ -16,6 +19,9 @@ namespace VKClient.Common.Library
 {
   public class VideoPlayerHelper
   {
+      private const long MaxPrebufferedVideoSize = 25L * 1024L * 1024L;
+      private const long Mp4ProbeEndByte = 65535L;
+
       public static string GetVideoUri(VKClient.Common.Backend.DataObjects.Video video, int resolution, out bool isExternal)
     {
       isExternal = false;
@@ -96,30 +102,175 @@ namespace VKClient.Common.Library
 
       private static void PlayVideo(string uri, bool isExternal, int resolution, Action callback)
       {
+          if (!isExternal)
+          {
+              VideoPlayerHelper.PlayNativeVideo(uri, callback);
+              return;
+          }
+
           Execute.ExecuteOnUIThread((Action)(() =>
           {
-              if (!isExternal)
+              string lowerInvariant = uri.ToLowerInvariant();
+              if (lowerInvariant.Contains("youtube"))
+                  VideoPlayerHelper.PlayYouTube(uri, resolution, callback);
+              else if (lowerInvariant.Contains("instagram.com/"))
               {
                   callback();
                   VideoPlayerHelper.LaunchMediaPlayer(new Uri(uri, UriKind.Absolute));
               }
               else
               {
-                  string lowerInvariant = uri.ToLowerInvariant();
-                  if (lowerInvariant.Contains("youtube"))
-                      VideoPlayerHelper.PlayYouTube(uri, resolution, callback);
-                  else if (lowerInvariant.Contains("instagram.com/"))
+                  callback();
+                  Navigator.Current.NavigateToWebUri(uri, false, false);
+              }
+          }));
+      }
+
+      private static void PlayNativeVideo(string uri, Action callback)
+      {
+          string cachedFile = MediaLRUCache.Instance.GetLocalFile(uri);
+          if (VideoPlayerHelper.CachedFileExists(cachedFile))
+          {
+              VideoPlayerHelper.LaunchCachedVideo(cachedFile, callback);
+              return;
+          }
+
+          string downloadUri = VideoPlayerHelper.RemoveFragment(uri);
+          Uri parsedUri;
+          if (!Uri.TryCreate(downloadUri, UriKind.Absolute, out parsedUri))
+          {
+              VideoPlayerHelper.LaunchRemoteVideo(downloadUri, callback);
+              return;
+          }
+
+          // OpenVK keeps the MP4 index at the end of some uploaded videos.
+          // Old Windows Phone players repeatedly seek through such streams,
+          // which causes stalls. Probe the first 64 KiB and locally prebuffer
+          // only small files that are not encoded for fast-start playback.
+          JsonWebRequest.Download(downloadUri, 0L, Mp4ProbeEndByte, (status, totalSize, bytes) =>
+          {
+              bool shouldPrebuffer = status == HttpStatusCode.PartialContent &&
+                                     totalSize > 0L && totalSize <= MaxPrebufferedVideoSize &&
+                                     bytes != null && bytes.Length > 0 &&
+                                     !VideoPlayerHelper.HasFastStartMoov(bytes);
+              if (!shouldPrebuffer)
+              {
+                  VideoPlayerHelper.LaunchRemoteVideo(downloadUri, callback);
+                  return;
+              }
+              VideoPlayerHelper.DownloadAndLaunchVideo(uri, downloadUri, callback);
+          });
+      }
+
+      private static void DownloadAndLaunchVideo(string cacheKey, string downloadUri, Action callback)
+      {
+          string fileId = "video_" + Guid.NewGuid().ToString("N") + ".mp4";
+          Stream destination = null;
+          try
+          {
+              CacheManager.EnsureCacheFolderExists();
+              destination = CacheManager.GetStreamForWrite(fileId);
+              JsonWebRequest.Download(downloadUri, destination, succeeded =>
+              {
+                  int fileSize = 0;
+                  try
                   {
-                      callback();
-                      VideoPlayerHelper.LaunchMediaPlayer(new Uri(uri, UriKind.Absolute));
+                      fileSize = destination.Length > int.MaxValue ? 0 : (int)destination.Length;
+                      destination.Dispose();
+                  }
+                  catch
+                  {
+                  }
+
+                  if (succeeded && fileSize > 0)
+                  {
+                      MediaLRUCache.Instance.AddLocalFile(cacheKey, fileId, fileSize);
+                      MediaLRUCache.Instance.Save();
+                      VideoPlayerHelper.LaunchCachedVideo(fileId, callback);
                   }
                   else
                   {
-                      callback();
-                      Navigator.Current.NavigateToWebUri(uri, false, false);
+                      CacheManager.TryDelete(fileId, CacheManager.DataType.CachedData);
+                      VideoPlayerHelper.LaunchRemoteVideo(downloadUri, callback);
                   }
-              }
-          }));
+              }, null, new Cancellation());
+          }
+          catch
+          {
+              if (destination != null)
+                  destination.Dispose();
+              CacheManager.TryDelete(fileId, CacheManager.DataType.CachedData);
+              VideoPlayerHelper.LaunchRemoteVideo(downloadUri, callback);
+          }
+      }
+
+      private static bool CachedFileExists(string fileId)
+      {
+          if (string.IsNullOrEmpty(fileId))
+              return false;
+          try
+          {
+              using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                  return store.FileExists(CacheManager.GetFilePath(fileId, CacheManager.DataType.CachedData, "/"));
+          }
+          catch
+          {
+              return false;
+          }
+      }
+
+      private static bool HasFastStartMoov(byte[] bytes)
+      {
+          int position = 0;
+          while (position + 8 <= bytes.Length)
+          {
+              long size = ((long)bytes[position] << 24) |
+                          ((long)bytes[position + 1] << 16) |
+                          ((long)bytes[position + 2] << 8) |
+                          bytes[position + 3];
+              bool isMoov = bytes[position + 4] == (byte)'m' &&
+                            bytes[position + 5] == (byte)'o' &&
+                            bytes[position + 6] == (byte)'o' &&
+                            bytes[position + 7] == (byte)'v';
+              bool isMdat = bytes[position + 4] == (byte)'m' &&
+                            bytes[position + 5] == (byte)'d' &&
+                            bytes[position + 6] == (byte)'a' &&
+                            bytes[position + 7] == (byte)'t';
+              if (isMoov)
+                  return true;
+              if (isMdat)
+                  return false;
+              if (size < 8L || size > int.MaxValue || position + size > bytes.Length)
+                  return true;
+              position += (int)size;
+          }
+          return true;
+      }
+
+      private static string RemoveFragment(string uri)
+      {
+          int fragmentIndex = uri.IndexOf('#');
+          return fragmentIndex >= 0 ? uri.Substring(0, fragmentIndex) : uri;
+      }
+
+      private static void LaunchCachedVideo(string fileId, Action callback)
+      {
+          Execute.ExecuteOnUIThread(() =>
+          {
+              callback();
+              VideoPlayerHelper.LaunchMediaPlayer(new Uri(
+                  CacheManager.GetFilePath(fileId, CacheManager.DataType.CachedData, "/"),
+                  UriKind.Relative));
+          });
+      }
+
+      private static void LaunchRemoteVideo(string uri, Action callback)
+      {
+          Execute.ExecuteOnUIThread(() =>
+          {
+              callback();
+              VideoPlayerHelper.LaunchMediaPlayer(new Uri(uri, UriKind.Absolute));
+          });
       }
 
       private static void PlayYouTube(string uri, int resolution, Action callback)

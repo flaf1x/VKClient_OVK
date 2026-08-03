@@ -75,23 +75,6 @@ namespace VKClient.Common.Library
         {
           //track.Source;
           AudioTrackHelper.EnsureAppGlobalStateInitialized();
-          if (track.Source.OriginalString.StartsWith("http") && track.GetTagOwnerId() == AppGlobalStateManager.Current.LoggedInUserId && AppGlobalStateManager.Current.GlobalState.IsMusicCachingEnabled)
-          {
-            PlayedFilesInfo playedFilesInfo = new PlayedFilesInfo();
-            playedFilesInfo.Restore();
-            Uri source = track.Source;
-            string tag = track.Tag;
-            playedFilesInfo.Add(source, tag);
-          }
-          Playlist playlist = PlaylistManager.LoadTracksFromIsolatedStorage(true);
-          AccountService.Instance.StatsTrackEvents(StatsEventsTracker.ConvertToAppEvents((IEnumerable<object>) new List<AudioPlayEvent>()
-          {
-            new AudioPlayEvent()
-            {
-              OwnerAndAudioId = track.Tag,
-              Source = playlist.Metadata.ActionSource
-            }
-          }), (Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>>) (result => {}));
           if (resultCallback == null)
             return;
           flag = true;

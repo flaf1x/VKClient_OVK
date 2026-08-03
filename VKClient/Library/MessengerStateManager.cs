@@ -1,6 +1,7 @@
 using Microsoft.Phone.Controls;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using VKClient.Common.Backend;
@@ -57,6 +58,18 @@ namespace VKClient.Library
     public long HandleInAppNotification(string title, string message, long lUid, string isChat, string imageSrc)
 {
 	Action _9__1=null;
+    bool chatNotification;
+    bool.TryParse(isChat, out chatNotification);
+    PushSettings pushSettings = AppGlobalStateManager.Current.GlobalState.PushSettings;
+    if (!AppGlobalStateManager.Current.GlobalState.PushNotificationsEnabled ||
+        AppGlobalStateManager.Current.GlobalState.PushNotificationsBlockedUntil >= DateTime.UtcNow ||
+        chatNotification && !pushSettings.chat ||
+        !chatNotification && !pushSettings.msg)
+      return lUid;
+    if (chatNotification ? pushSettings.chat_no_text : pushSettings.msg_no_text)
+      message = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"
+        ? "Новое сообщение"
+        : "New message";
 	Execute.ExecuteOnUIThread(delegate
 	{
 		ConversationPage conversationPage = ((App)Application.Current).RootFrame.Content as ConversationPage;

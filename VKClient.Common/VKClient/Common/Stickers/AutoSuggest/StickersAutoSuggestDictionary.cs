@@ -125,6 +125,10 @@ namespace VKClient.Common.Stickers.AutoSuggest
 
     public void EnsureDictIsLoadedAndUpToDate(bool forceReload = false)
     {
+      // The OpenVK client exposes emoji only. Avoid polling VK's unsupported
+      // sticker keyword store endpoint on every page activation.
+      return;
+      #pragma warning disable 0162
       if ((AppGlobalStateManager.Current.LoggedInUserId == 0L || this._isLoading ? 0 : (forceReload ? 1 : ((DateTime.UtcNow - this._lastLoadedDate).TotalHours >= (double) StickersAutoSuggestDictionary.REFRESH_AFTER_HOURS ? 1 : 0))) == 0)
         return;
       this._isLoading = true;
@@ -145,6 +149,7 @@ namespace VKClient.Common.Stickers.AutoSuggest
           this._lastLoadedDate = DateTime.MinValue;
         }
       }));
+      #pragma warning restore 0162
     }
 
     private void SetKeywordsData(StickersKeywordsData keywordsData)

@@ -164,16 +164,6 @@
                         IsChecked="{Binding VideoTagsNotifications, Mode=TwoWay}" 
                               Content="{Binding LocalizedResources.Settings_Notifications_VideoTags, Source={StaticResource LocalizedStrings}}"/>-->
 
-                        <CheckBox Margin="-12 -6 -12 -6"
-                                  IsChecked="{Binding GroupInvitationsNotifications, Mode=TwoWay}"
-                                  Content="{Binding LocalizedResources.Settings_Notifications_GroupInvitations, Source={StaticResource LocalizedStrings}}" />
-
-                        <CheckBox Margin="-12 -6 -12 -6"
-                                  Visibility="{Binding GamesNotificationsVisibility}"
-                                  IsChecked="{Binding GamesNotifications, Mode=TwoWay}"
-                                  Content="{Binding LocalizedResources.Settings_Notifications_Games, Source={StaticResource LocalizedStrings}}" />
-
-
                         <!--<CheckBox 
                         Margin="-12 -6 -12 -6"
                         IsChecked="{Binding GroupAcceptedNotifications, Mode=TwoWay}" 
@@ -194,10 +184,6 @@
                         IsChecked="{Binding BirthdaysNotifications, Mode=TwoWay}" 
                               Content="{Binding LocalizedResources.Settings_Notifications_Birthdays, Source={StaticResource LocalizedStrings}}"/>-->
                         <CheckBox Margin="-12 -6 -12 -6"
-                                  IsChecked="{Binding ForthcomingEventsNotifications, Mode=TwoWay}"
-                                  Content="{Binding LocalizedResources.Settings_Notifications_ForthcomingEvents, Source={StaticResource LocalizedStrings}}" />
-
-                        <CheckBox Margin="-12 -6 -12 -6"
                                   IsChecked="{Binding BirthdaysNotifications, Mode=TwoWay}"
                                   Content="{Binding LocalizedResources.Settings_Notifications_FriendsBirthdays, Source={StaticResource LocalizedStrings}}" />
 
@@ -205,36 +191,6 @@
                         Margin="-12 -6 -12 -6"
                         IsChecked="{Binding NewsSubscriptions, Mode=TwoWay}"                                                  
                         Content="{Binding LocalizedResources.Settings_Notifications_NewsSubscriptions, Source={StaticResource LocalizedStrings}}"/>-->
-
-                        <Grid Background="{StaticResource PhoneGreyDividerBrush}"
-                              Height="2"
-                              Margin="-16 16 -16 0" />
-
-
-                        <!-- NEWS SOURCES -->
-
-                        <TextBlock Margin="0 22 0 21"
-                                   FontFamily="Segoe WP Semibold"
-                                   Foreground="{StaticResource PhoneVKSubtleBrush}"
-                                   Text="{Binding LocalizedResources.Settings_Notifications_NewsSubscriptions, Source={StaticResource LocalizedStrings}, Converter={StaticResource StringToUpper}}" />
-
-
-                        <Grid Background="Transparent"
-                              framework:MetroInMotion.Tilt="1.5"
-                              Tap="ConfigureNewsSourcesTap"
-                              Margin="0 4 0 11">
-                            <StackPanel>
-                                <TextBlock FontSize="25.33"
-                                           Text="{Binding LocalizedResources.Settings_Nofications_Sources, Source={StaticResource LocalizedStrings}}" />
-
-                                <TextBlock Foreground="{StaticResource PhoneVKSubtleBrush}"
-                                           Margin="0 -3 0 0"
-                                           TextWrapping="Wrap"
-                                           Text="{Binding LocalizedResources.Settings_Notifications_SourcesHelpDesc, Source={StaticResource LocalizedStrings}}" />
-
-                            </StackPanel>
-
-                        </Grid>
 
                         <Grid Background="{StaticResource PhoneGreyDividerBrush}"
                               Height="2"

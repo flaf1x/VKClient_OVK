@@ -16,6 +16,7 @@ namespace VKClient.Common.Backend.DataObjects
     private string _photo807;
     private string _photo1280;
     private string _photo2560;
+    private string _srcOriginal;
 
     public long id { get; set; }
 
@@ -227,6 +228,18 @@ namespace VKClient.Common.Backend.DataObjects
       }
     }
 
+    public string src_original
+    {
+      get
+      {
+        return this._srcOriginal;
+      }
+      set
+      {
+        this._srcOriginal = value;
+      }
+    }
+
     public Likes likes { get; set; }
 
     public Comments comments { get; set; }
@@ -241,13 +254,10 @@ namespace VKClient.Common.Backend.DataObjects
 
     private string WidthHeightInfo()
     {
-      string str1 = "?wh=";
-      int num = this.width;
-      string str2 = num.ToString();
-      string str3 = "_";
-      num = this.height;
-      string str4 = num.ToString();
-      return str1 + str2 + str3 + str4;
+      // The wh query parameter belonged to VK's old image proxy. OpenVK's CDN
+      // canonicalizes some of these URLs with HTTP 308, which WP8.1 does not
+      // follow. The image URL already identifies the requested size.
+      return "";
     }
 
     public string GetAppropriateForScaleFactor(Size size)
@@ -361,7 +371,7 @@ namespace VKClient.Common.Backend.DataObjects
 
     public void Write(BinaryWriter writer)
     {
-      writer.Write(1);
+      writer.Write(3);
       writer.Write(this.pid);
       writer.Write(this.aid);
       writer.Write(this.owner_id);
@@ -374,11 +384,15 @@ namespace VKClient.Common.Backend.DataObjects
       writer.Write(this.created);
       writer.WriteString(this.access_key);
       writer.Write(this.user_id);
+      writer.WriteString(this.photo_807);
+      writer.WriteString(this.photo_1280);
+      writer.WriteString(this.photo_2560);
+      writer.WriteString(this.src_original);
     }
 
     public void Read(BinaryReader reader)
     {
-      reader.ReadInt32();
+      int version = reader.ReadInt32();
       this.pid = reader.ReadInt64();
       this.aid = reader.ReadInt64();
       this.owner_id = reader.ReadInt64();
@@ -390,7 +404,15 @@ namespace VKClient.Common.Backend.DataObjects
       this.text = reader.ReadString();
       this.created = reader.ReadInt32();
       this.access_key = reader.ReadString();
-      this.owner_id = reader.ReadInt64();
+      this.user_id = reader.ReadInt64();
+      if (version >= 2)
+      {
+        this.photo_807 = reader.ReadString();
+        this.photo_1280 = reader.ReadString();
+        this.photo_2560 = reader.ReadString();
+      }
+      if (version >= 3)
+        this.src_original = reader.ReadString();
     }
   }
 }

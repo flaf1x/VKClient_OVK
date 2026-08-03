@@ -19,6 +19,7 @@
     <ValidateXaml>true</ValidateXaml>
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <ThrowErrorsInValidation>true</ThrowErrorsInValidation>
+    <SupportedCultures>be-BY%3bkk-KZ%3bpt-BR%3buk-UA%3bru-RU</SupportedCultures>
     <TargetFrameworkProfile />
     <DefaultLanguage>ru-RU</DefaultLanguage>
   </PropertyGroup>
@@ -153,7 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Phone.Controls.Toolkit">
-      <HintPath>..\libs\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
+      <HintPath>..\libs\Unsigned\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
     </Reference>
     <Reference Include="VKCamera">
       <HintPath>..\libs\VKCamera.dll</HintPath>

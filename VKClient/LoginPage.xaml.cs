@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Navigation;
 using VKClient.Audio.Base;
 using VKClient.Audio.Base.Library;
+using VKClient.Common;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -94,7 +95,7 @@ namespace VKClient
             this.ShowProgressIndicator(true, "");
             Logger.Instance.Info("Calling back end service");
             //wtf
-            Logger.Instance.Error("WTF " + this.textBoxUsername.Text + " " + this.passwordBox.Password);
+            Logger.Instance.Info("Submitting OpenVK authentication request");
             //
             LoginService.Instance.GetAccessToken(this.textBoxUsername.Text, this.passwordBox.Password, (Action<BackendResult<AutorizationData, ResultCode>>)(result =>
             {
@@ -181,7 +182,7 @@ namespace VKClient
 
         private void ForgotPasswordTap(object sender, GestureEventArgs e)
         {
-            Navigator.Current.NavigateToWebUri("https://m.vk.com/restore", true, false);
+            Navigator.Current.NavigateToWebUri(VKConstants.OpenVKWebAddress + "/restore", true, false);
         }
 
         public class PageState

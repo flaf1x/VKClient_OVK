@@ -535,6 +535,7 @@ namespace VKClient.Common.UC
                 if (imageInfo.Height == 0.0)
                     imageInfo.Height = (double)photoViewModel.Photo.height;
                 imageInfo.Uri = photoViewModel.ImageSrc;
+                imageInfo.PreviewUri = photoViewModel.PreviewImageSrc;
                 return imageInfo;
             }), this._getImageByIdFunc, (Action<int, bool>)((ind, show) =>
             {

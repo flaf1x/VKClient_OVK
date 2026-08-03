@@ -46,25 +46,54 @@ namespace VKClient.Common.Backend
 
     public void GetUserGroups(long userId, int offset, int count, string filter, Action<BackendResult<GroupsLists, ResultCode>> callback)
     {
-      string str = string.Format("\r\n\r\nvar groups = API.groups.get({{ user_id: {0}, extended: 1, fields: \"members_count,activity,start_date,finish_date,verified\", filter: \"{1}\", count: {2}, offset: {3} }});\r\nvar invitations = API.groups.getInvites({{ count: 1, \"fields\": \"members_count\" }});\r\n\r\nvar first_invitation_community = null;\r\nvar first_invitation_inviter = null;\r\n\r\nif (invitations.items.length > 0)\r\n{{\r\n    first_invitation_community = invitations.items[0];\r\n    first_invitation_inviter = API.users.get({{ user_ids: first_invitation_community.invited_by, fields: \"sex\" }})[0];\r\n}}\r\n\r\nvar result = {{ \"groups\": groups }};\r\nif ({4})\r\n{{\r\n    result.invitations =\r\n    {{\r\n        \"count\": invitations.count,\r\n        \"first_invitation\":\r\n        {{\r\n            \"community\": first_invitation_community,\r\n            \"inviter\": first_invitation_inviter\r\n        }}\r\n    }};\r\n}}\r\n\r\nreturn result;\r\n\r\n                ", userId, filter, count, offset, (filter == "events" || filter == "moder" ? "false" : "true"));
-      string methodName = "execute";
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters.Add("code", str);
-      Action<BackendResult<GroupsLists, ResultCode>> callback1 = callback;
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<GroupsLists>(methodName, parameters, callback1, (Func<string, GroupsLists>) (jsonString =>
+      if (userId != 0)
+        parameters["user_id"] = userId.ToString();
+      parameters["extended"] = "1";
+      parameters["fields"] = "members_count,activity,start_date,finish_date,verified";
+      parameters["filter"] = filter;
+      parameters["count"] = count.ToString();
+      parameters["offset"] = offset.ToString();
+
+      VKRequestsDispatcher.DispatchRequestToVK<GroupsLists>("groups.get", parameters, callback, (Func<string, GroupsLists>) (jsonString =>
       {
-        GenericRoot<GroupsListWithInvitations> genericRoot = JsonConvert.DeserializeObject<GenericRoot<GroupsListWithInvitations>>(jsonString);
+        VKList<Group> response = JsonConvert.DeserializeObject<GenericRoot<VKList<Group>>>(jsonString).response;
         return new GroupsLists()
         {
-          Communities = genericRoot.response.groups,
-          Invitations = genericRoot.response.invitations
+          Communities = response ?? new VKList<Group>(),
+          Invitations = new CommunityInvitations()
         };
-      }), num1 != 0, num2 != 0, cancellationToken, null);
+      }), false, true, new CancellationToken?(), null);
+    }
+
+    public void GetUserEvents(long userId, Action<BackendResult<VKList<Group>, ResultCode>> callback)
+    {
+      // Since OpenVK's July 2026 events update, groups.get includes events in
+      // the regular memberships list. Its legacy filter=events parameter is
+      // still ignored, so fetch the memberships once and filter by the
+      // explicit group type on the client.
+      this.GetUserGroups(userId, 0, 1000, "", result =>
+      {
+        if (result.ResultCode != ResultCode.Succeeded ||
+            result.ResultData == null ||
+            result.ResultData.Communities == null)
+        {
+          callback(new BackendResult<VKList<Group>, ResultCode>(result.ResultCode));
+          return;
+        }
+
+        VKList<Group> communities = result.ResultData.Communities;
+        List<Group> events = (communities.items ?? new List<Group>())
+          .FindAll(group => group != null && group.GroupType == GroupType.Event);
+        this.AddCachedGroups(events);
+        callback(new BackendResult<VKList<Group>, ResultCode>(
+          ResultCode.Succeeded,
+          new VKList<Group>()
+          {
+            count = events.Count,
+            items = events
+          }));
+      });
     }
 
     public void GetCommunityInvitations(int offset, int count, Action<BackendResult<CommunityInvitationsList, ResultCode>> callback)
@@ -79,12 +108,57 @@ namespace VKClient.Common.Backend
 
     public void Join(long gid, bool notSure, Action<BackendResult<OwnCounters, ResultCode>> callback, string source = null)
     {
-      VKRequestsDispatcher.Execute<OwnCounters>(string.Format("var gid = {0};\r\n\r\nAPI.groups.join({{\"group_id\": gid, \"not_sure\": {1}{2}}});\r\n\r\nreturn API.getCounters();", gid, notSure ? "1" : "0", !string.IsNullOrEmpty(source) ? string.Format(", \"source\": \"{0}\"", source) : ""), callback, new Func<string, OwnCounters>(CountersDeserializerHelper.Deserialize), false, true, new CancellationToken?());
+      Dictionary<string, string> parameters = new Dictionary<string, string>();
+      parameters["group_id"] = gid.ToString();
+      parameters["not_sure"] = notSure ? "1" : "0";
+      if (!string.IsNullOrEmpty(source))
+        parameters["source"] = source;
+      VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("groups.join", parameters,
+        result =>
+        {
+          if (result.ResultCode != ResultCode.Succeeded)
+          {
+            callback(new BackendResult<OwnCounters, ResultCode>(result.ResultCode));
+            return;
+          }
+          // OpenVK does not return counters from groups.join. Fetch them
+          // separately instead of relying on the legacy execute script.
+          AccountService.Instance.GetCounters(counters =>
+          {
+            if (counters.ResultCode == ResultCode.Succeeded)
+              callback(counters);
+            else
+              callback(new BackendResult<OwnCounters, ResultCode>(ResultCode.Succeeded, new OwnCounters()));
+          });
+        }, jsonStr => new ResponseWithId(), false, true, new CancellationToken?(), null);
     }
 
     public void Leave(long gid, Action<BackendResult<OwnCounters, ResultCode>> callback)
     {
-      VKRequestsDispatcher.Execute<OwnCounters>(string.Format("var gid = {0};\r\n\r\nAPI.groups.leave({{\"group_id\": gid}});\r\n\r\nreturn API.getCounters();", gid), callback, new Func<string, OwnCounters>(CountersDeserializerHelper.Deserialize), false, true, new CancellationToken?());
+      VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("groups.leave", new Dictionary<string, string>()
+      {
+        {
+          "group_id",
+          gid.ToString()
+        }
+      },
+        result =>
+        {
+          if (result.ResultCode != ResultCode.Succeeded)
+          {
+            callback(new BackendResult<OwnCounters, ResultCode>(result.ResultCode));
+            return;
+          }
+          // OpenVK does not return counters from groups.leave. Fetch them
+          // separately instead of relying on the legacy execute script.
+          AccountService.Instance.GetCounters(counters =>
+          {
+            if (counters.ResultCode == ResultCode.Succeeded)
+              callback(counters);
+            else
+              callback(new BackendResult<OwnCounters, ResultCode>(ResultCode.Succeeded, new OwnCounters()));
+          });
+        }, jsonStr => new ResponseWithId(), false, true, new CancellationToken?(), null);
     }
 
     public void Search(string searchStr, int offset, int count, Action<BackendResult<VKList<Group>, ResultCode>> callback)
@@ -93,48 +167,48 @@ namespace VKClient.Common.Backend
       parameters["q"] = searchStr;
       parameters["offset"] = offset.ToString();
       parameters["count"] = count.ToString();
-      parameters["fields"] = "start_date";
+      parameters["fields"] = "screen_name,is_admin,is_member,members_count,activity,photo_50,photo_100,photo_200,photo_max,start_date";
       VKRequestsDispatcher.DispatchRequestToVK<VKList<Group>>("groups.search", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
     public void GetGroupInfo(long groupId, Action<BackendResult<GroupData, ResultCode>> callback)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<GroupData>("execute.getGroupInfo", new Dictionary<string, string>()
+      VKRequestsDispatcher.DispatchRequestToVK<GroupData>("groups.getById", new Dictionary<string, string>()
       {
         {
-          "groupId",
+          "group_id",
           groupId.ToString()
         },
         {
-          "func_v",
-          "2"
+          "fields",
+          "activity,status,description,members_count,counters,city,country,place,site,screen_name,is_member,is_admin,admin_level,can_post,can_create_topic,can_upload_video,verified,photo_50,photo_100,photo_200,photo_max,cover,start_date,finish_date"
         }
       }, callback, (Func<string, GroupData>) (jsonStr =>
       {
-        jsonStr = VKRequestsDispatcher.FixArrayToObject(jsonStr, "counters");
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "photos", true);
-        jsonStr = VKRequestsDispatcher.FixArrayToObject(jsonStr, "mediaSectionsSettings");
-        GroupData response = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<GroupData>>(jsonStr).response;
-        GroupMembershipType groupMembershipType = GroupMembershipType.NotAMember;
-        try
+        List<Group> groups = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<List<Group>>>(jsonStr).response;
+        Group group = groups != null && groups.Count > 0 ? groups[0] : new Group();
+        group.MembershipType = group.IsMember
+          ? GroupMembershipType.Member
+          : GroupMembershipType.NotAMember;
+
+        GroupData response = new GroupData()
         {
-          groupMembershipType = (GroupMembershipType) response.group.member_status;
-          if (groupMembershipType == GroupMembershipType.InvitationRejected)
-            groupMembershipType = GroupMembershipType.NotAMember;
-        }
-        catch
-        {
-          if (response.membership.member == 1)
-            groupMembershipType = GroupMembershipType.Member;
-          if (response.membership.invitation == 1)
-            groupMembershipType = GroupMembershipType.InvitationReceived;
-          if (response.membership.request == 1)
-            groupMembershipType = GroupMembershipType.RequestSent;
-        }
-        response.group.MembershipType = groupMembershipType;
-        if (Enum.IsDefined(typeof (ProfileMainSectionType), response.group.main_section))
-          response.group.MainSection = (ProfileMainSectionType) response.group.main_section;
-        this.AddCachedGroup(response.group);
+          group = group,
+          membership = new GroupMembership() { member = group.IsMember ? 1 : 0 },
+          photos = new VKList<Photo>() { items = new List<Photo>() },
+          followers = new VKList<User>() { items = new List<User>() },
+          friends = new List<User>(),
+          subscriptions = new VKList<SubscriptionObj>() { items = new List<SubscriptionObj>() },
+          gifts = new VKList<GiftItemData>() { items = new List<GiftItemData>() },
+          topics = new List<Topic>(),
+          videos = new List<Video>(),
+          products = new List<Product>(),
+          audios = new List<AudioObj>(),
+          contactsUsers = new List<User>(),
+          invites = new VKList<Group>() { items = new List<Group>() },
+          mediaSectionsSettings = new MediaSectionsSettings()
+        };
+        this.AddCachedGroup(group);
         return response;
       }), false, true, new CancellationToken?(),  null);
     }
@@ -613,17 +687,51 @@ namespace VKClient.Common.Backend
 
     public void GetSubscribers(long communityId, int offset, int count, string filter, bool needManagersAndContacts, Action<BackendResult<CommunitySubscribers, ResultCode>> callback)
     {
-      string str = string.Format("\r\n\r\nvar subscribers = API.groups.getMembers({{ \"group_id\": {0}, \"offset\": {1}, \"count\": {2}, \"filter\": \"{3}\", \"fields\": \"online,online_mobile,photo_max,first_name_acc,last_name_acc\" }});\r\n\r\nvar managers = [];\r\nvar contacts = [];\r\n\r\nif ({4})\r\n{{\r\n    managers = API.groups.getMembers({{ \"group_id\": {5}, \"filter\": \"managers\" }}).items;\r\n    contacts = API.groups.getById({{ \"group_id\": {6}, \"fields\": \"contacts\" }})[0].contacts;\r\n}}\r\n\r\nreturn \r\n{{\r\n    \"subscribers\": subscribers,\r\n    \"managers\": managers,\r\n    \"contacts\": contacts\r\n}};\r\n\r\n", communityId, offset, count, filter, (needManagersAndContacts ? "true" : "false"), communityId, communityId);
-      string methodName = "execute";
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters.Add("code", str);
-      Action<BackendResult<CommunitySubscribers, ResultCode>> callback1 = callback;
-      // ISSUE: variable of the null type
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      VKRequestsDispatcher.DispatchRequestToVK<CommunitySubscribers>(methodName, parameters, callback1, null, num1 != 0, num2 != 0, cancellationToken, null);
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      {
+        { "group_id", Math.Abs(communityId).ToString() },
+        { "offset", offset.ToString() },
+        { "count", (offset + count).ToString() },
+        { "fields", "sex,screen_name,photo_50,photo_100,photo_200,photo_max" }
+      };
+      VKRequestsDispatcher.DispatchRequestToVK<VKList<User>>(
+        "groups.getMembers",
+        parameters,
+        (Action<BackendResult<VKList<User>, ResultCode>>) (result =>
+        {
+          if (result.ResultCode != ResultCode.Succeeded)
+          {
+            callback(new BackendResult<CommunitySubscribers, ResultCode>(result.ResultCode));
+            return;
+          }
+          VKList<User> subscribers = result.ResultData ?? new VKList<User>();
+          subscribers.items = subscribers.items ?? new List<User>();
+          int receivedCount = subscribers.items.Count;
+          subscribers.count = offset + receivedCount + (receivedCount == count ? 1 : 0);
+          callback(new BackendResult<CommunitySubscribers, ResultCode>(
+            ResultCode.Succeeded,
+            new CommunitySubscribers()
+            {
+              subscribers = subscribers,
+              managers = new List<User>(),
+              contacts = new List<GroupContact>()
+            }));
+        }),
+        (Func<string, VKList<User>>) (jsonStr =>
+        {
+          VKRequestsDispatcher.GenericRoot<VKList<User>> root =
+            JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<VKList<User>>>(jsonStr);
+          VKList<User> users = root != null ? root.response : null;
+          if (users == null)
+            users = new VKList<User>();
+          if (users.items == null)
+            users.items = new List<User>();
+          return users;
+        }),
+        false,
+        true,
+        new CancellationToken?(),
+        null);
     }
 
     public void SearchSubscribers(string q, long communityId, int offset, int count, bool isFriendsOnly, Action<BackendResult<VKList<User>, ResultCode>> callback)

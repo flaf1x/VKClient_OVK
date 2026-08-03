@@ -56,6 +56,21 @@ namespace VKClient.Audio.Base.Core
       this._currentCapacity = this._currentCapacity + this._getValueCapacityFunc(val);
     }
 
+    [MethodImpl(MethodImplOptions.Synchronized)]
+    public bool Remove(K key)
+    {
+      LinkedListNode<LRUCacheItem<K, V>> node;
+      if (!this.cacheMap.TryGetValue(key, out node))
+        return false;
+      this.lruList.Remove(node);
+      this.cacheMap.Remove(key);
+      if (this._getValueCapacityFunc != null)
+        this._currentCapacity = this._currentCapacity - this._getValueCapacityFunc(node.Value.value);
+      if (this.OnRemovedCallback != null)
+        this.OnRemovedCallback(node.Value);
+      return true;
+    }
+
     private void RemoveFirst()
     {
       LinkedListNode<LRUCacheItem<K, V>> first = this.lruList.First;

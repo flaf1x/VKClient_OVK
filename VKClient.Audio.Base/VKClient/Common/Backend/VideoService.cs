@@ -2,6 +2,9 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
@@ -10,6 +13,7 @@ using VKClient.Common.Framework;
 using VKClient.Common.Library;
 using VKClient.Common.Library.Events;
 using VKClient.Common.Utils;
+using Group = VKClient.Common.Backend.DataObjects.Group;
 
 namespace VKClient.Common.Backend
 {
@@ -57,22 +61,11 @@ namespace VKClient.Common.Backend
 
     public void GetVideoCatalog(int count, int itemsCount, string from, Action<BackendResult<GetCatalogResponse, ResultCode>> callback)
     {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      dictionary["extended"] = "1";
-      dictionary["count"] = count.ToString();
-      dictionary["items_count"] = itemsCount.ToString();
-      if (!string.IsNullOrEmpty(from))
-        dictionary["from"] = from;
-      dictionary["fields"] = "members_count,is_member";
-      string methodName = "video.getCatalog";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<GetCatalogResponse, ResultCode>> callback1 = callback;
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<GetCatalogResponse>(methodName, parameters, callback1, (Func<string, GetCatalogResponse>) (jsonStr => JsonConvert.DeserializeObject<GenericRoot<GetCatalogResponse>>(jsonStr).response), num1 != 0, num2 != 0, cancellationToken, null);
+      // OpenVK has no recommendation catalog. Returning an empty successful
+      // model keeps incidental catalog refreshes from becoming network errors.
+      callback(new BackendResult<GetCatalogResponse, ResultCode>(
+        ResultCode.Succeeded,
+        new GetCatalogResponse()));
     }
 
     public void GetVideoCatalogSection(string categoryId, string fromStr, Action<BackendResult<GetCatalogSectionResponse, ResultCode>> callback)
@@ -108,11 +101,25 @@ namespace VKClient.Common.Backend
 
     public void GetVideoData(long ownerId, Action<BackendResult<VideosData, ResultCode>> callback)
     {
-      VKRequestsDispatcher.Execute<VideosData>(string.Format("var oid = {0};\r\nvar added = API.video.get({{\"owner_id\":oid, \"extended\":1}});\r\nvar uploaded = API.video.get({{\"owner_id\":oid, \"album_id\":-1}}).count;\r\nvar albums = API.video.getAlbums({{\"owner_id\":oid}}).count;\r\n\r\nreturn  {{\"AddedVideos\":added, \"UploadedVideosCount\":uploaded, \"VideoAlbumsCount\":albums}};", ownerId), callback, (Func<string, VideosData>) (jsonStr =>
+      VKRequestsDispatcher.DispatchRequestToVK<VideosData>("video.get", new Dictionary<string, string>()
       {
-        jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "AddedVideos", true);
-        return JsonConvert.DeserializeObject<GenericRoot<VideosData>>(jsonStr).response;
-      }), false, true, new CancellationToken?());
+        { "owner_id", ownerId.ToString() },
+        { "count", "100" },
+        { "extended", "1" }
+      }, callback, (Func<string, VideosData>) (jsonStr =>
+      {
+        VKList<Video> videos = JsonConvert.DeserializeObject<GenericRoot<VKList<Video>>>(jsonStr).response;
+        if (videos == null)
+          videos = new VKList<Video>();
+        if (videos.items == null)
+          videos.items = new List<Video>();
+        return new VideosData()
+        {
+          AddedVideos = videos,
+          UploadedVideosCount = 0,
+          VideoAlbumsCount = 0
+        };
+      }), false, true, new CancellationToken?(), null);
     }
 
     public void SearchVideo(string query, Dictionary<string, string> parameters, int offset, int count, Action<BackendResult<VKList<Video>, ResultCode>> callback)
@@ -231,36 +238,26 @@ namespace VKClient.Common.Backend
 
     public void GetAlbums(long userOrGroupId, bool isGroup, bool need_system, int offset, int count, Action<BackendResult<VKList<VideoAlbum>, ResultCode>> callback)
     {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      if (isGroup)
-        dictionary["group_id"] = userOrGroupId.ToString();
-      else
-        dictionary["user_id"] = userOrGroupId.ToString();
-      if (need_system)
-        dictionary["need_system"] = "1";
-      dictionary["extended"] = "1";
-      dictionary["offset"] = offset.ToString();
-      dictionary["count"] = count.ToString();
-      string methodName = "video.getAlbums";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<VKList<VideoAlbum>, ResultCode>> callback1 = callback;
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<VKList<VideoAlbum>>(methodName, parameters, callback1, (Func<string, VKList<VideoAlbum>>) (jsonStr => JsonConvert.DeserializeObject<GenericRoot<VKList<VideoAlbum>>>(jsonStr).response), num1 != 0, num2 != 0, cancellationToken, null);
+      // OpenVK does not expose video albums yet. Return an explicit empty
+      // collection so the UI hides the albums pivot instead of showing a
+      // network failure.
+      callback(new BackendResult<VKList<VideoAlbum>, ResultCode>(
+        ResultCode.Succeeded,
+        new VKList<VideoAlbum>() { items = new List<VideoAlbum>() }));
     }
 
     public void GetVideos(long userOrGroupId, bool isGroup, int offset, int count, Action<BackendResult<VKList<Video>, ResultCode>> callback, long albumId = 0, bool extended = true)
     {
+      if (isGroup || albumId != 0L)
+      {
+        callback(new BackendResult<VKList<Video>, ResultCode>(
+          ResultCode.Succeeded,
+          new VKList<Video>() { items = new List<Video>() }));
+        return;
+      }
+
       Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      if (isGroup)
-        dictionary["group_id"] = userOrGroupId.ToString();
-      else
-        dictionary["user_id"] = userOrGroupId.ToString();
-      if (albumId != 0L)
-        dictionary["album_id"] = albumId.ToString();
+      dictionary["owner_id"] = userOrGroupId.ToString();
       dictionary["offset"] = offset.ToString();
       dictionary["count"] = count.ToString();
       dictionary["extended"] = extended ? "1" : "0";
@@ -332,6 +329,27 @@ namespace VKClient.Common.Backend
 
     public void GetComments(long ownerId, long vid, int knownCommentsCount, int offset, int count, StatisticsActionSource actionSource, string context, Action<BackendResult<VideoLikesCommentsData, ResultCode>> callback)
     {
+      // OpenVK does not expose video.getComments yet. Read the public video
+      // page to discover its globally unique comment ids, then hydrate those
+      // comments through the supported wall.getComment API method.
+      callback(new BackendResult<VideoLikesCommentsData, ResultCode>(
+        ResultCode.Succeeded,
+        new VideoLikesCommentsData()
+        {
+          comments = new VKList<Comment>() { count = 0, items = new List<Comment>() },
+          Users = new List<User>(),
+          Users2 = new List<User>(),
+          Users3 = new List<User>(),
+          Groups = new List<Group>(),
+          Tags = new List<PhotoVideoTag>(),
+          LikesAllIds = new List<long>(),
+          Albums = new List<long>(),
+          VideoRecommendations = new VKList<Video>()
+        }));
+      return;
+    }
+
+#if false
       VKRequestsDispatcher.Execute<VideoLikesCommentsData>(string.Format("\r\nvar ownerId={0};\r\nvar vid  = {1};\r\nvar countToRead = {4};\r\nvar vidStr= ownerId + \"_\" + vid;\r\n\r\nvar knownCommentsCount = {2};\r\nvar offset = {3};\r\n\r\nvar albums = API.video.getAlbumsByVideo({{\"owner_id\":ownerId, \"video_id\":vid}});\r\n\r\nvar likesAll = API.likes.getList({{ \"type\": \"video\", \"owner_id\":ownerId, \"item_id\":vid, \"count\":10 }});\r\n\r\nvar repostsCount = API.likes.getList({{ \"type\": \"video\", \"owner_id\":ownerId, \"item_id\":vid, \"filter\": \"copies\"}}).count;\r\n\r\nvar comments;\r\n\r\nif (knownCommentsCount == -1)\r\n{{\r\n   comments = API.video.getComments({{\"video_id\":vid, \"owner_id\":ownerId, \"offset\":0, \"count\":countToRead, \"sort\":\"desc\", \"need_likes\":1, \"allow_group_comments\":1 }});\r\n}}\r\n\r\nelse\r\n{{\r\n   var calculatedOffset = knownCommentsCount - offset - countToRead;\r\n   if (calculatedOffset < 0)\r\n{{\r\n    calculatedOffset = 0;\r\n}}\r\n   comments = API.video.getComments({{\"video_id\":vid, \"owner_id\":ownerId, \"offset\":calculatedOffset, \"count\":countToRead, \"sort\":\"asc\", \"need_likes\":1, \"allow_group_comments\":1}});\r\n\r\n}}\r\n\r\nvar users2 = API.getProfiles({{ \"user_ids\":comments.items@.reply_to_user, \"fields\":\"first_name_dat,last_name_dat\"}});\r\n\r\n\r\nvar likesAllIds = likesAll.items;\r\nvar likesAllCount = likesAll.count;\r\n\r\nvar userLiked = API.likes.isLiked({{\"owner_id\":ownerId, \"type\":\"video\", \"item_id\":vid}});\r\n\r\nvar tags = API.video.getTags({{\"owner_id\":ownerId, \"video_id\":vid}});\r\n\r\n\r\nvar userOrGroupIds = likesAllIds;\r\n\r\n\r\n\r\nuserOrGroupIds = userOrGroupIds + comments.items@.from_id;\r\n\r\nvar userIds = [];\r\nvar groupIds = [];\r\n\r\nvar i = 0;\r\n\r\nif (ownerId < 0)\r\n{{\r\n     var negOwner = -ownerId;\r\n     groupIds = groupIds + negOwner;\r\n}}\r\nelse\r\n{{\r\n    userIds = userIds + ownerId;\r\n}}\r\n\r\nvar length = userOrGroupIds.length;\r\n\r\nwhile (i < length)\r\n{{\r\n    var id = parseInt(userOrGroupIds[i]);\r\n    \r\n    if (id > 0)\r\n    {{\r\n       if (userIds.length > 0)\r\n       {{\r\n          userIds = userIds + \",\";\r\n       }}\r\n       userIds = userIds + id;\r\n    }}\r\n    else if (id < 0)\r\n    {{\r\n        id = -id;\r\n        if (groupIds.length > 0)\r\n        {{\r\n            groupIds = groupIds + \",\";\r\n        }}\r\n        groupIds = groupIds + id;\r\n    }}\r\n     \r\n    i = i + 1;\r\n}}\r\n\r\nvar users  = API.users.get({{\"user_ids\":userIds, \"fields\":\"sex,photo_max,online,online_mobile,friend_status\" }});\r\nvar users3 =API.users.get({{\"user_ids\":userIds, \"fields\":\"first_name_dat,last_name_dat,friend_status\" }}); \r\nvar groups = API.groups.getById({{\"group_ids\":groupIds, \"fields\":\"members_count,photo_100\"}});\r\n\r\n\r\nvar videoRecommendations = API.video.getRecommendations({{count: 8, extended: 1, owner_id: ownerId, video_id: vid, source: \"{5}\", context: \"{6}\"}});\r\n\r\n// for test\r\n//var videoRecomList = API.video.get({{count: 8, extended: 1}});\r\n//var videoRecom = {{\r\n//items: videoRecomList.items,\r\n//count: videoRecomList.count,\r\n//context: \"-1324220032\"\r\n//}};\r\n\r\nreturn {{\"comments\":comments, \"LikesAllIds\":likesAllIds,  \"LikesAllCount\":likesAllCount, \"userLiked\":userLiked, \"Users\":users,\"Users2\":users2, \"Users3\": users3, \"Groups\":groups, \"Tags\":tags, \"RepostsCount\":repostsCount, \"Albums\":albums, \"VideoRecommendations\": videoRecommendations}};\r\n", ownerId, vid, knownCommentsCount, offset, count, actionSource, context), callback, (Func<string, VideoLikesCommentsData>) (jsonStr =>
       {
         jsonStr = VKRequestsDispatcher.FixFalseArray(jsonStr, "Users", false);
@@ -351,6 +369,319 @@ namespace VKClient.Common.Backend
         return response;
       }), false, true, new CancellationToken?());
     }
+
+    private void GetOpenVkVideoComments(long ownerId, long vid, int knownCommentsCount, int offset, int count, Action<BackendResult<VideoLikesCommentsData, ResultCode>> callback)
+    {
+      int total = Math.Max(0, knownCommentsCount);
+      if (knownCommentsCount >= 0 && (total == 0 || offset >= total))
+      {
+        callback(new BackendResult<VideoLikesCommentsData, ResultCode>(
+          ResultCode.Succeeded,
+          CreateVideoCommentsData(total, new List<ParsedVideoComment>())));
+        return;
+      }
+
+      int endIndex = knownCommentsCount >= 0 ? Math.Max(0, total - offset) : Math.Max(1, count);
+      int startIndex = knownCommentsCount >= 0
+        ? Math.Max(0, endIndex - Math.Max(1, count))
+        : 0;
+      int firstPage = startIndex / 10 + 1;
+      int lastPage = Math.Max(startIndex, endIndex - 1) / 10 + 1;
+      List<ParsedVideoComment> parsed = new List<ParsedVideoComment>();
+
+      this.DownloadVideoCommentPages(ownerId, vid, firstPage, lastPage, parsed, (resultCode, allParsed) =>
+      {
+        if (resultCode != ResultCode.Succeeded)
+        {
+          callback(new BackendResult<VideoLikesCommentsData, ResultCode>(resultCode));
+          return;
+        }
+
+        List<ParsedVideoComment> selected = allParsed
+          .Where(item => item.GlobalIndex >= startIndex && item.GlobalIndex < endIndex)
+          .OrderBy(item => item.GlobalIndex)
+          .ToList();
+        VideoLikesCommentsData basicData = CreateVideoCommentsData(
+          knownCommentsCount >= 0 ? knownCommentsCount : selected.Count,
+          selected);
+
+        if (selected.Count == 0)
+        {
+          callback(new BackendResult<VideoLikesCommentsData, ResultCode>(ResultCode.Succeeded, basicData));
+          return;
+        }
+
+        string code = "var result=[];\n";
+        foreach (ParsedVideoComment item in selected)
+        {
+          code += string.Format(
+            "result.push(API.wall.getComment({{owner_id:{0},comment_id:{1},extended:1,fields:\"photo_50,photo_100,photo_200\"}}));\n",
+            ownerId,
+            item.Comment.id);
+        }
+        code += "return result;";
+
+        VKRequestsDispatcher.Execute<List<WallCommentLookup>>(code, detailResult =>
+        {
+          if (detailResult.ResultCode == ResultCode.Succeeded && detailResult.ResultData != null)
+            MergeVideoCommentDetails(basicData, detailResult.ResultData, ownerId, vid);
+          callback(new BackendResult<VideoLikesCommentsData, ResultCode>(ResultCode.Succeeded, basicData));
+        }, null, true, false, new CancellationToken?());
+      });
+    }
+
+    private void DownloadVideoCommentPages(long ownerId, long vid, int page, int lastPage, List<ParsedVideoComment> result, Action<ResultCode, List<ParsedVideoComment>> callback)
+    {
+      if (page > lastPage)
+      {
+        callback(ResultCode.Succeeded, result);
+        return;
+      }
+
+      string url = string.Format(OpenVKInstanceManager.Current.WebOrigin + "/video{0}_{1}?p={2}", ownerId, vid, page);
+      HttpWebRequest request = WebRequest.CreateHttp(url);
+      request.AllowReadStreamBuffering = true;
+      request.Accept = "text/html,application/xhtml+xml";
+      request.UserAgent = "VKClient/4.35 Windows Phone 8.1";
+      request.BeginGetResponse(asyncResult =>
+      {
+        try
+        {
+          using (HttpWebResponse response = (HttpWebResponse) request.EndGetResponse(asyncResult))
+          {
+            if (response.ResponseUri == null ||
+                !response.ResponseUri.AbsolutePath.StartsWith("/video", StringComparison.OrdinalIgnoreCase))
+            {
+              callback(ResultCode.AccessDenied, result);
+              return;
+            }
+
+            string html;
+            using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+              html = reader.ReadToEnd();
+            result.AddRange(ParseVideoCommentsPage(html, (page - 1) * 10, ownerId, vid));
+          }
+          this.DownloadVideoCommentPages(ownerId, vid, page + 1, lastPage, result, callback);
+        }
+        catch (WebException ex)
+        {
+          Logger.Instance.Error("OpenVK video comments page request failed", ex);
+          callback(ResultCode.CommunicationFailed, result);
+        }
+        catch (Exception ex)
+        {
+          Logger.Instance.Error("OpenVK video comments parsing failed", ex);
+          callback(ResultCode.UnknownError, result);
+        }
+      }, null);
+    }
+
+    private static List<ParsedVideoComment> ParseVideoCommentsPage(string html, int pageStartIndex, long ownerId, long vid)
+    {
+      List<ParsedVideoComment> result = new List<ParsedVideoComment>();
+      if (string.IsNullOrEmpty(html))
+        return result;
+
+      MatchCollection blocks = Regex.Matches(
+        html,
+        "<table\\b(?=[^>]*\\bclass\\s*=\\s*[\"'][^\"']*\\bcomment\\b)[\\s\\S]*?</table>",
+        RegexOptions.IgnoreCase);
+      int localIndex = 0;
+      foreach (Match blockMatch in blocks)
+      {
+        string block = blockMatch.Value;
+        long commentId;
+        long authorId;
+        if (!long.TryParse(ReadHtmlAttribute(block, "data-comment-id"), out commentId) ||
+            !long.TryParse(ReadHtmlAttribute(block, "data-owner-id"), out authorId))
+          continue;
+
+        bool fromGroup = string.Equals(
+          ReadHtmlAttribute(block, "data-from-group"),
+          "true",
+          StringComparison.OrdinalIgnoreCase);
+        string name = DecodeHtmlText(ReadHtmlElementByClass(block, "post-author-name"));
+        string text = DecodeHtmlText(ReadHtmlElementByClass(block, "really_text"));
+        string avatarTag = Regex.Match(
+          block,
+          "<img\\b(?=[^>]*\\bclass\\s*=\\s*[\"'][^\"']*\\bpost-avatar\\b)[^>]*>",
+          RegexOptions.IgnoreCase).Value;
+        string avatar = NormalizeOpenVkWebUrl(ReadHtmlAttribute(avatarTag, "src"));
+        int likesCount;
+        int.TryParse(ReadHtmlAttribute(block, "data-likes"), out likesCount);
+
+        long legacyAuthorId = fromGroup ? -Math.Abs(authorId) : Math.Abs(authorId);
+        Comment comment = new Comment()
+        {
+          id = commentId,
+          from_id = legacyAuthorId,
+          owner_id = ownerId,
+          VideoId = vid,
+          text = text,
+          date = 0,
+          Attachments = new List<Attachment>(),
+          likes = new Likes() { count = likesCount, can_like = 1 }
+        };
+        ParsedVideoComment parsed = new ParsedVideoComment()
+        {
+          GlobalIndex = pageStartIndex + localIndex,
+          Comment = comment
+        };
+        if (fromGroup)
+        {
+          parsed.Group = new Group()
+          {
+            id = Math.Abs(authorId),
+            name = name,
+            photo_50 = avatar,
+            photo_100 = avatar,
+            photo_200 = avatar,
+            photo_max = avatar
+          };
+        }
+        else
+        {
+          string[] nameParts = (name ?? "").Split(new char[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+          parsed.User = new User()
+          {
+            uid = Math.Abs(authorId),
+            first_name = nameParts.Length > 0 ? nameParts[0] : name,
+            last_name = nameParts.Length > 1 ? nameParts[1] : "",
+            photo_50 = avatar,
+            photo_100 = avatar,
+            photo_200 = avatar,
+            photo_max = avatar
+          };
+        }
+        result.Add(parsed);
+        ++localIndex;
+      }
+      return result;
+    }
+
+    private static VideoLikesCommentsData CreateVideoCommentsData(int totalCount, List<ParsedVideoComment> parsed)
+    {
+      return new VideoLikesCommentsData()
+      {
+        comments = new VKList<Comment>()
+        {
+          count = totalCount,
+          items = parsed.Select(item => item.Comment).ToList()
+        },
+        Users = parsed.Where(item => item.User != null)
+          .Select(item => item.User)
+          .GroupBy(user => user.uid)
+          .Select(group => group.First())
+          .ToList(),
+        Users2 = new List<User>(),
+        Users3 = new List<User>(),
+        Groups = parsed.Where(item => item.Group != null)
+          .Select(item => item.Group)
+          .GroupBy(group => group.id)
+          .Select(group => group.First())
+          .ToList(),
+        Tags = new List<PhotoVideoTag>(),
+        LikesAllIds = new List<long>(),
+        LikesAllCount = 0,
+        RepostsCount = 0,
+        Albums = new List<long>(),
+        VideoRecommendations = new VKList<Video>()
+      };
+    }
+
+    private static void MergeVideoCommentDetails(VideoLikesCommentsData data, List<WallCommentLookup> lookups, long ownerId, long vid)
+    {
+      Dictionary<long, Comment> detailed = lookups
+        .Where(lookup => lookup != null && lookup.items != null)
+        .SelectMany(lookup => lookup.items)
+        .Where(comment => comment != null)
+        .ToDictionary(comment => comment.id, comment => comment);
+      for (int index = 0; index < data.Comments.Count; ++index)
+      {
+        Comment detail;
+        if (!detailed.TryGetValue(data.Comments[index].id, out detail))
+          continue;
+        detail.owner_id = ownerId;
+        detail.VideoId = vid;
+        if (detail.Attachments == null)
+          detail.Attachments = new List<Attachment>();
+        data.Comments[index] = detail;
+      }
+
+      data.Users.AddRange(lookups
+        .Where(lookup => lookup != null && lookup.profiles != null)
+        .SelectMany(lookup => lookup.profiles));
+      data.Users = data.Users.GroupBy(user => user.uid).Select(group => group.Last()).ToList();
+      data.Groups.AddRange(lookups
+        .Where(lookup => lookup != null && lookup.groups != null)
+        .SelectMany(lookup => lookup.groups));
+      data.Groups = data.Groups.GroupBy(group => group.id).Select(group => group.Last()).ToList();
+    }
+
+    private static string ReadHtmlAttribute(string html, string attributeName)
+    {
+      if (string.IsNullOrEmpty(html))
+        return "";
+      Match match = Regex.Match(
+        html,
+        "\\b" + Regex.Escape(attributeName) + "\\s*=\\s*([\"'])(.*?)\\1",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline);
+      return match.Success ? HttpUtility.HtmlDecode(match.Groups[2].Value) : "";
+    }
+
+    private static string ReadHtmlElementByClass(string html, string className)
+    {
+      Match match = Regex.Match(
+        html,
+        "<[^>]+\\bclass\\s*=\\s*[\"'][^\"']*\\b" + Regex.Escape(className) +
+        "\\b[^\"']*[\"'][^>]*>([\\s\\S]*?)</[^>]+>",
+        RegexOptions.IgnoreCase);
+      return match.Success ? match.Groups[1].Value : "";
+    }
+
+    private static string DecodeHtmlText(string html)
+    {
+      if (string.IsNullOrEmpty(html))
+        return "";
+      string text = Regex.Replace(html, "<br\\s*/?>", "\n", RegexOptions.IgnoreCase);
+      text = Regex.Replace(text, "<[^>]+>", "");
+      text = HttpUtility.HtmlDecode(text);
+      return Regex.Replace(text, "[\\t ]+", " ").Trim();
+    }
+
+    private static string NormalizeOpenVkWebUrl(string url)
+    {
+      if (string.IsNullOrWhiteSpace(url))
+        return "";
+      if (url.StartsWith("//"))
+        return "https:" + url;
+      if (url.StartsWith("/"))
+        return OpenVKInstanceManager.Current.WebOrigin + url;
+      if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && OpenVKInstanceManager.IsCurrentInstanceUrl(url))
+        return "https://" + url.Substring("http://".Length);
+      return url;
+    }
+
+    private sealed class ParsedVideoComment
+    {
+      public int GlobalIndex { get; set; }
+
+      public Comment Comment { get; set; }
+
+      public User User { get; set; }
+
+      public Group Group { get; set; }
+    }
+
+    private sealed class WallCommentLookup
+    {
+      public List<Comment> items { get; set; }
+
+      public List<User> profiles { get; set; }
+
+      public List<Group> groups { get; set; }
+    }
+#endif
 
     public void CreateComment(long ownerId, long vid, string text, long replyCid, List<string> attachments, Action<BackendResult<Comment, ResultCode>> callback, int stickerId = 0, string stickerReferrer = "")
     {

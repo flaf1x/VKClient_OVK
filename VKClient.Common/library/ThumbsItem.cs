@@ -101,7 +101,7 @@ namespace VKClient.Common.Library
                 if (a.type == "photo" || a.type == "video" || (a.type == "album" || a.type == "market_album"))
                     return true;
                 if (a.type == "doc" && a.doc != null)
-                    return a.doc.IsGif;
+                    return a.doc.IsVideoGif;
                 return false;
             }))) : null) ?? new List<Attachment>());
             this._friendsOnly = friendsOnly;

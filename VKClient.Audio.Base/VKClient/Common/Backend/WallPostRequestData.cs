@@ -22,7 +22,6 @@ namespace VKClient.Common.Backend
 
     public bool PublishOnTwitter { get; set; }
 
-    public bool PublishOnFacebook { get; set; }
 
     public bool OnBehalfOfGroup { get; set; }
 

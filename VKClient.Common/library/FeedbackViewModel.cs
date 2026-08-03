@@ -41,12 +41,12 @@ namespace VKClient.Common.Library
                     for (int index = 0; index < ndata.items.Count; ++index)
                     {
                         Notification notification = ndata.items[index];
-                        bool showEarliesReplies = notification.Date > ndata.last_viewed && index < ndata.items.Count - 1 && ndata.items[index + 1].Date < ndata.last_viewed;
+                        bool showEarliesReplies = notification.Date > ndata.last_viewed && index < ndata.items.Count - 1 && ndata.items[index + 1].Date <= ndata.last_viewed;
                         if (!Enumerable.Any<IVirtualizable>(this.FeedbackVM.Collection, (Func<IVirtualizable, bool>)(f =>
                         {
-                            if ((f as NewsFeedbackItem).Notification.date == notification.date)
-                                return (f as NewsFeedbackItem).Notification.NotType == notification.NotType;
-                            return false;
+                            NewsFeedbackItem existing = f as NewsFeedbackItem;
+                            return existing != null &&
+                                   existing.Notification.UniqueKey == notification.UniqueKey;
                         })))
                         {
                             NewsFeedbackItem newsFeedbackItem = new NewsFeedbackItem(480.0, new Thickness(), notification, ndata.profiles, ndata.groups, showEarliesReplies);
@@ -117,7 +117,10 @@ namespace VKClient.Common.Library
             NewsFeedService.Current.GetNotifications(Extensions.DateTimeToUnixTimestamp(DateTime.UtcNow - TimeSpan.FromDays(30.0), true), 0, offset/* == 0 ? 0 : this._offset*/, offset == 0 ? "" : this._from, count, (Action<BackendResult<NotificationData, ResultCode>>)(res =>
             {
                 if (res.ResultCode == ResultCode.Succeeded)
+                {
                     NewsFeedService.Current.MarkAsViewed();
+                    CountersManager.Current.ResetFeedback();
+                }
                 callback(res);
             }));
         }

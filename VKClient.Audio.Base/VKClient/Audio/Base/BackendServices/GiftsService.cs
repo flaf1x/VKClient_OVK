@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
@@ -46,7 +47,9 @@ namespace VKClient.Audio.Base.BackendServices
       string str1 = userId.ToString();
       parameters[index1] = str1;
       string index2 = "count";
-      string str2 = count.ToString();
+      // OpenVK currently slices after reading the first page. Increasing the
+      // server-side window keeps legacy offset pagination working.
+      string str2 = Math.Max(count, offset + count).ToString();
       parameters[index2] = str2;
       string index3 = "offset";
       string str3 = offset.ToString();
@@ -54,7 +57,53 @@ namespace VKClient.Audio.Base.BackendServices
       string index4 = "fields";
       string str4 = "photo_max,can_see_gifts,first_name_gen";
       parameters[index4] = str4;
-      VKRequestsDispatcher.DispatchRequestToVK<GiftsResponse>("execute.getGifts", parameters, callback,  null, false, true, new CancellationToken?(),  null);
+      VKRequestsDispatcher.DispatchRequestToVK<GiftsResponse>("gifts.get", parameters, (Action<BackendResult<GiftsResponse, ResultCode>>) (result =>
+      {
+        if (result.ResultCode != ResultCode.Succeeded || result.ResultData == null)
+        {
+          callback(result);
+          return;
+        }
+
+        GiftsResponse response = result.ResultData;
+        List<GiftItemData> items = response.gifts != null && response.gifts.items != null
+          ? response.gifts.items
+          : new List<GiftItemData>();
+        List<long> profileIds = items
+          .Where(item => item != null && item.from_id > 0L)
+          .Select(item => item.from_id)
+          .Concat(userId > 0L ? new List<long>() { userId } : new List<long>())
+          .Distinct()
+          .ToList();
+        if (profileIds.Count == 0)
+        {
+          callback(result);
+          return;
+        }
+
+        UsersService.Instance.GetUsers(profileIds, (Action<BackendResult<List<User>, ResultCode>>) (profilesResult =>
+        {
+          if (profilesResult.ResultCode == ResultCode.Succeeded)
+          {
+            response.users = profilesResult.ResultData ?? new List<User>();
+            response.user = response.users.FirstOrDefault(user => user.id == userId);
+          }
+          callback(result);
+        }));
+      }), (Func<string, GiftsResponse>) (jsonString =>
+      {
+        VKList<GiftItemData> gifts = Newtonsoft.Json.JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<VKList<GiftItemData>>>(jsonString).response;
+        if (gifts == null)
+          gifts = new VKList<GiftItemData>();
+        if (gifts.items == null)
+          gifts.items = new List<GiftItemData>();
+        return new GiftsResponse()
+        {
+          gifts = gifts,
+          users = new List<User>(),
+          groups = new List<Group>()
+        };
+      }), false, true, new CancellationToken?(), null);
     }
 
     public void GetGiftInfo(List<long> userIds, Action<BackendResult<GiftResponse, ResultCode>> callback)
@@ -79,32 +128,6 @@ namespace VKClient.Audio.Base.BackendServices
       string str3 = (isChat ? 1 : 0).ToString();
       parameters[index3] = str3;
       VKRequestsDispatcher.DispatchRequestToVK<GiftInfoFromStoreResponse>("execute.getGiftInfoFromStore", parameters, callback,  null, false, true, cancellationToken,  null);
-    }
-
-    public void Send(List<long> userIds, long giftId, int guid, string message, GiftPrivacy privacy, string section = "", Action<BackendResult<VKList<GiftSentResponse>, ResultCode>> callback = null)
-    {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      string index1 = "user_ids";
-      string str1 = string.Join<long>(",", (IEnumerable<long>) userIds);
-      dictionary[index1] = str1;
-      string index2 = "gift_id";
-      string str2 = giftId.ToString();
-      dictionary[index2] = str2;
-      string index3 = "guid";
-      string str3 = guid.ToString();
-      dictionary[index3] = str3;
-      string index4 = "privacy";
-      string str4 = ((int) privacy).ToString();
-      dictionary[index4] = str4;
-      string index5 = "no_inapp";
-      string str5 = "1";
-      dictionary[index5] = str5;
-      Dictionary<string, string> parameters = dictionary;
-      if (!string.IsNullOrWhiteSpace(message))
-        parameters["message"] = message;
-      if (!string.IsNullOrWhiteSpace(section))
-        parameters["section"] = section;
-      VKRequestsDispatcher.DispatchRequestToVK<VKList<GiftSentResponse>>("gifts.send", parameters, callback,  null, false, true, new CancellationToken?(), (Action) (() => EventAggregator.Current.Publish(new GiftsPurchaseStepsEvent(GiftPurchaseStepsSource.gift_page, GiftPurchaseStepsAction.purchase_window))));
     }
 
     public void Delete(long id, string giftHash, Action<BackendResult<int, ResultCode>> callback)

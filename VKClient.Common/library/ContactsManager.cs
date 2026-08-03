@@ -84,6 +84,8 @@ namespace VKClient.Common.Library
                     await this.DeleteAllContactsAsync();
                 if (!loggedInUser)
                     return;
+                if (!syncContacts)
+                    await this.EnsurePeopleHubProvisionedAsync();
                 if (!((System.DateTime.UtcNow - (await this.GetSavedList()).SyncedDate).TotalHours >= 24.0 | forceNow1))
                     return;
                 UsersService.Instance.GetFriendsWithRequests((Action<BackendResult<AllFriendsList, ResultCode>>)(async res =>
@@ -103,6 +105,21 @@ namespace VKClient.Common.Library
             if (this._deleting || this._synching)
                 return;
             await this.DoDeleteAllContactsAsync();
+        }
+
+        public async Task EnsurePeopleHubProvisionedAsync()
+        {
+            if (AppGlobalStateManager.Current.LoggedInUserId == 0L)
+                return;
+            try
+            {
+                ContactStore store = await ContactStore.CreateOrOpenAsync();
+                await this.EnsureProvisioned(store);
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.Error("ContactsManager failed to provision People Hub", ex);
+            }
         }
 
         private async Task DoDeleteAllContactsAsync()
@@ -394,12 +411,12 @@ namespace VKClient.Common.Library
                 contact.RemoteId = (ContactsManager.GetRemoteId(user));
                 contact.GivenName = (user.first_name);
                 contact.FamilyName = (user.last_name);
-                if (!string.IsNullOrWhiteSpace(user.photo_max) && !user.photo_max.EndsWith(".gif"))
+                if (!string.IsNullOrWhiteSpace(user.UiAvatarSmall))
                 {
-                    Stream stream = await HttpExtensions.TryGetResponseStreamAsync(user.photo_max);
+                    Stream stream = await HttpExtensions.TryGetResponseStreamAsync(user.UiAvatarSmall);
                     if (stream == null)
                     {
-                        throw new Exception("failed to download contact pic " + user.photo_max);
+                        throw new Exception("failed to download contact pic " + user.UiAvatarSmall);
                     }
                     await contact.SetDisplayPictureAsync(stream.AsInputStream());
                 }

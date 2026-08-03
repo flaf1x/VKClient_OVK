@@ -1683,7 +1683,7 @@ in the Friends section</value>
     <value>Title</value>
   </data>
   <data name="Audio_Cached" xml:space="preserve">
-    <value>Cached</value>
+    <value>Downloads</value>
   </data>
   <data name="Settings_EditProfile_ShowDayMonthAndYear" xml:space="preserve">
     <value>full birthdate</value>
@@ -4080,7 +4080,7 @@ in the Friends section</value>
     <value>started following you</value>
   </data>
   <data name="Privacy_CacheMusic" xml:space="preserve">
-    <value>Cache music</value>
+    <value>Automatically download played tracks from My Music</value>
   </data>
   <data name="VideoCatalog_Albums" xml:space="preserve">
     <value>Albums</value>

@@ -88,13 +88,11 @@ namespace VKClient.Common.Library.Posts
     {
       get
       {
-        long ownerId = this._pickedDocument.owner_id;
-        long id = this._pickedDocument.id;
-        string accessKey = this._pickedDocument.access_key;
-        string str = string.Format("doc{0}_{1}", ownerId, id);
-        if (ownerId != AppGlobalStateManager.Current.LoggedInUserId && !string.IsNullOrEmpty(accessKey))
-          str += string.Format("_{0}", accessKey);
-        return str;
+        if (this._pickedDocument == null || this._pickedDocument.id <= 0L)
+          return "";
+        // Use the data object's canonical form for both own and foreign docs.
+        // It retains an access key whenever OpenVK supplies one for a GIF.
+        return this._pickedDocument.UniqueIdForAttachment;
       }
     }
 

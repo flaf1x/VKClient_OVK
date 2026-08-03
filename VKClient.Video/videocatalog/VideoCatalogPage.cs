@@ -193,7 +193,7 @@ namespace VKClient.Common.VideoCatalog
       });
       DataTemplate itemTemplate = dataTemplate;
       Thickness? margin = new Thickness?(new Thickness(0.0, 77.0, 0.0, 0.0));
-      GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>) searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, (Func<SearchParamsUCBase>) (() => (SearchParamsUCBase) new SearchParamsVideoUC()), margin).Show((UIElement) this.pivot);
+      GenericSearchUC.CreatePopup<VKClient.Common.Backend.DataObjects.Video, VideoHeader>((ISearchDataProvider<VKClient.Common.Backend.DataObjects.Video, VideoHeader>) searchDataProvider, selectedItemCallback, textChangedCallback, itemTemplate, null, margin).Show((UIElement) this.pivot);
     }
 
     private void HandleSearchSelectedItem(object listBox, object selectedItem)
@@ -218,7 +218,14 @@ namespace VKClient.Common.VideoCatalog
       {
         VideoCatalogViewModel catalogViewModel = new VideoCatalogViewModel();
         base.DataContext=(catalogViewModel);
-        catalogViewModel.LoadData(true);
+        // OpenVK implements video.get, but not VK's recommendation catalog.
+        // Open the supported "My videos" collection directly.
+        if (this.pivot.Items.Contains(this.pivotItemCatalog))
+          this.pivot.Items.Remove(this.pivotItemCatalog);
+        this.pivot.SelectedItem = this.pivotItemMyVideos;
+        catalogViewModel.UserVideosVM.VideoListSource = UserVideosViewModel.CurrentSource.Added;
+        catalogViewModel.UserVideosVM.LoadIfNeeded();
+        this.UpdateAppBar();
         this._isInitialized = true;
       }
       this.HandleInputParams();

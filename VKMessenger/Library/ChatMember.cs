@@ -2,6 +2,7 @@ using System;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Windows;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 using VKClient.Common.Library;
@@ -37,7 +38,7 @@ namespace VKMessenger.Library
     {
       get
       {
-        return this._user.photo_max;
+        return AvatarHelper.Prepare(this._user.photo_max);
       }
     }
 

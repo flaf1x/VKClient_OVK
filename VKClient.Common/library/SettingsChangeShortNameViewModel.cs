@@ -125,7 +125,7 @@ namespace VKClient.Common.Library
       get
       {
         if (!string.IsNullOrWhiteSpace(this.ShortName))
-          return string.Concat("vk.com/", this.ShortName);
+          return string.Concat("openvk.org/", this.ShortName);
         return "";
       }
     }

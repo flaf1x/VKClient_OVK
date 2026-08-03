@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using VKClient.Common.Utils;
+using XamlAnimatedGif;
 
 namespace VKClient.Common.Framework
 {
@@ -15,6 +16,7 @@ namespace VKClient.Common.Framework
       public static readonly DependencyProperty StreamSourceProperty = DependencyProperty.RegisterAttached("StreamSource", typeof(Stream), typeof(ImageLoader), new PropertyMetadata(new PropertyChangedCallback(ImageLoader.OnStreamSourceChanged)));
       public static readonly DependencyProperty ImageBrushSourceProperty = DependencyProperty.RegisterAttached("ImageBrushSource", typeof(string), typeof(ImageLoader), new PropertyMetadata(new PropertyChangedCallback(ImageLoader.OnImageBrushSourceChanged)));
       public static readonly DependencyProperty ImageBrushMultiResSourceProperty = DependencyProperty.RegisterAttached("ImageBrushMultiResSource", typeof(string), typeof(ImageLoader), new PropertyMetadata(new PropertyChangedCallback(ImageLoader.OnImageBrushMultiResSourceChanged)));
+      private static readonly DependencyProperty UsesGifDecoderProperty = DependencyProperty.RegisterAttached("UsesGifDecoder", typeof(bool), typeof(ImageLoader), new PropertyMetadata(false));
 
     public static string GetUriSource(Image obj)
     {
@@ -148,7 +150,41 @@ namespace VKClient.Common.Framework
     private static void HandleUriChangeLowProfile(Image image, string uriStr)
     {
       Uri uri = uriStr.ConvertToUri();
+      if (IsGifUri(uri))
+      {
+        VeryLowProfileImageLoader.SetUriSource(image, null);
+        image.SetValue(ImageLoader.UsesGifDecoderProperty, true);
+        AnimationBehavior.SetAutoStart(image, false);
+        AnimationBehavior.SetSourceUri(image, uri);
+        return;
+      }
+
+      // Avoid initializing the optional GIF decoder for every regular JPEG.
+      // Apart from being wasteful, a decoder initialization problem used to
+      // break all ImageLoader bindings, including user and group avatars.
+      if ((bool) image.GetValue(ImageLoader.UsesGifDecoderProperty))
+      {
+        AnimationBehavior.SetSourceUri(image, null);
+        image.SetValue(ImageLoader.UsesGifDecoderProperty, false);
+      }
       VeryLowProfileImageLoader.SetUriSource(image, uri);
+    }
+
+    private static bool IsGifUri(Uri uri)
+    {
+      if (uri == null)
+        return false;
+
+      string path = uri.IsAbsoluteUri ? uri.AbsolutePath : uri.OriginalString;
+      if (string.IsNullOrEmpty(path) ||
+          !path.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+        return false;
+      // Avatars built by AvatarHelper carry "static=1": decode them natively
+      // as plain (static) images instead of spinning up the animation player.
+      if (uri.IsAbsoluteUri &&
+          UriExtensions.ParseQueryString(uri).ContainsKey("static"))
+        return false;
+      return true;
     }
   }
 }

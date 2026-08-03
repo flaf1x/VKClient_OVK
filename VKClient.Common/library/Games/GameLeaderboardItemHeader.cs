@@ -39,7 +39,7 @@ namespace VKClient.Common.Library.Games
       {
         if (this._user == null)
           return "";
-        return this._user.photo_max;
+        return this._user.UiAvatarSmall;
       }
     }
 

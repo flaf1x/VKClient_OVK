@@ -19,8 +19,7 @@
     <ValidateXaml>true</ValidateXaml>
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <ThrowErrorsInValidation>true</ThrowErrorsInValidation>
-    <SupportedCultures>
-    </SupportedCultures>
+    <SupportedCultures>be-BY%3bkk-KZ%3bpt-BR%3buk-UA%3bru-RU</SupportedCultures>
     <TargetFrameworkProfile />
     <DefaultLanguage>ru-RU</DefaultLanguage>
   </PropertyGroup>
@@ -346,9 +345,6 @@
     <Compile Include="FriendsImportContactsPage.cs">
       <DependentUpon>friendsimportcontactspage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="FriendsImportFacebookPage.cs">
-      <DependentUpon>friendsimportfacebookpage.xaml</DependentUpon>
-    </Compile>
     <Compile Include="FriendsImportGmailPage.cs">
       <DependentUpon>friendsimportgmailpage.xaml</DependentUpon>
     </Compile>
@@ -524,7 +520,6 @@
     <Compile Include="library\FriendRecommendationItemType.cs" />
     <Compile Include="library\FriendRequestsViewModel.cs" />
     <Compile Include="library\FriendsImport\ContactsFriendsImportProvider.cs" />
-    <Compile Include="library\FriendsImport\FacebookFriendsImportProvider.cs" />
     <Compile Include="library\FriendsImport\FriendsImportHelper.cs" />
     <Compile Include="library\FriendsImport\FriendsImportResponse.cs" />
     <Compile Include="library\FriendsImport\FriendsImportViewModel.cs" />
@@ -622,6 +617,7 @@
     <Compile Include="library\NewsSearchViewModel.cs" />
     <Compile Include="library\NewsSources.cs" />
     <Compile Include="library\NewsViewModel.cs" />
+    <Compile Include="library\OpenVKNotificationsManager.cs" />
     <Compile Include="library\OptionsMenu.cs" />
     <Compile Include="library\OptionsMenuItem.cs" />
     <Compile Include="library\OptionsMenuItemType.cs" />
@@ -903,7 +899,6 @@
     <Compile Include="Profiles\Shared\ViewModels\CustomItem.cs" />
     <Compile Include="Profiles\Shared\ViewModels\DiscussionMediaListItemViewModel.cs" />
     <Compile Include="Profiles\Shared\ViewModels\EmptyDataMediaListItemViewModel.cs" />
-    <Compile Include="Profiles\Shared\ViewModels\FacebookSocialNetworkItem.cs" />
     <Compile Include="Profiles\Shared\ViewModels\GenericMediaListItemViewModel.cs" />
     <Compile Include="Profiles\Shared\ViewModels\GiftsMediaListItemViewModel.cs" />
     <Compile Include="Profiles\Shared\ViewModels\GrandchildrenItem.cs" />
@@ -1699,12 +1694,6 @@
     <Compile Include="YoutubeExtractor\YoutubeParseException.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Facebook">
-      <HintPath>..\libs\Facebook.dll</HintPath>
-    </Reference>
-    <Reference Include="Facebook.Client">
-      <HintPath>..\libs\Facebook.Client.dll</HintPath>
-    </Reference>
     <Reference Include="FFmpegInterop">
       <HintPath>..\libs\FFmpegInterop.winmd</HintPath>
     </Reference>
@@ -1712,9 +1701,9 @@
       <HintPath>..\libs\Hammock.WindowsPhone.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Phone.Controls, Version=8.0.0.0, Culture=neutral, PublicKeyToken=24eec0d8c86cda1e, processorArchitecture=MSIL" />
-    <Reference Include="Microsoft.Phone.Controls.Toolkit, Version=8.0.1.0, Culture=neutral, PublicKeyToken=b772ad94eb9ca604, processorArchitecture=MSIL">
+    <Reference Include="Microsoft.Phone.Controls.Toolkit, Version=8.0.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\libs\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
+      <HintPath>..\libs\Unsigned\Microsoft.Phone.Controls.Toolkit.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\VKClient\packages\Newtonsoft.Json.9.0.1\lib\portable-net45+wp80+win8+wpa81\Newtonsoft.Json.dll</HintPath>
@@ -1739,10 +1728,10 @@
       <HintPath>..\libs\SharpDX.Toolkit.Graphics.dll</HintPath>
     </Reference>
     <Reference Include="System.Net.Http">
-      <HintPath>..\libs\System.Net.Http.dll</HintPath>
+      <HintPath>..\libs\Signed\System.Net.Http.dll</HintPath>
     </Reference>
     <Reference Include="System.Windows.Interactivity">
-      <HintPath>..\libs\System.Windows.Interactivity.dll</HintPath>
+      <HintPath>$(MSBuildProgramFiles32)\Microsoft SDKs\Expression\Blend\Windows Phone\v8.0\Libraries\System.Windows.Interactivity.dll</HintPath>
     </Reference>
     <Reference Include="VKClient_Opus">
       <HintPath>..\libs\VKClient_Opus.winmd</HintPath>
@@ -1753,7 +1742,7 @@
       <Project>{3f61632e-1f7a-42c4-bf38-ae07d3e9f383}</Project>
       <Name>VKClient.Audio.Base</Name>
     </ProjectReference>
-    <ProjectReference Include="..\XamlAnimatedGif.WP_SL81\XamlAnimatedGif.WP_SL.csproj">
+    <ProjectReference Include="..\XamlAnimatedGif.WP_SL\XamlAnimatedGif.WP_SL.csproj">
       <Project>{13b99d87-ab88-4575-a6d7-63428c2e9460}</Project>
       <Name>XamlAnimatedGif.WP_SL</Name>
     </ProjectReference>
@@ -1867,10 +1856,6 @@
       <SubType>Designer</SubType>
     </Resource>
     <Resource Include="friendsimportcontactspage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Resource>
-    <Resource Include="friendsimportfacebookpage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Resource>
@@ -2903,6 +2888,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\AboutAppDog.png" />
+    <Content Include="Resources\AboutAppOVK.png" />
+    <Content Include="Resources\AboutAppDM.png" />
     <Content Include="Resources\Account32px-1080p.png" />
     <Content Include="Resources\Account32px-720p.png" />
     <Content Include="Resources\Account32px-WVGA.png" />
@@ -4918,10 +4905,22 @@
     <Content Include="Resources\FeedbackIconsFollower-720p.png" />
     <Content Include="Resources\FeedbackIconsFollower-WVGA.png" />
     <Content Include="Resources\FeedbackIconsFollower-WXGA.png" />
+    <Content Include="Resources\FeedbackIconsComment-1080p.png" />
+    <Content Include="Resources\FeedbackIconsComment-720p.png" />
+    <Content Include="Resources\FeedbackIconsComment-WVGA.png" />
+    <Content Include="Resources\FeedbackIconsComment-WXGA.png" />
+    <Content Include="Resources\FeedbackIconsGift-1080p.png" />
+    <Content Include="Resources\FeedbackIconsGift-720p.png" />
+    <Content Include="Resources\FeedbackIconsGift-WVGA.png" />
+    <Content Include="Resources\FeedbackIconsGift-WXGA.png" />
     <Content Include="Resources\FeedbackIconsLike-1080p.png" />
     <Content Include="Resources\FeedbackIconsLike-720p.png" />
     <Content Include="Resources\FeedbackIconsLike-WVGA.png" />
     <Content Include="Resources\FeedbackIconsLike-WXGA.png" />
+    <Content Include="Resources\FeedbackIconsMention-1080p.png" />
+    <Content Include="Resources\FeedbackIconsMention-720p.png" />
+    <Content Include="Resources\FeedbackIconsMention-WVGA.png" />
+    <Content Include="Resources\FeedbackIconsMention-WXGA.png" />
     <Content Include="Resources\FeedbackIconsMoneyGreen-1080p.png" />
     <Content Include="Resources\FeedbackIconsMoneyGreen-720p.png" />
     <Content Include="Resources\FeedbackIconsMoneyGreen-WVGA.png" />
@@ -4965,10 +4964,6 @@
     <Content Include="Resources\FindFriends\FindFriendsContacts-720p.png" />
     <Content Include="Resources\FindFriends\FindFriendsContacts-WVGA.png" />
     <Content Include="Resources\FindFriends\FindFriendsContacts-WXGA.png" />
-    <Content Include="Resources\FindFriends\FindFriendsFacebook-1080p.png" />
-    <Content Include="Resources\FindFriends\FindFriendsFacebook-720p.png" />
-    <Content Include="Resources\FindFriends\FindFriendsFacebook-WVGA.png" />
-    <Content Include="Resources\FindFriends\FindFriendsFacebook-WXGA.png" />
     <Content Include="Resources\FindFriends\FindFriendsGmail-1080p.png" />
     <Content Include="Resources\FindFriends\FindFriendsGmail-720p.png" />
     <Content Include="Resources\FindFriends\FindFriendsGmail-WVGA.png" />
@@ -5213,10 +5208,6 @@
     <Content Include="Resources\NewPost\Deattach-720p.png" />
     <Content Include="Resources\NewPost\Deattach-WVGA.png" />
     <Content Include="Resources\NewPost\Deattach-WXGA.png" />
-    <Content Include="Resources\NewPost\ImportFacebook-1080p.png" />
-    <Content Include="Resources\NewPost\ImportFacebook-720p.png" />
-    <Content Include="Resources\NewPost\ImportFacebook-WVGA.png" />
-    <Content Include="Resources\NewPost\ImportFacebook-WXGA.png" />
     <Content Include="Resources\NewPost\ImportTwitter-1080p.png" />
     <Content Include="Resources\NewPost\ImportTwitter-720p.png" />
     <Content Include="Resources\NewPost\ImportTwitter-WVGA.png" />
@@ -5582,10 +5573,6 @@
     <Content Include="Resources\Profile\AttachVideoPlay-720p.png" />
     <Content Include="Resources\Profile\AttachVideoPlay-WVGA.png" />
     <Content Include="Resources\Profile\AttachVideoPlay-WXGA.png" />
-    <Content Include="Resources\Profile\Contacts\ProfileFacebook-1080p.png" />
-    <Content Include="Resources\Profile\Contacts\ProfileFacebook-720p.png" />
-    <Content Include="Resources\Profile\Contacts\ProfileFacebook-WVGA.png" />
-    <Content Include="Resources\Profile\Contacts\ProfileFacebook-WXGA.png" />
     <Content Include="Resources\Profile\Contacts\ProfileInstagram-1080p.png" />
     <Content Include="Resources\Profile\Contacts\ProfileInstagram-720p.png" />
     <Content Include="Resources\Profile\Contacts\ProfileInstagram-WVGA.png" />

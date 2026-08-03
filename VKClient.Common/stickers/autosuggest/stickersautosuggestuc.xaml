@@ -5,8 +5,6 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:framework="clr-namespace:VKClient.Common.Framework;assembly=VKClient.Common"
     xmlns:local="clr-namespace:VKClient.Common.Stickers.AutoSuggest"
-             xmlns:i="clr-namespace:System.Windows.Interactivity;assembly=System.Windows.Interactivity"
-             xmlns:imagePreview="clr-namespace:VKClient.Common.Shared.ImagePreview"
     mc:Ignorable="d"
     FontFamily="{StaticResource PhoneFontFamilyNormal}"
     FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -45,13 +43,8 @@
                               Tap="Grid_Tap">
                             <Image Height="88"
                                    Opacity="{Binding Opacity}"
-                               Width="88"
-                               framework:ImageLoader.UriSource="{Binding PreviewUri, FallbackValue='https://new.vk.com/images/stickers/910/128.png'}" >
-                                <i:Interaction.Behaviors>
-                                    <imagePreview:PreviewBehavior PreviewUri="{Binding PreviewUriBig}"
-                                                                  TopOffset="10" />
-                                </i:Interaction.Behaviors>
-                            </Image>
+                                   Width="88"
+                                   framework:ImageLoader.UriSource="{Binding PreviewUri, FallbackValue='https://new.vk.com/images/stickers/910/128.png'}" />
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

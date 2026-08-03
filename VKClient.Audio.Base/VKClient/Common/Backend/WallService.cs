@@ -64,14 +64,11 @@ namespace VKClient.Common.Backend
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       long num;
-      if (postData.owner_id != 0L)
-      {
-        Dictionary<string, string> dictionary = parameters;
-        string index = "owner_id";
-        num = postData.owner_id;
-        string str = num.ToString();
-        dictionary[index] = str;
-      }
+      // owner_id is optional in old VK, but required by OpenVK. A zero value
+      // in the editor means the logged-in user's wall.
+      parameters["owner_id"] = (postData.owner_id != 0L
+        ? postData.owner_id
+        : AppGlobalStateManager.Current.LoggedInUserId).ToString();
       Dictionary<string, string> dictionary1 = parameters;
       string index1 = "post_id";
       num = postData.post_id;
@@ -148,18 +145,6 @@ namespace VKClient.Common.Backend
         string str = nullable.Value.ToString((IFormatProvider) CultureInfo.InvariantCulture);
         dictionary[index] = str;
       }
-      if (postData.publish_date.HasValue)
-      {
-        Dictionary<string, string> dictionary = parameters;
-        string index = "publish_date";
-        num = postData.publish_date.Value;
-        string str = num.ToString((IFormatProvider) CultureInfo.InvariantCulture);
-        dictionary[index] = str;
-      }
-      if (postData.PublishOnTwitter)
-        parameters["services"] = "twitter";
-      if (postData.PublishOnFacebook)
-        parameters["services"] = !postData.PublishOnTwitter ? "facebook" : "twitter,facebook";
       if (postData.post_id != 0L)
       {
         Dictionary<string, string> dictionary = parameters;
@@ -170,8 +155,6 @@ namespace VKClient.Common.Backend
       }
       parameters["from_group"] = postData.OnBehalfOfGroup || postData.Sign ? "1" : "0";
       parameters["signed"] = postData.Sign ? "1" : "0";
-      if (postData.FriendsOnly)
-        parameters["friends_only"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("wall.post", parameters, callback, (Func<string, ResponseWithId>) (jsonStr =>
       {
         WallService.ResponseWithPostId responseWithPostId = JsonConvert.DeserializeObject<WallService.ResponseWithPostId>(jsonStr);
@@ -200,55 +183,377 @@ namespace VKClient.Common.Backend
       VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("wall.reportComment", parameters, callback, (Func<string, ResponseWithId>) (jsonStr => new ResponseWithId()), false, true, new CancellationToken?(),  null);
     }
 
-    public void GetWallPostByIdWithComments(long postId, long ownerId, int offset, int countToRead, int knownTotalCount, bool needWallPost, Action<BackendResult<GetWallPostResponseData, ResultCode>> callback, long pollId = 0, long pollOwnerId = 0, LikeObjectType likeObjType = LikeObjectType.post)
+    public void GetWallPostByIdWithComments(long postId, long ownerId, int offset, int countToRead, int knownTotalCount, bool needWallPost, Action<BackendResult<GetWallPostResponseData, ResultCode>> callback, long pollId = 0, long pollOwnerId = 0, LikeObjectType likeObjType = LikeObjectType.post, WallPost knownWallPost = null)
     {
-      long userId = VKRequestsDispatcher.AuthData.user_id;
-      if (knownTotalCount != -1 && offset + countToRead > knownTotalCount)
-        countToRead = knownTotalCount - offset;
-      string str1 = (!needWallPost ? "var likesAll = API.likes.getList({{\"item_id\":{0}, \"owner_id\":{1}, \"count\":20, type:\"{8}\"}});" : " var wallPost = API.wall.getById({{\"posts\":\"{1}_{0}\"}});\r\nvar likesAll = API.likes.getList({{\"item_id\":{0}, \"owner_id\":{1}, \"count\":20, type:wallPost[0].post_type}});" + Environment.NewLine) + "\r\n\r\n\r\n\r\nvar offset = {2};\r\n\r\n\r\nvar comments = API.wall.getComments({{\"post_id\":\"{0}\", \"owner_id\":\"{1}\", \"offset\":offset, \"count\":\"{3}\", \"need_likes\":\"1\", \"sort\":\"desc\", \"preview_length\":\"0\", \"allow_group_comments\":1}});\r\n\r\nvar datUsersNames = comments.items@.reply_to_user + comments.items@.from_id;\r\nvar users2 = API.users.get({{\"user_ids\":datUsersNames, \"fields\":\"first_name_dat,last_name_dat\"}});\r\n\r\n\r\n\r\nvar userOrGroupIds = likesAll.items;\r\n";
-      if (needWallPost)
-        str1 += "userOrGroupIds = userOrGroupIds + wallPost@.from_id + wallPost@.to_id + wallPost@.signer_id + wallPost[0].copy_history@.owner_id + wallPost[0].copy_history@.from_id;\r\n";
-      string str2 = str1 + "userOrGroupIds = userOrGroupIds + comments.items@.from_id;\r\n\r\n\r\nvar userIds = [];\r\nvar groupIds = [];\r\n\r\nvar i = 0;\r\n\r\nvar length = userOrGroupIds.length;\r\n\r\nwhile (i < length)\r\n{{\r\n    var id = parseInt(userOrGroupIds[i]);\r\n    \r\n    if (id > 0)\r\n    {{\r\n       if (userIds.length > 0)\r\n       {{\r\n          userIds = userIds + \",\";\r\n       }}\r\n       userIds = userIds + id;\r\n    }}\r\n    else if (id < 0)\r\n    {{\r\n        id = -id;\r\n        if (groupIds.length > 0)\r\n        {{\r\n            groupIds = groupIds + \",\";\r\n        }}\r\n        groupIds = groupIds + id;\r\n    }}\r\n     \r\n    i = i + 1;\r\n}}\r\n\r\nif ({1} < 0)\r\n{{\r\n    if (groupIds.length > 0) groupIds = groupIds + \",\";\r\n    groupIds = groupIds + ({1} * -1);\r\n}}\r\n\r\nvar users  = API.users.get({{\"user_ids\":userIds, \"fields\":\"sex,photo_max,online,online_mobile\" }});\r\nvar groups = API.groups.getById({{\"group_ids\":groupIds}});";
-      string str3 = string.Format(pollId == 0L ? (!needWallPost ? str2 + "return {{\"Users\": users, \"Groups\":groups, \"LikesAll\":likesAll, \"comments\": comments, \"Users2\": users2 }};" : str2 + "return {{\"Users\": users, \"Groups\":groups, \"LikesAll\":likesAll, \"WallPost\":wallPost[0], \"comments\": comments, \"Users2\": users2 }};") : (!needWallPost ? str2 + "\r\nvar poll= API.polls.getById({{\"owner_id\":{7}, \"poll_id\":{6}}});   \r\nreturn {{\"Users\": users, \"Groups\":groups, \"LikesAll\":likesAll, \"comments\": comments, \"Users2\": users2, \"Poll\":poll }};" : str2 + "\r\nvar poll= API.polls.getById({{\"owner_id\":{7}, \"poll_id\":{6}}});   \r\nreturn {{\"Users\": users, \"Groups\":groups, \"LikesAll\":likesAll, \"WallPost\":wallPost[0], \"comments\": comments, \"Users2\": users2, \"Poll\":poll }};"), postId, ownerId, offset, countToRead, knownTotalCount, userId, pollId, pollOwnerId, likeObjType);
-      Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["code"] = str3;
-      VKRequestsDispatcher.DispatchRequestToVK<GetWallPostResponseData>("execute", parameters, callback, (Func<string, GetWallPostResponseData>) (jsonStr =>
+      if (!needWallPost)
       {
-        VKRequestsDispatcher.GenericRoot<GetWallPostResponseData> genericRoot = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<GetWallPostResponseData>>(VKRequestsDispatcher.FixFalseArray(VKRequestsDispatcher.FixFalseArray(VKRequestsDispatcher.FixFalseArray(VKRequestsDispatcher.FixFalseArray(VKRequestsDispatcher.FixFalseArray(VKRequestsDispatcher.FixFalseArray(jsonStr, "Users", false), "Users2", false), "Groups", false), "Poll", true), "LikesAll", true), "comments", true));
-        if (genericRoot.response.LikesAll.items != null)
-          genericRoot.response.LikesAll.users = new List<UserLike>(genericRoot.response.LikesAll.items.Select<long, UserLike>((Func<long, UserLike>) (it => new UserLike()
+        this.LoadWallComments(
+          postId,
+          ownerId,
+          offset,
+          countToRead,
+          knownWallPost ?? new WallPost(),
+          new List<User>(),
+          new List<Group>(),
+          callback);
+        return;
+      }
+
+      this.GetWallById(ownerId, postId, (Action<BackendResult<WallData, ResultCode>>) (wallResult =>
+      {
+        if (wallResult.ResultCode != ResultCode.Succeeded)
+        {
+          this.LoadWallComments(
+            postId,
+            ownerId,
+            offset,
+            countToRead,
+            new WallPost()
+            {
+              id = postId,
+              to_id = ownerId,
+              from_id = ownerId,
+              post_type = "post"
+            },
+            new List<User>(),
+            new List<Group>(),
+            callback);
+          return;
+        }
+
+        WallData wallData = wallResult.ResultData ?? new WallData();
+        WallPost wallPost = wallData.items != null
+          ? wallData.items.FirstOrDefault()
+          : null;
+        this.LoadWallComments(
+          postId,
+          ownerId,
+          offset,
+          countToRead,
+          wallPost ?? new WallPost(),
+          wallData.profiles ?? new List<User>(),
+          wallData.groups ?? new List<Group>(),
+          callback);
+      }));
+    }
+
+    private void LoadWallComments(
+      long postId,
+      long ownerId,
+      int offset,
+      int countToRead,
+      WallPost wallPost,
+      List<User> wallUsers,
+      List<Group> wallGroups,
+      Action<BackendResult<GetWallPostResponseData, ResultCode>> callback)
+    {
+      // OpenVK's wall.getComments passes offset + 1 to Nette's page()
+      // method, so offset is a zero-based page number rather than a row
+      // offset as it was in VK API. Callers use a fixed page size.
+      int apiOffset = countToRead > 0 ? offset / countToRead : 0;
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      {
+        { "post_id", postId.ToString() },
+        { "owner_id", ownerId.ToString() },
+        { "offset", apiOffset.ToString() },
+        { "count", countToRead.ToString() },
+        { "need_likes", "1" },
+        { "sort", "desc" },
+        { "extended", "1" },
+        { "fields", "sex,screen_name,photo_50,photo_100,photo_200,photo_max,online,online_mobile,first_name_dat,last_name_dat" }
+      };
+
+      VKRequestsDispatcher.DispatchRequestToVK<CommentsResponse>(
+        "wall.getComments",
+        parameters,
+        (Action<BackendResult<CommentsResponse, ResultCode>>) (commentsResult =>
+        {
+          if (commentsResult.ResultCode != ResultCode.Succeeded)
           {
-            uid = it
-          })));
-        genericRoot.response.Users.Add(AppGlobalStateManager.Current.GlobalState.LoggedInUser);
-        genericRoot.response.Comments.Reverse();
-        GroupsService.Current.AddCachedGroups((IEnumerable<Group>) genericRoot.response.Groups);
-        if (countToRead == 0)
-          genericRoot.response.Comments.Clear();
-        if (genericRoot.response.WallPost == null)
-          genericRoot.response.WallPost = new WallPost();
-        return genericRoot.response;
-      }), false, true, new CancellationToken?(),  null);
+            WallPost fallbackWallPost = wallPost ?? new WallPost();
+            fallbackWallPost.comments = fallbackWallPost.comments ?? new Comments();
+            fallbackWallPost.likes = fallbackWallPost.likes ?? new Likes();
+            fallbackWallPost.reposts = fallbackWallPost.reposts ?? new Reposts();
+            this.CompleteWallCommentsRequest(
+              new GetWallPostResponseData()
+              {
+                comments = new VKList<Comment>() { count = 0, items = new List<Comment>() },
+                Users = wallUsers ?? new List<User>(),
+                Users2 = new List<User>(wallUsers ?? new List<User>()),
+                Groups = wallGroups ?? new List<Group>(),
+                WallPost = fallbackWallPost,
+                LikesAll = new LikesInfo() { count = fallbackWallPost.likes.count }
+              },
+              callback);
+            return;
+          }
+
+          CommentsResponse commentsResponse = commentsResult.ResultData ?? new CommentsResponse();
+          List<Comment> comments = commentsResponse.items ?? new List<Comment>();
+          comments.Reverse();
+          if (countToRead == 0)
+            comments.Clear();
+
+          List<User> users = commentsResponse.profiles ?? new List<User>();
+          foreach (User wallUser in wallUsers ?? new List<User>())
+          {
+            if (wallUser != null && !users.Any(user => user.id == wallUser.id))
+              users.Add(wallUser);
+          }
+          List<Group> groups = commentsResponse.groups ?? new List<Group>();
+          foreach (Group wallGroup in wallGroups ?? new List<Group>())
+          {
+            if (wallGroup != null && !groups.Any(group => group.id == wallGroup.id))
+              groups.Add(wallGroup);
+          }
+
+          GetWallPostResponseData resultData = new GetWallPostResponseData()
+          {
+            comments = new VKList<Comment>()
+            {
+              count = commentsResponse.count,
+              items = comments
+            },
+            Users = users,
+            Users2 = new List<User>(users),
+            Groups = groups,
+            WallPost = wallPost ?? new WallPost(),
+            LikesAll = new LikesInfo()
+            {
+              count = wallPost != null && wallPost.likes != null
+                ? wallPost.likes.count
+                : 0
+            },
+            Poll = commentsResponse.poll
+          };
+
+          resultData.WallPost.comments = resultData.WallPost.comments ?? new Comments();
+          resultData.WallPost.likes = resultData.WallPost.likes ?? new Likes();
+          resultData.WallPost.reposts = resultData.WallPost.reposts ?? new Reposts();
+
+          Action loadMissingGroups = () =>
+          {
+            List<long> missingGroupIds = comments
+              .Where(comment => comment != null && comment.from_id < 0L)
+              .Select(comment => -comment.from_id)
+              .Where(groupId => !resultData.Groups.Any(group => group != null && group.id == groupId))
+              .Distinct()
+              .ToList();
+            if (missingGroupIds.Count == 0)
+            {
+              this.CompleteWallCommentsRequest(resultData, callback);
+              return;
+            }
+
+            VKRequestsDispatcher.DispatchRequestToVK<List<Group>>(
+              "groups.getById",
+              new Dictionary<string, string>()
+              {
+                { "group_ids", missingGroupIds.GetCommaSeparated() },
+                { "fields", "photo_50,photo_100,photo_200,photo_max" }
+              },
+              (Action<BackendResult<List<Group>, ResultCode>>) (groupsResult =>
+              {
+                if (groupsResult.ResultCode == ResultCode.Succeeded &&
+                    groupsResult.ResultData != null)
+                  resultData.Groups.AddRange(groupsResult.ResultData);
+                this.CompleteWallCommentsRequest(resultData, callback);
+              }),
+              (Func<string, List<Group>>) (jsonStr =>
+                JsonConvert.DeserializeObject<GenericRoot<List<Group>>>(jsonStr).response ?? new List<Group>()),
+              false,
+              true,
+              new CancellationToken?(),
+              null);
+          };
+
+          List<long> missingUserIds = comments
+            .Where(comment => comment != null && comment.from_id > 0L)
+            .Select(comment => comment.from_id)
+            .Where(userId => !resultData.Users.Any(user => user != null && user.id == userId))
+            .Distinct()
+            .ToList();
+          if (missingUserIds.Count == 0)
+          {
+            loadMissingGroups();
+            return;
+          }
+
+          VKRequestsDispatcher.DispatchRequestToVK<List<User>>(
+            "users.get",
+            new Dictionary<string, string>()
+            {
+              { "user_ids", missingUserIds.GetCommaSeparated() },
+              { "fields", "sex,screen_name,photo_50,photo_100,photo_200,photo_max,online,online_mobile,first_name_dat,last_name_dat" }
+            },
+            (Action<BackendResult<List<User>, ResultCode>>) (usersResult =>
+            {
+              if (usersResult.ResultCode == ResultCode.Succeeded &&
+                  usersResult.ResultData != null)
+              {
+                resultData.Users.AddRange(usersResult.ResultData);
+                resultData.Users2.AddRange(usersResult.ResultData);
+              }
+              loadMissingGroups();
+            }),
+            (Func<string, List<User>>) (jsonStr =>
+              JsonConvert.DeserializeObject<GenericRoot<List<User>>>(jsonStr).response ?? new List<User>()),
+            false,
+            true,
+            new CancellationToken?(),
+            null);
+        }),
+        (Func<string, CommentsResponse>) (jsonStr =>
+          JsonConvert.DeserializeObject<GenericRoot<CommentsResponse>>(jsonStr).response ?? new CommentsResponse()),
+        false,
+        true,
+        new CancellationToken?(),
+        null);
+    }
+
+    private void CompleteWallCommentsRequest(GetWallPostResponseData resultData, Action<BackendResult<GetWallPostResponseData, ResultCode>> callback)
+    {
+      resultData.Users = resultData.Users ?? new List<User>();
+      resultData.Users2 = resultData.Users2 ?? new List<User>();
+      resultData.Groups = resultData.Groups ?? new List<Group>();
+      resultData.comments = resultData.comments ?? new VKList<Comment>()
+      {
+        count = 0,
+        items = new List<Comment>()
+      };
+      resultData.comments.items = resultData.comments.items ?? new List<Comment>();
+      resultData.WallPost = resultData.WallPost ?? new WallPost();
+      resultData.WallPost.comments = resultData.WallPost.comments ?? new Comments();
+      resultData.WallPost.likes = resultData.WallPost.likes ?? new Likes();
+      resultData.WallPost.reposts = resultData.WallPost.reposts ?? new Reposts();
+      resultData.LikesAll = resultData.LikesAll ?? new LikesInfo();
+      if (resultData.LikesAll.count > 0 &&
+          resultData.WallPost.id != 0L)
+      {
+        VKRequestsDispatcher.DispatchRequestToVK<VKList<User>>(
+          "likes.getList",
+          new Dictionary<string, string>()
+          {
+            { "type", "post" },
+            { "owner_id", resultData.WallPost.to_id.ToString() },
+            { "item_id", resultData.WallPost.id.ToString() },
+            { "extended", "1" },
+            { "offset", "0" },
+            { "count", "10" }
+          },
+          (Action<BackendResult<VKList<User>, ResultCode>>) (likesResult =>
+          {
+            if (likesResult.ResultCode == ResultCode.Succeeded &&
+                likesResult.ResultData != null &&
+                likesResult.ResultData.items != null)
+            {
+              foreach (User user in likesResult.ResultData.items)
+              {
+                if (user != null &&
+                    !resultData.Users.Any(existing => existing != null &&
+                      existing.uid == user.uid))
+                  resultData.Users.Add(user);
+              }
+              resultData.LikesAll.users = likesResult.ResultData.items
+                .Where(user => user != null)
+                .Select(user => new UserLike() { uid = user.uid })
+                .ToList();
+            }
+            this.FinishWallCommentsRequest(resultData, callback);
+          }),
+          (Func<string, VKList<User>>) (jsonStr =>
+          {
+            GenericRoot<VKList<User>> root =
+              JsonConvert.DeserializeObject<GenericRoot<VKList<User>>>(jsonStr);
+            return root != null && root.response != null
+              ? root.response
+              : new VKList<User>() { items = new List<User>() };
+          }),
+          false,
+          true,
+          new CancellationToken?(),
+          null);
+        return;
+      }
+      this.FinishWallCommentsRequest(resultData, callback);
+    }
+
+    private void FinishWallCommentsRequest(GetWallPostResponseData resultData, Action<BackendResult<GetWallPostResponseData, ResultCode>> callback)
+    {
+      if (resultData.Groups != null)
+        GroupsService.Current.AddCachedGroups((IEnumerable<Group>) resultData.Groups);
+      callback(new BackendResult<GetWallPostResponseData, ResultCode>(
+        ResultCode.Succeeded,
+        resultData));
     }
 
     public void AddComment(long postId, long ownerId, string text, long replyToCid, bool fromGroup, List<string> attachmentIds, Action<BackendResult<Comment, ResultCode>> callback, int stickerId = 0, string stickerReferrer = "")
     {
-      Dictionary<string, string> dictionary = new Dictionary<string, string>()
+      Dictionary<string, string> parameters = new Dictionary<string, string>()
       {
-        {
-          "code",
-          string.Format("\r\n\r\nvar new_comment_id = API.wall.addComment({{\r\n    owner_id: {0},\r\n    post_id: {1},\r\n    text: \"{2}\",\r\n    from_group: {3},\r\n    sticker_id: {4},\r\n    reply_to_comment: {5},\r\n    attachments: \"{6}\",\r\n    sticker_referrer: \"{7}\"\r\n}}).comment_id;\r\n\r\nvar last_comments = API.wall.getComments({{\r\n    owner_id: {8},\r\n    post_id: {9},\r\n    need_likes: 1,\r\n    count: 10,\r\n    sort: \"desc\",\r\n    preview_length: 0,\r\n    allow_group_comments: 1\r\n}}).items;\r\n\r\nvar i = last_comments.length - 1;\r\nwhile (i >= 0)\r\n{{\r\n    if (last_comments[i].id == new_comment_id)\r\n        return last_comments[i];\r\n\r\n    i = i - 1;\r\n}}\r\n\r\nreturn null;\r\n\r\n                ", ownerId, postId, text.Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r"), (fromGroup ? "1" : "0"), stickerId, replyToCid, attachmentIds.GetCommaSeparated(","), stickerReferrer, ownerId, postId)
-        }
+        { "owner_id", ownerId.ToString() },
+        { "post_id", postId.ToString() },
+        { "message", text ?? "" },
+        { "from_group", fromGroup ? "1" : "0" }
       };
-      string methodName = "execute";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<Comment, ResultCode>> callback1 = callback;
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-      
-      VKRequestsDispatcher.DispatchRequestToVK<Comment>(methodName, parameters, callback1, (Func<string, Comment>) (jsonStr => JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<Comment>>(jsonStr).response), num1 != 0, num2 != 0, cancellationToken, null);
+      if (attachmentIds != null && attachmentIds.Count > 0)
+        parameters["attachments"] = attachmentIds.GetCommaSeparated(",");
+
+      VKRequestsDispatcher.DispatchRequestToVK<WallService.CommentResponse>(
+        "wall.createComment",
+        parameters,
+        (Action<BackendResult<WallService.CommentResponse, ResultCode>>) (createResult =>
+        {
+          if (createResult.ResultCode != ResultCode.Succeeded ||
+              createResult.ResultData == null)
+          {
+            callback(new BackendResult<Comment, ResultCode>(createResult.ResultCode));
+            return;
+          }
+
+          VKRequestsDispatcher.DispatchRequestToVK<CommentsResponse>(
+            "wall.getComment",
+            new Dictionary<string, string>()
+            {
+              { "owner_id", ownerId.ToString() },
+              { "comment_id", createResult.ResultData.comment_id.ToString() }
+            },
+            (Action<BackendResult<CommentsResponse, ResultCode>>) (commentResult =>
+            {
+              if (commentResult.ResultCode != ResultCode.Succeeded)
+              {
+                callback(new BackendResult<Comment, ResultCode>(commentResult.ResultCode));
+                return;
+              }
+
+              Comment comment = commentResult.ResultData != null &&
+                                commentResult.ResultData.items != null
+                ? commentResult.ResultData.items.FirstOrDefault()
+                : null;
+              if (comment == null)
+              {
+                callback(new BackendResult<Comment, ResultCode>(ResultCode.DeserializationError));
+                return;
+              }
+
+              comment.reply_to_comment = replyToCid;
+              comment.owner_id = ownerId;
+              comment.post_id = postId;
+              callback(new BackendResult<Comment, ResultCode>(ResultCode.Succeeded, comment));
+            }),
+            (Func<string, CommentsResponse>) (jsonStr =>
+              JsonConvert.DeserializeObject<GenericRoot<CommentsResponse>>(jsonStr).response ?? new CommentsResponse()),
+            false,
+            true,
+            new CancellationToken?(),
+            null);
+        }),
+        (Func<string, WallService.CommentResponse>) (jsonStr =>
+          JsonConvert.DeserializeObject<GenericRoot<WallService.CommentResponse>>(jsonStr).response),
+        false,
+        true,
+        new CancellationToken?(),
+        null);
     }
 
     public void DeleteComment(long ownerId, long cid, Action<BackendResult<ResponseWithId, ResultCode>> callback)
@@ -422,46 +727,7 @@ namespace VKClient.Common.Backend
 
     public void SendStats(List<WallPost> viewedWallPosts)
     {
-      List<string> ids1 = new List<string>();
-      List<string> ids2 = new List<string>();
-      foreach (WallPost viewedWallPost in viewedWallPosts)
-      {
-        List<string> stringList1 = ids1;
-        long num = viewedWallPost.to_id;
-        string str1 = num.ToString();
-        string str2 = "_";
-        num = viewedWallPost.id;
-        string str3 = num.ToString();
-        string str4 = str1 + str2 + str3;
-        stringList1.Add(str4);
-        if (!viewedWallPost.copy_history.IsNullOrEmpty())
-        {
-          foreach (WallPost wallPost in viewedWallPost.copy_history)
-          {
-            List<string> stringList2 = ids2;
-            // ISSUE: variable of a boxed type
-            long ownerId = wallPost.owner_id;
-            string str5 = "_";
-            num = wallPost.id;
-            string str6 = num.ToString();
-            string str7 = ownerId.ToString() + str5 + str6;
-            stringList2.Add(str7);
-          }
-        }
-      }
-      Dictionary<string, string> dictionary = new Dictionary<string, string>();
-      dictionary["post_ids"] = ids1.GetCommaSeparated(",");
-      dictionary["repost_ids"] = ids2.GetCommaSeparated(",");
-      string methodName = "stats.viewPosts";
-      Dictionary<string, string> parameters = dictionary;
-      Action<BackendResult<ResponseWithId, ResultCode>> action = (Action<BackendResult<ResponseWithId, ResultCode>>) (res => {});
-      int num1 = 0;
-      int num2 = 1;
-      CancellationToken? cancellationToken = new CancellationToken?();
-      // ISSUE: variable of the null type
-
-      Action<BackendResult<ResponseWithId, ResultCode>> callback = (Action<BackendResult<ResponseWithId, ResultCode>>)(res => { });
-      VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>(methodName, parameters, callback, (Func<string, ResponseWithId>) (jsonStr => new ResponseWithId()), num1 != 0, num2 != 0, cancellationToken, null);
+      // stats.viewPosts is not implemented by OpenVK.
     }
 
     public class ResponseWithPostId

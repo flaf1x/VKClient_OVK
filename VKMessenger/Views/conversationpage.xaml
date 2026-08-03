@@ -75,7 +75,8 @@
                    HorizontalAlignment="Right" />
             <commonUC:NewMessageUC Grid.Row="1"
                                    x:Name="ucNewMessage"
-                                   IsVoiceMessageButtonEnabled="True" />
+                                   EmojiOnly="True"
+                                   IsVoiceMessageButtonEnabled="False" />
 
 
         </Grid>

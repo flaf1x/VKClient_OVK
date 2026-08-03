@@ -111,9 +111,9 @@ namespace VKClient.Common.Library
             {
                 string str = "";
                 if (this._user != null)
-                    str = this._user.photo_max;
+                    str = this._user.UiAvatarSmall;
                 if (this._group != null)
-                    str = this._group.photo_200;
+                    str = this._group.UiAvatarSmall;
                 return str;
             }
         }
@@ -158,11 +158,7 @@ namespace VKClient.Common.Library
         {
             get
             {
-                if (this._comment.from_id == AppGlobalStateManager.Current.LoggedInUserId)
-                    return false;
-                if (this._likeObjectType != LikeObjectType.comment && this._likeObjectType != LikeObjectType.photo_comment)
-                    return this._likeObjectType == LikeObjectType.video_comment;
-                return true;
+                return false;
             }
         }
 

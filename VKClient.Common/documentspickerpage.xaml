@@ -56,54 +56,9 @@
 
                 <framework:ExtendedLongListSelector.ListHeader>
                     <StackPanel Margin="0 8">
-
-                        <Grid Tap="FirstButton_OnClicked"
-                              framework:MetroInMotion.Tilt="2.5"
-                              Background="Transparent"
-                              Height="64">
-
-                            <Border Background="{StaticResource PhoneAccentBlueBrush}"
-                                    HorizontalAlignment="Left"
-                                    Margin="16"
-                                    Height="32"
-                                    Width="32">
-                                <Border.OpacityMask>
-                                    <ImageBrush framework:ImageLoader.ImageBrushMultiResSource="../Resources/New/Gallery32px.png" />
-                                </Border.OpacityMask>
-                            </Border>
-
-                            <TextBlock Text="{Binding LocalizedResources.Documents_ChooseFromGallery, Source={StaticResource LocalizedStrings}}"
-                                       Foreground="{StaticResource PhoneAccentBlueBrush}"
-                                       Margin="64 14 0 0"
-                                       FontSize="25.33" />
-                        </Grid>
-
-                        <Grid Tap="SecondButton_OnClicked"
-                              framework:MetroInMotion.Tilt="2.5"
-                              Background="Transparent"
-                              Height="64">
-
-                            <Border Background="{StaticResource PhoneAccentBlueBrush}"
-                                    HorizontalAlignment="Left"
-                                    Margin="16"
-                                    Height="32"
-                                    Width="32">
-                                <Border.OpacityMask>
-                                    <ImageBrush framework:ImageLoader.ImageBrushMultiResSource="../Resources/New/Upload32px.png" />
-                                </Border.OpacityMask>
-                            </Border>
-
-                            <TextBlock Text="{Binding LocalizedResources.UploadFile, Source={StaticResource LocalizedStrings}}"
-                                       Foreground="{StaticResource PhoneAccentBlueBrush}"
-                                       Margin="64 14 0 0"
-                                       FontSize="25.33" />
-                        </Grid>
-
                         <Rectangle x:Name="rectSeparator"
-                                   Height="16"
-                                   Margin="0 8 0 0"
-                                   Fill="{StaticResource PhoneNewsDividerBrush}" />
-
+                                   Height="0"
+                                   Fill="Transparent" />
                         <Border Height="64"
                                 HorizontalAlignment="Left"
                                 Background="Transparent"

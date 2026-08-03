@@ -394,7 +394,7 @@ namespace VKClient.Video.Library
         {
             get
             {
-                return this.OwnerId != AppGlobalStateManager.Current.LoggedInUserId;
+                return false;
             }
         }
 
@@ -444,14 +444,14 @@ namespace VKClient.Video.Library
         {
             get
             {
-                return string.Format("https://vk.com/video{0}_{1}", this.OwnerId, this.VideoId);
+                return string.Format("https://openvk.org/video{0}_{1}", this.OwnerId, this.VideoId);
             }
         }
 
         public VideoCommentsViewModel(long ownerId, long videoId, string accessKey, VKClient.Common.Backend.DataObjects.Video video = null, StatisticsActionSource actionSource = StatisticsActionSource.news, string videoContext = "")
         {
             this.Resolutions = new List<VideoResolution>();
-            this._knownCommentsCount = -1;
+            this._knownCommentsCount = video != null ? video.comments : -1;
             this._lastTimeCompletedPlayRequest = DateTime.MinValue;
 
             this.OwnerId = ownerId;
@@ -466,6 +466,7 @@ namespace VKClient.Video.Library
                 this.PublishOpenVideoEvent();
             }
             this.UpdateOwnerInfo();
+            this.LoadOwnerInfo();
             this.UpdateDescription();
             this.InitResolutionsCollection();
             EventAggregator.Current.Subscribe(this);
@@ -495,6 +496,41 @@ namespace VKClient.Video.Library
             }
         }
 
+        private void LoadOwnerInfo()
+        {
+            if (this.OwnerId > 0L)
+            {
+                UsersService.Instance.GetUsers(new List<long>() { this.OwnerId }, (Action<BackendResult<List<User>, ResultCode>>)(res =>
+                {
+                    if (res.ResultCode != ResultCode.Succeeded || res.ResultData == null)
+                        return;
+                    User user = res.ResultData.FirstOrDefault((User u) => u.uid == this.OwnerId);
+                    if (user == null)
+                        return;
+                    Execute.ExecuteOnUIThread((Action)(() =>
+                    {
+                        this.OwnerHeaderViewModel = new OwnerFullHeaderWithSubscribeViewModel(user);
+                    }));
+                }));
+                return;
+            }
+            if (this.OwnerId < 0L)
+            {
+                GroupsService.Current.GetCommunity(-this.OwnerId, "members_count,photo_50,photo_100,photo_200,photo_max,is_member,admin_level", (Action<BackendResult<List<Group>, ResultCode>>)(res =>
+                {
+                    Group group = res.ResultCode == ResultCode.Succeeded && res.ResultData != null
+                        ? res.ResultData.FirstOrDefault()
+                        : null;
+                    if (group == null)
+                        return;
+                    Execute.ExecuteOnUIThread((Action)(() =>
+                    {
+                        this.OwnerHeaderViewModel = new OwnerFullHeaderWithSubscribeViewModel(group);
+                    }));
+                }));
+            }
+        }
+
         public override void Load(Action<ResultCode> callback)
         {
             VKClient.Common.Backend.DataObjects.Video video = this.Video;
@@ -510,6 +546,8 @@ namespace VKClient.Video.Library
                         {
                             int num = this.Video == null ? 1 : 0;
                             this.Video = res.ResultData[0];
+                            if (this._knownCommentsCount < 0)
+                                this._knownCommentsCount = this.Video.comments;
                             this._catItemVM = new CatalogItemViewModel(new VideoCatalogItem(this.Video), new List<User>(), new List<Group>(), false);
                             this.NotifyVideoDurationPropertiesChanged();
                             if (num != 0)

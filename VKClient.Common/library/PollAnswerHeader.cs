@@ -81,6 +81,8 @@ namespace VKClient.Common.Library
     private double GetAbsoluteRate()
     {
       List<Answer> answers = this._pollVM.Poll.answers;
+      if (answers == null || answers.Count == 0)
+        return 0.0;
       this._maxVotes = answers[0].votes;
       this._maxVotes = Enumerable.Max((IEnumerable<int>)Enumerable.Concat<int>(Enumerable.Select<Answer, int>(answers, (Func<Answer, int>)(a => a.votes)), new int[1]
       {

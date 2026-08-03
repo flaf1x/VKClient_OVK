@@ -70,7 +70,7 @@ namespace VKClient.Groups.Management.Library
     {
       get
       {
-        return this._user.photo_max;
+        return this._user.UiAvatarSmall;
       }
     }
 

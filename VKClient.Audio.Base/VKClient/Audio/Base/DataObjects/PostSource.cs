@@ -111,7 +111,7 @@ label_27:
                 return PostSourcePlatform.Vinci;
             else if (this.platform == "android")
                 return PostSourcePlatform.Android;
-            else if (this.platform == "windows" || this.platform == "wphone")
+            else if (this.platform == "windows" || this.platform == "wphone" || this.platform == "windows_phone")
                 return PostSourcePlatform.Windows;
             else if (this.platform == "chronicle")
                 return PostSourcePlatform.Snapster;

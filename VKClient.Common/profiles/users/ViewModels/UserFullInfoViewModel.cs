@@ -114,8 +114,6 @@ namespace VKClient.Common.Profiles.Users.ViewModels
       profileInfoItemList2.Add((ProfileInfoItem) new VKSocialNetworkItem((IProfileData) this._userData));
       if (!string.IsNullOrEmpty(user.skype))
         profileInfoItemList2.Add((ProfileInfoItem) new SkypeSocialNetworkItem(user.skype));
-      if (!string.IsNullOrEmpty(user.facebook))
-        profileInfoItemList2.Add((ProfileInfoItem) new FacebookSocialNetworkItem(user.facebook, user.facebook_name));
       if (!string.IsNullOrEmpty(user.twitter))
         profileInfoItemList2.Add((ProfileInfoItem) new TwitterSocialNetworkItem(user.twitter));
       if (!string.IsNullOrEmpty(user.instagram))

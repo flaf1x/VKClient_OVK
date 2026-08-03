@@ -104,7 +104,8 @@ namespace VKClient.Common.UC
         {
             get
             {
-                return this.CheckOnPage("VideoCatalogPage");
+                return this.CheckOnPage("VideoCatalogPage") ||
+                       this.CheckOnPage("VideoPage");
             }
         }
 
@@ -492,7 +493,7 @@ namespace VKClient.Common.UC
             {
                 bool flag = e == null;
                 MenuUC.PublishMenuItemClickedEvent("videos");
-                this.NavigateOnMenuClick((Action)(() => Navigator.Current.NavigateToVideoCatalog()), !flag);
+                this.NavigateOnMenuClick((Action)(() => Navigator.Current.NavigateToVideo(false, AppGlobalStateManager.Current.LoggedInUserId, false, false)), !flag);
             }
         }
 

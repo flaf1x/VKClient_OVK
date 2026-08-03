@@ -325,7 +325,7 @@ namespace VKMessenger.Library
                     this._wallPost = attachment.wall;
                     this.ResourceUri = string.Concat(new object[4]
                   {
-                    "https://vk.com/wall",
+                    "https://openvk.org/wall",
                     attachment.wall.to_id,
                     "_",
                     attachment.wall.id
@@ -340,7 +340,7 @@ namespace VKMessenger.Library
                     this._comment = attachment.wall_reply;
                     this.ResourceUri = string.Concat(new object[4]
           {
-            "https://vk.com/wall",
+            "https://openvk.org/wall",
             attachment.wall_reply.owner_id,
             "_",
             attachment.wall_reply.post_id

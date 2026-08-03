@@ -5,6 +5,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Windows;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -156,7 +157,7 @@ namespace VKClient.Common.Library
             get
             {
                 if (this._profileInfo != null)
-                    return this._profileInfo.photo_max;
+                    return AvatarHelper.Prepare(this._profileInfo.photo_max);
                 return "";
             }
         }

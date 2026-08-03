@@ -961,7 +961,7 @@ namespace VKMessenger.Library
                 this.UIDate = this._outboundMessage == null || this._outboundMessage.OutboundMessageStatus != OutboundMessageStatus.Failed ? UIStringFormatterHelper.FormatDateForMessageUI(Extensions.UnixTimeStampToDateTime((double)this._message.date, true)) : string.Empty;
                 this.UpdateUIOpacity();
                 if (this.IsChat || this._isForwarded)
-                    this.UIImageUrl = this._associatedUser.photo_max;
+                    this.UIImageUrl = this._associatedUser.UiAvatarSmall;
                 this.UIUserName = this._associatedUser.first_name;
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.UIStatusDelivered));
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.UIStatusFailed));

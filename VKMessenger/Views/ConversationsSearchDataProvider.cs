@@ -56,38 +56,11 @@ namespace VKMessenger.Views
 
     public void GetData(string searchString, Dictionary<string, string> parameters, int offset, int count, Action<BackendResult<VKList<User>, ResultCode>> callback)
     {
-      MessagesService.Instance.SearchDialogs(searchString, (Action<BackendResult<List<object>, ResultCode>>) (res =>
-      {
-        if (res.ResultCode != ResultCode.Succeeded)
-        {
-          callback(new BackendResult<VKList<User>, ResultCode>(res.ResultCode,  null));
-        }
-        else
-        {
-          List<User> userList = new List<User>();
-          foreach (object obj in res.ResultData)
-          {
-            if (obj is User)
-            {
-              User user = obj as User;
-              userList.Add(user);
-            }
-            else if (obj is Chat)
-            {
-              Chat chat = obj as Chat;
-              if (chat.photo_200 == null)
-                chat.photo_200 = MultiResolutionHelper.Instance.AppendResolutionSuffix("/Resources/New/PlaceholderGroup62Light.png", true, "");
-              User user = new User() { first_name = chat.title, photo_max = chat.photo_200, last_name = "", uid = -chat.chat_id };
-              userList.Add(user);
-            }
-          }
-          callback(new BackendResult<VKList<User>, ResultCode>(res.ResultCode, new VKList<User>()
-          {
-            count = res.ResultData.Count,
-            items = userList
-          }));
-        }
-      }));
+      // OpenVK does not implement the legacy messages.searchDialogs method.
+      // The picker still needs a useful global search, so search people through
+      // the supported users.search endpoint; loaded conversations are searched
+      // locally by ConversationSearchViewModel.
+      UsersService.Instance.SearchUsers(searchString, offset, count, callback);
     }
   }
 }

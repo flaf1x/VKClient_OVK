@@ -123,5 +123,24 @@ namespace VKClient.Audio.Base.Utils
         return string.Format(format, str);
       return string.Format(format, str, additionalFormatParam);
     }
+
+    public static string FormatNumberOfSomething(double number, string oneSomethingFrm, string twoSomethingFrm, string fiveSomethingFrm, bool includeNumberInResult = true, string additionalFormatParam = null, bool includeZero = false)
+    {
+      if (number < 0.0)
+        throw new Exception("Invalid number to format.");
+      if (number == 0.0 && !includeZero)
+        return "";
+      int whole = (int) Math.Floor(number);
+      int num = whole % 10;
+      string format = !(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "en") || !(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt") ? (whole == 1 ? oneSomethingFrm : twoSomethingFrm) : (num != 1 || whole % 100 == 11 ? (num < 2 || num > 4 || whole % 100 >= 12 && whole % 100 <= 14 ? fiveSomethingFrm : twoSomethingFrm) : oneSomethingFrm);
+      if (!includeNumberInResult)
+        return string.Format(format, "").Trim();
+      NumberFormatInfo numberFormatInfo = (NumberFormatInfo) CultureInfo.InvariantCulture.NumberFormat.Clone();
+      numberFormatInfo.NumberGroupSeparator = " ";
+      string str = number.ToString("#,#.##", (IFormatProvider) numberFormatInfo);
+      if (additionalFormatParam == null)
+        return string.Format(format, str);
+      return string.Format(format, str, additionalFormatParam);
+    }
   }
 }

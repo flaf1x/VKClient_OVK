@@ -93,7 +93,7 @@ namespace VKMessenger.Library
             {
                 if (this.AssignedUser == null)
                     return string.Empty;
-                return this.AssignedUser.photo_max;
+                return this.AssignedUser.UiAvatarMedium;
             }
         }
 

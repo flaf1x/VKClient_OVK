@@ -16,7 +16,7 @@ namespace VKClient.Common.Library
 
     public override void Navigate()
     {
-      Navigator.Current.NavigateToWebUri(this._navigateUri, true, false);
+      Navigator.Current.NavigateToWebUri(this._navigateUri, false, false);
     }
   }
 }

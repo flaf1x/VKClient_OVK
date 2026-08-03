@@ -172,7 +172,7 @@ namespace VKClient.Common.Library
         public LinkHeader(User user)
         {
             this.Id = user.id;
-            this.Photo = user.photo_max;
+            this.Photo = user.UiAvatarSmall;
             this.Title = user.Name;
             this.User = user;
         }
@@ -180,7 +180,7 @@ namespace VKClient.Common.Library
         public LinkHeader(User user, CommunityManagementRole currentUserRole, bool isManagement)
         {
             this.Id = user.id;
-            this.Photo = user.photo_max;
+            this.Photo = user.UiAvatarSmall;
             this.Title = user.Name;
             this.User = user;
             this.IsActionButtonEnabled = isManagement && (user.Role == CommunityManagementRole.Unknown || currentUserRole == CommunityManagementRole.Administrator || currentUserRole == CommunityManagementRole.Creator) && (user.id != AppGlobalStateManager.Current.LoggedInUserId || currentUserRole == CommunityManagementRole.Administrator) && user.Role != CommunityManagementRole.Creator;
@@ -197,7 +197,7 @@ namespace VKClient.Common.Library
         public LinkHeader(User user, Action<FrameworkElement> actionButtonAction, string icon)
         {
             this.Id = user.id;
-            this.Photo = user.photo_max;
+            this.Photo = user.UiAvatarSmall;
             this.Title = user.Name;
             this.User = user;
             this.ActionButtonSize = 32.0;

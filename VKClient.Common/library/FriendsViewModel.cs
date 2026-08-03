@@ -403,7 +403,7 @@ namespace VKClient.Common.Library
                     case FriendsViewModel.Mode.Friends:
                         bool isCachedFriendsLoaded = false;
                         SavedContacts friends = (SavedContacts)await FriendsCache.Instance.GetFriends();
-                        if (!this._allFriendsVM.Refresh && (DateTime.UtcNow - friends.SyncedDate).TotalMinutes < 60.0)
+                        if (!this._allFriendsVM.Refresh && friends.SavedUsers != null && friends.SavedUsers.Count > 100 && (DateTime.UtcNow - friends.SyncedDate).TotalMinutes < 60.0)
                         {
                             callback(new BackendResult<List<User>, ResultCode>(ResultCode.Succeeded, friends.SavedUsers));
                             this.RequestsViewModel = friends.Requests;

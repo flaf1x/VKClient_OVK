@@ -6,6 +6,6 @@ namespace VKClient.Audio.Base.DataObjects
   {
     public List<VotesPack> VotesPacks { get; set; }
 
-    public int Balance { get; set; }
+    public double Balance { get; set; }
   }
 }

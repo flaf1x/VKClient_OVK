@@ -23,6 +23,7 @@ using VKMessenger.Views;
 using System.Windows.Media;
 using VKClient.Common.Framework.CodeForFun;
 using VKClient.Audio.Base.BLExtensions;
+using VKClient.Audio.Base.AudioCache;
 
 using System.Linq;
 
@@ -65,6 +66,17 @@ namespace VKClient.Audio
             if (dataContext == null)
                 return;
             Navigator.Current.NavigateToEditAudio(dataContext.Track);
+        }
+
+        private void DownloadTrackItem_Tap(object sender, RoutedEventArgs e)
+        {
+            FrameworkElement frameworkElement = sender as FrameworkElement;
+            AudioHeader dataContext = frameworkElement != null
+                ? frameworkElement.DataContext as AudioHeader
+                : null;
+            if (dataContext == null)
+                return;
+            AudioCacheManager.Instance.Download(dataContext.Track);
         }
 
         private void DeleteTrackItem_Tap(object sender, RoutedEventArgs e)
@@ -110,7 +122,16 @@ namespace VKClient.Audio
             string tag = (sender as Grid).Tag.ToString();
             AudioHeader track = this.VM.AllTracks.Collection.First((h) => h.Track.UniqueId == tag);
 
-            if (track.Track.UniqueId == BGAudioPlayerWrapper.Instance.Track.GetTagId())
+            if (this.IsInPickMode)
+            {
+                ParametersRepository.SetParameterForId("PickedAudio", track.Track);
+                e.Handled = true;
+                Navigator.Current.GoBack();
+                return;
+            }
+
+            AudioTrack currentTrack = BGAudioPlayerWrapper.Instance.Track;
+            if (currentTrack != null && track.Track.UniqueId == currentTrack.GetTagId())
             {
                 if (BGAudioPlayerWrapper.Instance.PlayerState == PlayState.Playing)
                     BGAudioPlayerWrapper.Instance.Pause();
@@ -128,6 +149,13 @@ namespace VKClient.Audio
         {            
             string tag = (sender as Grid).Tag.ToString();
             AudioHeader track = this.VM.AllTracks.Collection.First((h) => h.Track.UniqueId == tag);
+            if (this.IsInPickMode)
+            {
+                ParametersRepository.SetParameterForId("PickedAudio", track.Track);
+                e.Handled = true;
+                Navigator.Current.GoBack();
+                return;
+            }
             this.NavigateToAudioPlayer(track, this.VM.AllTracks.Collection, true);
         }
         
@@ -139,13 +167,15 @@ namespace VKClient.Audio
             {
                 track.ShowContentRestrictedMessage();
             }
-            else if (track.Track.UniqueId == BGAudioPlayerWrapper.Instance.Track.GetTagId())
-            {
-                if (need_navigate)
-                    Navigator.Current.NavigateToAudioPlayer(true);
-            }
             else
             {
+                AudioTrack currentTrack = BGAudioPlayerWrapper.Instance.Track;
+                if (currentTrack != null && track.Track.UniqueId == currentTrack.GetTagId())
+                {
+                    if (need_navigate)
+                        Navigator.Current.NavigateToAudioPlayer(true);
+                    return;
+                }
                 List<AudioObj> tracks = new List<AudioObj>();
                 IEnumerator enumerator = enumerable.GetEnumerator();
                 try

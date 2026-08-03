@@ -1,4 +1,3 @@
-using Facebook.Client;
 using Microsoft.Xna.Framework.Media;
 using System;
 using System.Collections.Generic;
@@ -14,6 +13,7 @@ using VKClient.Audio.Base.Events;
 using VKClient.Audio.Base.Library;
 using VKClient.Audio.Base.Social;
 using VKClient.Audio.Base.Utils;
+using VKClient.Common;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -286,6 +286,10 @@ namespace VKClient.Library
 			}
 			if (originalString.Contains("PeopleExtension"))
 			{
+				// Windows Phone queues People Hub feed requests and launches the
+				// provider. The old client never drained that queue, leaving
+				// What's new permanently empty.
+				SocialDataManager.Instance.ProcessSocialOperationsQueue();
 				Dictionary<string, string> dictionary = uri.ParseQueryString();
 				if (needHandleActivation)
 				{
@@ -310,7 +314,7 @@ namespace VKClient.Library
 						});
 					}
 					string text3 = dictionary["action"];
-					if (text3 == "Show_Contact")
+					if (string.Equals(text3, "Show_Contact", StringComparison.OrdinalIgnoreCase) && array.Length > 0)
 					{
 						Enumerable.FirstOrDefault<string>(array);
 						long itemIdByRemoteId = RemoteIdHelper.GetItemIdByRemoteId(array[0]);
@@ -326,9 +330,15 @@ namespace VKClient.Library
 						text4 += "&ClearBackStack=True";
 						return new Uri(text4, UriKind.Relative);
 					}
-					if (text3 == "Post_Update")
+					if (string.Equals(text3, "Post_Update", StringComparison.OrdinalIgnoreCase))
 					{
 						return new Uri(NavigatorImpl.GetNavToNewPostStr(0, false, 0, false, false, false) + "&ClearBackStack=True", UriKind.Relative);
+					}
+					if (string.Equals(text3, "Show_Feed", StringComparison.OrdinalIgnoreCase) ||
+						string.Equals(text3, "Show_Updates", StringComparison.OrdinalIgnoreCase) ||
+						string.Equals(text3, "ShowFeed", StringComparison.OrdinalIgnoreCase))
+					{
+						return new Uri("/VKClient.Common;component/NewsPage.xaml?ClearBackStack=True", UriKind.Relative);
 					}
 				}
 			}
@@ -353,7 +363,7 @@ namespace VKClient.Library
           if (!str2.StartsWith(oldValue))
           {
             if (str2.StartsWith("vk://"))
-              return new Uri(NavigatorImpl.GetOpenUrlPageStr(str2.Replace("vk://", "https://vk.com/")), UriKind.Relative);
+              return new Uri(NavigatorImpl.GetOpenUrlPageStr(str2.Replace("vk://", VKConstants.OpenVKWebAddress + "/")), UriKind.Relative);
             MessageBox.Show("Unsupported protocol: " + str2);
             str2 = str1;
           }
@@ -364,11 +374,6 @@ namespace VKClient.Library
           }
           else
             str2 = str2.Replace(oldValue, "/VKClient.Common;component/SDKAuthPage.xaml") + "&SDKGUID=" + str3.ToLowerInvariant();
-        }
-        else if (str2.StartsWith("fb128749580520227://authorize"))
-        {
-          if (((UriMapperBase) new FacebookUriMapper()).MapUri(uri).OriginalString.StartsWith("/SuccessfulFacebookLogin.xaml"))
-            return new Uri("/VKClient.Common;component/FriendsImportFacebookPage.xaml", UriKind.Relative);
         }
         else if (str2.StartsWith("com.vk.vkclient:/gmail-oauth/code"))
         {

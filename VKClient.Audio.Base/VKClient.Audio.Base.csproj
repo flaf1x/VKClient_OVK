@@ -405,6 +405,7 @@
     <Compile Include="VKClient\Audio\Base\StringUtils.cs" />
     <Compile Include="VKClient\Audio\Base\UploadResponseData.cs" />
     <Compile Include="VKClient\Audio\Base\UploadServerAddress.cs" />
+    <Compile Include="VKClient\Audio\Base\Utils\AvatarHelper.cs" />
     <Compile Include="VKClient\Audio\Base\Utils\BaseFormatterHelper.cs" />
     <Compile Include="VKClient\Audio\Base\Utils\CultureHelper.cs" />
     <Compile Include="VKClient\Audio\Base\Utils\CultureName.cs" />
@@ -641,6 +642,7 @@
     <Compile Include="VKClient\Common\Backend\IPageDataRequesteeInfo.cs" />
     <Compile Include="VKClient\Common\Backend\IPhotosService.cs" />
     <Compile Include="VKClient\Common\Backend\JsonResponseData.cs" />
+    <Compile Include="VKClient\Common\Backend\OpenVKResponseAdapter.cs" />
     <Compile Include="VKClient\Common\Backend\JsonWebRequest.cs" />
     <Compile Include="VKClient\Common\Backend\LikeListFilter.cs" />
     <Compile Include="VKClient\Common\Backend\LikeObjectType.cs" />
@@ -757,6 +759,7 @@
     <Compile Include="VKClient\Common\Utils\ScaleFactor.cs" />
     <Compile Include="VKClient\Common\Utils\UriExtensions.cs" />
     <Compile Include="VKClient\Common\VKConstants.cs" />
+    <Compile Include="VKClient\Common\OpenVKInstanceManager.cs" />
     <Compile Include="VKMessenger\Backend\BackendServices.cs" />
     <Compile Include="VKMessenger\Backend\ChatInfo.cs" />
     <Compile Include="VKMessenger\Backend\ChatService.cs" />

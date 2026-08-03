@@ -229,26 +229,6 @@ namespace VKClient.Common.Library
     private void CreateMenu()
     {
       this._menuItems = new List<MenuItem>();
-      if (this._hideSourceItemsCallback != null && this.SourceId != AppGlobalStateManager.Current.LoggedInUserId)
-      {
-        MenuItem menuItem1 = new MenuItem();
-        string hideFromNews = CommonResources.HideFromNews;
-        menuItem1.Header = hideFromNews;
-        MenuItem menuItem2 = menuItem1;
-        // ISSUE: method pointer
-        menuItem2.Click += new RoutedEventHandler( this.hideFromNewsMenuItem_Click);
-        this._menuItems.Add(menuItem2);
-      }
-      if (this._ignoreNewsfeedItemCallback != null && this.GetIgnoreItemData() != null)
-      {
-        MenuItem menuItem1 = new MenuItem();
-        string lowerInvariant = CommonResources.HideThisPost.ToLowerInvariant();
-        menuItem1.Header = lowerInvariant;
-        MenuItem menuItem2 = menuItem1;
-        // ISSUE: method pointer
-        menuItem2.Click += new RoutedEventHandler( this.HidePostItem_OnClick);
-        this._menuItems.Add(menuItem2);
-      }
       if (this._getExtraMenuItemsFunc != null)
         this._menuItems.AddRange((IEnumerable<MenuItem>) this._getExtraMenuItemsFunc());
       UserOrGroupHeaderItem headerItem = this._headerItem;

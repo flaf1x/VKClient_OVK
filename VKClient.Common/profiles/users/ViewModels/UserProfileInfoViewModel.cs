@@ -54,11 +54,11 @@ namespace VKClient.Common.Profiles.Users.ViewModels
           if (randomMutualFriends != null && user.id != AppGlobalStateManager.Current.LoggedInUserId)
           {
             if (randomMutualFriends.Count > 0)
-              infoListItem2.Preview1 = randomMutualFriends[0].photo_max;
+              infoListItem2.Preview1 = randomMutualFriends[0].UiAvatarSmall;
             if (randomMutualFriends.Count > 1)
-              infoListItem2.Preview2 = randomMutualFriends[1].photo_max;
+              infoListItem2.Preview2 = randomMutualFriends[1].UiAvatarSmall;
             if (randomMutualFriends.Count > 2)
-              infoListItem2.Preview3 = randomMutualFriends[2].photo_max;
+              infoListItem2.Preview3 = randomMutualFriends[2].UiAvatarSmall;
           }
           infoListItemList1.Add(infoListItem2);
         }
@@ -129,7 +129,7 @@ namespace VKClient.Common.Profiles.Users.ViewModels
           Group occupationGroup = this._userData.occupationGroup;
           if (occupationGroup != null)
           {
-            infoListItem.Preview1 = occupationGroup.photo_200;
+            infoListItem.Preview1 = occupationGroup.UiAvatarSmall;
             infoListItem.IsTiltEnabled = true;
             infoListItem.TapAction = (Action) (() => Navigator.Current.NavigateToGroup(occupationGroup.id, occupationGroup.name, false));
           }

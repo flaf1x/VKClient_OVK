@@ -44,6 +44,14 @@ namespace VKClient.Audio.Base.BackendServices
           "1"
         },
         {
+          "extended",
+          "1"
+        },
+        {
+          "photo_sizes",
+          "1"
+        },
+        {
           "offset",
           offset.ToString()
         }
@@ -165,10 +173,6 @@ namespace VKClient.Audio.Base.BackendServices
       VKRequestsDispatcher.DispatchRequestToVK<ProfilePhoto>("photos.saveOwnerPhoto", new Dictionary<string, string>()
       {
         {
-          "server",
-          responseData.server
-        },
-        {
           "photo",
           responseData.photo
         },
@@ -176,7 +180,7 @@ namespace VKClient.Audio.Base.BackendServices
           "hash",
           responseData.hash
         }
-      }, callback1,  null, false, true, new CancellationToken?(),  null);
+      }, callback1, jsonStr => JsonConvert.DeserializeObject<GenericRoot<ProfilePhoto>>(jsonStr).response, false, true, new CancellationToken?(), null);
     }
   }
 }

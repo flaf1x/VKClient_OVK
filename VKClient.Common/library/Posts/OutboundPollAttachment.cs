@@ -58,7 +58,11 @@ namespace VKClient.Common.Library.Posts
     {
       get
       {
-        return string.Concat( new object[4]{ "poll", this._poll.owner_id, "_", this._poll.poll_id });
+        // OpenVK's attachment parser passes the first numeric component
+        // directly to Polls::get(). Unlike VK, that component is the poll id,
+        // not the owner id. Keep three components so the generic parser can
+        // still unpack owner/id/access_key without warnings.
+        return string.Concat(new object[3] { "poll", this._poll.poll_id, "_0_" });
       }
     }
 

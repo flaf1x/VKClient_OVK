@@ -6,9 +6,12 @@ namespace VKClient.Common.Library.Posts
   public static class AttachmentTypes
   {
     public static readonly List<NamedAttachmentType> AttachmentPhotoSubtypes = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.PhotoFromPhone, Name = CommonResources.Attachments_UploadFromGallery }, new NamedAttachmentType() { AttachmentType = AttachmentType.PhotoMy, Name = CommonResources.Attachments_MyPhotos } };
-    public static readonly List<NamedAttachmentType> AttachmentVideoSubtypes = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.VideoFromPhone, Name = CommonResources.Attachments_UploadFromGallery }, new NamedAttachmentType() { AttachmentType = AttachmentType.VideoMy, Name = CommonResources.Attachments_MyVideo } };
+    public static readonly List<NamedAttachmentType> AttachmentVideoSubtypes = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.VideoMy, Name = CommonResources.Attachments_MyVideo } };
+    // Documents are selected from the user's existing OpenVK documents. Uploading
+    // arbitrary files from the phone stays unavailable, while a post can contain
+    // several existing documents, including a GIF and an archive together.
     public static readonly List<NamedAttachmentType> AttachmentTypesWithPhotoFromGallery = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.Photo, Name = CommonResources.AttachmentType_Photo }, new NamedAttachmentType() { AttachmentType = AttachmentType.Audio, Name = CommonResources.AttachmentType_Audio }, new NamedAttachmentType() { AttachmentType = AttachmentType.Video, Name = CommonResources.AttachmentType_Video }, new NamedAttachmentType() { AttachmentType = AttachmentType.Document, Name = CommonResources.AttachmentType_Document } };
-    public static readonly List<NamedAttachmentType> AttachmentTypesWithPhotoFromGalleryAndLocation = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.Photo, Name = CommonResources.AttachmentType_Photo }, new NamedAttachmentType() { AttachmentType = AttachmentType.Audio, Name = CommonResources.AttachmentType_Audio }, new NamedAttachmentType() { AttachmentType = AttachmentType.Video, Name = CommonResources.AttachmentType_Video }, new NamedAttachmentType() { AttachmentType = AttachmentType.Document, Name = CommonResources.AttachmentType_Document }, new NamedAttachmentType() { AttachmentType = AttachmentType.Location, Name = CommonResources.AttachmentType_Location } };
+    public static readonly List<NamedAttachmentType> AttachmentTypesWithPhotoFromGalleryAndLocation = new List<NamedAttachmentType>() { new NamedAttachmentType() { AttachmentType = AttachmentType.Photo, Name = CommonResources.AttachmentType_Photo }, new NamedAttachmentType() { AttachmentType = AttachmentType.Audio, Name = CommonResources.AttachmentType_Audio }, new NamedAttachmentType() { AttachmentType = AttachmentType.Video, Name = CommonResources.AttachmentType_Video } };
     public static readonly List<NamedAttachmentType> AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation;
     public static readonly NamedAttachmentType PollAttachmentType;
     public static readonly NamedAttachmentType TimerAttachmentType;
@@ -40,16 +43,6 @@ namespace VKClient.Common.Library.Posts
       string lowerInvariant1 = CommonResources.Graffiti.ToLowerInvariant();
       namedAttachmentType1.Name = lowerInvariant1;
       namedAttachmentTypeList.Add(namedAttachmentType1);
-      namedAttachmentTypeList.Add(new NamedAttachmentType()
-      {
-        AttachmentType = AttachmentType.Document,
-        Name = CommonResources.AttachmentType_Document
-      });
-      namedAttachmentTypeList.Add(new NamedAttachmentType()
-      {
-        AttachmentType = AttachmentType.Location,
-        Name = CommonResources.AttachmentType_Location
-      });
       AttachmentTypes.AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation = namedAttachmentTypeList;
       NamedAttachmentType namedAttachmentType2 = new NamedAttachmentType();
       namedAttachmentType2.AttachmentType = AttachmentType.Poll;

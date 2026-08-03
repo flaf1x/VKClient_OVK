@@ -8,6 +8,7 @@ using VKClient.Common.Framework;
 using VKClient.Common.Library;
 using VKClient.Common.Library.Events;
 using VKClient.Common.Localization;
+using VKClient.Common.UC;
 using VKClient.Common.Utils;
 
 namespace VKClient.Common.Shared
@@ -55,9 +56,9 @@ namespace VKClient.Common.Shared
       get
       {
         if (this._group != null)
-          return this._group.photo_100;
+          return this._group.UiAvatarMedium;
         if (this._user != null)
-          return this._user.photo_max;
+          return this._user.UiAvatarMedium;
         return "";
       }
     }
@@ -214,6 +215,8 @@ namespace VKClient.Common.Shared
           }
           CountersManager.Current.Counters = res.ResultData;
         }
+        else
+          GenericInfoUC.ShowBasedOnResult(res.ResultCode, "", res.Error);
         this._isInProgress = false;
         this.SetInProgressMain(false, "");
       }));

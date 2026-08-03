@@ -20,6 +20,7 @@ namespace VKClient.Audio.Base.Social
     public class SocialDataManager
     {
         private static SocialDataManager _instance;
+        private bool _isProcessingOperations;
 
         public static SocialDataManager Instance
         {
@@ -77,41 +78,56 @@ namespace VKClient.Audio.Base.Social
 
         public async Task ProcessSocialOperationsQueue()
         {
-            OperationQueue queue = await SocialManager.GetOperationQueueAsync();
-            while (true)
+            if (this._isProcessingOperations || AppGlobalStateManager.Current.LoggedInUserId == 0L)
+                return;
+            this._isProcessingOperations = true;
+            Logger.Instance.Info("SocialDataManager: checking People Hub operation queue");
+            try
             {
-                ISocialOperation operation = await queue.GetNextOperationAsync();
-                if (operation != null)
+                OperationQueue queue = await SocialManager.GetOperationQueueAsync();
+                while (true)
                 {
-                    try
+                    ISocialOperation operation = await queue.GetNextOperationAsync();
+                    if (operation != null)
                     {
-                        switch (operation.Type)
+                        Logger.Instance.Info("SocialDataManager: processing operation " + operation.Type);
+                        try
                         {
-                            case SocialOperationType.DownloadHomeFeed:
-                                /*int num1 = */
-                                await this.ProcessHomeFeed(operation as DownloadHomeFeedOperation);// ? 1 : 0;
-                                break;
-                            case SocialOperationType.DownloadContactFeed:
-                                await this.ProcessContactFeed(operation as DownloadFeedOperation);
-                                break;
-                            case SocialOperationType.DownloadDashboard:
-                                this.ProcessDashboard(operation as DownloadDashboardFeedOperation);
-                                break;
-                            case SocialOperationType.DownloadRichConnectData:
-                                /*int num2 = */
-                                await this.ProcessConnectData(operation as DownloadRichConnectDataOperation);// ? 1 : 0;
-                                break;
+                            switch (operation.Type)
+                            {
+                                case SocialOperationType.DownloadHomeFeed:
+                                    await this.ProcessHomeFeed(operation as DownloadHomeFeedOperation);
+                                    break;
+                                case SocialOperationType.DownloadContactFeed:
+                                    await this.ProcessContactFeed(operation as DownloadFeedOperation);
+                                    break;
+                                case SocialOperationType.DownloadDashboard:
+                                    await this.ProcessDashboard(operation as DownloadDashboardFeedOperation);
+                                    break;
+                                case SocialOperationType.DownloadRichConnectData:
+                                    await this.ProcessConnectData(operation as DownloadRichConnectDataOperation);
+                                    break;
+                            }
+                            operation.NotifyCompletion();
                         }
-                        operation.NotifyCompletion();
+                        catch (Exception ex)
+                        {
+                            Logger.Instance.ErrorAndSaveToIso("SocialDataManager: operation failed", ex);
+                            operation.NotifyCompletion(false);
+                        }
+                        operation = null;
                     }
-                    catch
-                    {
-                        operation.NotifyCompletion(false);
-                    }
-                    operation = null;
+                    else
+                        break;
                 }
-                else
-                    break;
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.ErrorAndSaveToIso("SocialDataManager: failed to read operation queue", ex);
+            }
+            finally
+            {
+                this._isProcessingOperations = false;
             }
         }
 
@@ -154,9 +170,10 @@ namespace VKClient.Audio.Base.Social
             return true;
         }
 
-        private /*async Task*/void ProcessDashboard(DownloadDashboardFeedOperation downloadDashboardFeedOperation)
+        private async Task ProcessDashboard(DownloadDashboardFeedOperation downloadDashboardFeedOperation)
         {
-            this.ProcessFeedOperationDetails(downloadDashboardFeedOperation.FeedOperationDetails, new Func<FeedOperationDetails, Task>(this.ProcessSingleDashboardRequest));
+            foreach (FeedOperationDetails details in downloadDashboardFeedOperation.FeedOperationDetails)
+                await this.ProcessSingleDashboardRequest(details);
         }
 
         private async Task ProcessContactFeed(DownloadFeedOperation downloadFeedOperation)
@@ -226,27 +243,17 @@ namespace VKClient.Audio.Base.Social
 
         private async Task<bool> ProcessContactFeeds(List<FeedOperationDetails> fodList)
         {
-            List<WallService.WallRequestData> requestData = new List<WallService.WallRequestData>();
-            using (List<FeedOperationDetails>.Enumerator enumerator = fodList.GetEnumerator())
+            // OpenVK does not implement VKScript/execute, which the legacy
+            // GetWallForManyUsers path depends on. Load each requested wall
+            // through the regular wall.get API instead.
+            foreach (FeedOperationDetails fod in fodList)
             {
-                while (enumerator.MoveNext())
-                {
-                    FeedOperationDetails current = enumerator.Current;
-                    requestData.Add(new WallService.WallRequestData()
-                    {
-                        UserId = RemoteIdHelper.GetItemIdByRemoteId(current.OwnerRemoteId),
-                        Offset = this.GetRequiredOffset(current),
-                        Count = current.ItemCount
-                    });
-                }
-            }
-            BackendResult<List<WallData>, ResultCode> res = await WallService.Current.GetWallForManyUsers(requestData);
-            if (res.ResultCode != ResultCode.Succeeded)
-                return false;
-            for (int i = 0; i < fodList.Count && i < res.ResultData.Count; ++i)
-            {
-                FeedOperationDetails fod = fodList[i];
-                WallData currentWallData = res.ResultData[i];
+                int offset = this.GetRequiredOffset(fod);
+                BackendResult<WallData, ResultCode> res = await WallService.Current.GetWall(
+                    RemoteIdHelper.GetItemIdByRemoteId(fod.OwnerRemoteId), offset, fod.ItemCount, "owner");
+                if (res.ResultCode != ResultCode.Succeeded || res.ResultData == null)
+                    return false;
+                WallData currentWallData = res.ResultData;
                 int nextOffset = this.GetRequiredOffset(fod) + currentWallData.wall.Count;
                 Feed feed = await SocialManager.OpenContactFeedAsync(fod);
                 foreach (WallPost wallPost in currentWallData.wall)
@@ -300,9 +307,9 @@ namespace VKClient.Audio.Base.Social
                 }
                 return res.ResultCode == ResultCode.Succeeded;
             }
-            catch
+            catch (Exception ex)
             {
-                Debugger.Break();
+                Logger.Instance.Error("ProcessHomeFeed failed", ex);
                 return false;
             }
         }
@@ -574,7 +581,7 @@ namespace VKClient.Audio.Base.Social
             FeedItemSharedStory feedItemSharedStory = new FeedItemSharedStory();
             feedItemSharedStory.Content.Title = BaseResources.WikiPage;
             feedItemSharedStory.Content.Message = wiki.title;
-            string str1 = string.Format("https://vk.com/club{0}?w=page-{0}_{1}", (object)wiki.gid, (object)wiki.pid);
+            string str1 = string.Format("https://openvk.org/club{0}?w=page-{0}_{1}", (object)wiki.gid, (object)wiki.pid);
             feedItemSharedStory.Content.Target = str1;
             string str2 = str1;
             feedItemSharedStory.DefaultTarget = str2;

@@ -66,6 +66,7 @@ namespace VKClient.Common.UC
     {
       //base.\u002Ector();
       this.InitializeComponent();
+      ((UIElement) this.borderSendGift).Visibility = Visibility.Collapsed;
     }
 
     private void UpdateName()
@@ -83,7 +84,7 @@ namespace VKClient.Common.UC
 
     private void UpdateGiftVisibility()
     {
-      ((UIElement) this.borderSendGift).Visibility = this.GiftVisibility;
+      ((UIElement) this.borderSendGift).Visibility = Visibility.Collapsed;
       this.UpdateName();
     }
 

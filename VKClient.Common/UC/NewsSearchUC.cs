@@ -39,6 +39,7 @@ namespace VKClient.Common.UC
         public NewsSearchUC()
         {
             //base.\u002Ector();
+            this._de = new DelayedExecutor(300);
             this.InitializeComponent();
             this.textBlockWatermarkText.Text = (CommonResources.NewsSearch.ToLowerInvariant());
         }
@@ -101,7 +102,10 @@ namespace VKClient.Common.UC
 
         private void NewsSearchUC_Loaded(object sender, RoutedEventArgs e)
         {
-            if (this._viewModel.ItemsCount != 0 || !string.IsNullOrEmpty(this.TextBoxSearch.Text) || !this._focusOnLoad)
+            if (this._viewModel == null ||
+                this._viewModel.ItemsCount != 0 ||
+                !string.IsNullOrEmpty(this.TextBoxSearch.Text) ||
+                !this._focusOnLoad)
                 return;
             this._de.AddToDelayedExecution((Action)(() => Execute.ExecuteOnUIThread((Action)(() => ((Control)this.textBoxSearch).Focus()))));
         }

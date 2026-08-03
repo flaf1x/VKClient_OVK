@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Windows;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Library;
 using VKMessenger.Backend;
@@ -62,9 +63,9 @@ namespace VKMessenger.Library
       {
           if (this.UserPhotoVisibility != Visibility.Visible)
           return "";
-        string photo200 = this._message.photo_200;
+        string photo200 = AvatarHelper.Prepare(this._message.photo_200);
         if (string.IsNullOrEmpty(photo200))
-          return this.User.photo_max;
+          return this.User.UiAvatarSmall;
         return photo200;
       }
     }
@@ -135,7 +136,7 @@ namespace VKMessenger.Library
         if (user.id == AppGlobalStateManager.Current.LoggedInUserId && associatedUsers.Count > userIndex + 2)
           ++userIndex;
         if (userIndex == num)
-          return user.photo_max;
+          return user.UiAvatarSmall;
         ++num;
       }
       return "";

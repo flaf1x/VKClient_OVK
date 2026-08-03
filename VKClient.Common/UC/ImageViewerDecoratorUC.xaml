@@ -108,10 +108,6 @@
                                 <toolkit:MenuItem Header="{Binding LocalizedResources.AppBarMenu_Save, Source={StaticResource LocalizedStrings}}"
                                                   Click="MenuItemSave_OnClick" />
 
-                                <toolkit:MenuItem x:Name="menuItemSaveInAlbum"
-                                                  Header="{Binding LocalizedResources.AppBarMenu_SaveInAlbum, Source={StaticResource LocalizedStrings}}"
-                                                  Click="MenuItemSaveInAlbum_OnClick" />
-
                             </toolkit:ContextMenu>
                         </toolkit:ContextMenuService.ContextMenu>
 
@@ -233,19 +229,6 @@
 
                         <Grid x:Name="gridGifs"
                               Width="160">
-                            <Border Height="64"
-                                    Background="Transparent"
-                                    framework:MetroInMotion.Tilt="1.5"
-                                    Visibility="{Binding CurrentPhotoVM.CanAddVisibility}"
-                                    Tap="AddTap">
-
-                                <Rectangle Style="{StaticResource ActionIconStyle}">
-                                    <Rectangle.OpacityMask>
-                                        <ImageBrush framework:ImageLoader.ImageBrushMultiResSource="/Resources/Add32px.png" />
-                                    </Rectangle.OpacityMask>
-                                </Rectangle>
-                            </Border>
-
                             <Border Height="64"
                                     Background="Transparent"
                                     Visibility="{Binding CurrentPhotoVM.AddedVisibility}">

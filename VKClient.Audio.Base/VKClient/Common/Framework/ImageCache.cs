@@ -37,8 +37,17 @@ namespace VKClient.Common.Framework
       if (uriString == null)
         return  null;
       string empty = string.Empty;
-      if (uriString.EndsWith("gif"))
-        return (!uriString.StartsWith(ImageCache.COMMUNITY_IMAGE) ? (!uriString.StartsWith("https://vk.com/images/deactivated") ? (!uriString.StartsWith("https://vk.com/images/contact") ? (!uriString.Contains("_null") ? Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/Photo_Placeholder.png", UriKind.RelativeOrAbsolute)) : Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/Empty1x1.png", UriKind.RelativeOrAbsolute))) : Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/EmailUser.png", UriKind.RelativeOrAbsolute))) : Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/deactivatedUser.png", UriKind.RelativeOrAbsolute))) : Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/community_100.png", UriKind.RelativeOrAbsolute))).Stream;
+      // Old VK used a few well-known *.gif URLs as semantic placeholders.
+      // Do not classify every GIF on the internet as one of those placeholders:
+      // OpenVK legitimately uses GIF for many resized images.
+      if (uriString.StartsWith(ImageCache.COMMUNITY_IMAGE, StringComparison.OrdinalIgnoreCase))
+        return Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/community_100.png", UriKind.RelativeOrAbsolute)).Stream;
+      if (uriString.StartsWith("https://vk.com/images/deactivated", StringComparison.OrdinalIgnoreCase))
+        return Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/deactivatedUser.png", UriKind.RelativeOrAbsolute)).Stream;
+      if (uriString.StartsWith("https://vk.com/images/contact", StringComparison.OrdinalIgnoreCase))
+        return Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/EmailUser.png", UriKind.RelativeOrAbsolute)).Stream;
+      if (uriString.IndexOf("_null", StringComparison.OrdinalIgnoreCase) >= 0)
+        return Application.GetResourceStream(new Uri("/VKClient.Common;component/Resources/Empty1x1.png", UriKind.RelativeOrAbsolute)).Stream;
       lock (this._lockObj)
       {
         if (this._uriToLocalPathDict.ContainsKey(uriString))
@@ -67,6 +76,29 @@ namespace VKClient.Common.Framework
       catch (Exception ex)
       {
         Logger.Instance.Error("TryRemoveUri failed", ex);
+      }
+    }
+
+    public void Clear()
+    {
+      lock (this._lockObj)
+      {
+        using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+        {
+          foreach (string path in this._uriToLocalPathDict.Values)
+          {
+            try
+            {
+              if (!string.IsNullOrWhiteSpace(path) && store.FileExists(path))
+                store.DeleteFile(path);
+            }
+            catch (Exception ex)
+            {
+              Logger.Instance.Error("ImageCache.Clear failed for " + path, ex);
+            }
+          }
+        }
+        this._uriToLocalPathDict.Clear();
       }
     }
 

@@ -27,7 +27,7 @@ namespace VKClient.Common.MoneyTransfers.Library
     {
       get
       {
-        return this.User.photo_max;
+        return this.User.UiAvatarMedium;
       }
     }
 

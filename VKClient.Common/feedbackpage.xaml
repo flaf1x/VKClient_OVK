@@ -67,28 +67,6 @@
                     </StackPanel>
                 </ViewportControl>
             </controls:PivotItem>
-            <controls:PivotItem Name="pivotItemComments">
-
-                <controls:PivotItem.Header>
-                    <TextBlock FontSize="46"
-                               FontFamily="Segoe WP SemiLight"
-                               Text="{Binding LocalizedResources.comments_pivotItem, Source={StaticResource LocStr}}" />
-                </controls:PivotItem.Header>
-
-
-                <ViewportControl Name="scrollComments"
-                                 HorizontalContentAlignment="Stretch"
-                                 VerticalContentAlignment="Stretch">
-                    <StackPanel Name="stackPanelComments">
-                        <framework:MyVirtualizingPanel2 x:Name="panelComments"
-                                                        DataContext="{Binding CommentsVM}"
-                                                        Visibility="{Binding IsLoadedVisibility}"
-                                                        ItemsSource="{Binding Collection}" />
-                        <uc:FooterUC DataContext="{Binding CommentsVM}" />
-                    </StackPanel>
-
-                </ViewportControl>
-            </controls:PivotItem>
         </controls:Pivot>
         <uc:PullToRefreshUC x:Name="ucPullToRefresh" />
     </Grid>

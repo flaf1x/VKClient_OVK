@@ -1,4 +1,5 @@
 using System.Windows;
+using VKClient.Audio.Base.Utils;
 using VKMessenger.Backend;
 
 namespace VKMessenger.Library
@@ -20,8 +21,8 @@ namespace VKMessenger.Library
       get
       {
         if (!this.IsUser)
-          return this._chatUser.photo_200;
-        return this._chatUser.photo_max;
+          return AvatarHelper.Prepare(this._chatUser.photo_200);
+        return AvatarHelper.Prepare(this._chatUser.photo_max);
       }
     }
 

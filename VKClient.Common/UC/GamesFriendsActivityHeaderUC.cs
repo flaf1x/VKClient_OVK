@@ -71,7 +71,7 @@ namespace VKClient.Common.UC
       GameActivityHeader newValue = e.NewValue as GameActivityHeader;
       if (newValue == null)
         return;
-      ImageLoader.SetUriSource(activityHeaderUc.imageUser, newValue.User.photo_max);
+      ImageLoader.SetUriSource(activityHeaderUc.imageUser, newValue.User.UiAvatarSmall);
       ImageLoader.SetUriSource(activityHeaderUc.imageGame, newValue.Game.icon_150);
       ((PresentationFrameworkCollection<Inline>) activityHeaderUc.textBlockDescription.Inlines).Clear();
       List<Inline> inlineList = newValue.ComposeActivityText(true);

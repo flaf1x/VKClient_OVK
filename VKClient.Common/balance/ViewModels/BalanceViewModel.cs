@@ -14,8 +14,8 @@ namespace VKClient.Common.Balance.ViewModels
     {
       get
       {
-        int balance = this.Balance;
-        if (balance == 0)
+        double balance = this.Balance;
+        if (balance == 0.0)
           return CommonResources.NoVotes;
         return UIStringFormatterHelper.FormatNumberOfSomething(balance, CommonResources.OneVoteFrm, CommonResources.TwoFourVotesFrm, CommonResources.FiveVotesFrm, true,  null, false);
       }

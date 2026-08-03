@@ -11,6 +11,11 @@
              Width="56"
              Height="56">
 
+    <UserControl.Resources>
+        <Style TargetType="Image">
+            <Setter Property="Stretch" Value="UniformToFill" />
+        </Style>
+    </UserControl.Resources>
 
     <Border Name="gridConversationHeader"
           commonFramework:MetroInMotion.Tilt="1.2"

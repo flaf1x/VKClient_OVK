@@ -50,8 +50,6 @@ namespace VKClient.Common.Gifts.Views
         firstName = queryString["FirstName"];
       if (queryString.ContainsKey("FirstNameGen"))
         firstNameGen = queryString["FirstNameGen"];
-      if (userId != AppGlobalStateManager.Current.LoggedInUserId)
-        this.BuildAppBar();
       this._viewModel = new GiftsViewModel(userId, firstName, firstNameGen);
       base.DataContext = this._viewModel;
       this._viewModel.GiftsVM.LoadData(false, false,  null, false);

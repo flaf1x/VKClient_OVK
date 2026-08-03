@@ -574,9 +574,21 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
         {
             get
             {
-                if (this._profileData != null && this._profileData.CanPost && !this.IsServiceProfile)
-                    return !this._profileData.IsDeactivated;
-                return false;
+                if (this._profileData == null || this.IsServiceProfile || this._profileData.IsDeactivated)
+                    return false;
+                if (this._profileData.CanPost)
+                    return true;
+
+                // OpenVK currently omits users.can_post even when it is requested.
+                // Keep the action available on accessible user profiles and let
+                // wall.post enforce the actual wall.write privacy rule.
+                return this._userData != null && this._userData.user != null &&
+                       this._userData.user.blacklisted != 1 &&
+                       this._userData.user.blacklisted_by_me != 1 &&
+                       this._status != ProfileLoadingStatus.Private &&
+                       this._status != ProfileLoadingStatus.Blacklisted &&
+                       this._status != ProfileLoadingStatus.Banned &&
+                       this._status != ProfileLoadingStatus.Deleted;
             }
         }
 
@@ -1521,6 +1533,30 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
         {
             if (this._status == ProfileLoadingStatus.Banned || this._status == ProfileLoadingStatus.Deleted)
                 return;
+            // Community avatar albums are not exposed consistently through
+            // photos.get. Keep the current-avatar-only behaviour for groups.
+            // User avatar albums are resolved by PhotosService from the real
+            // albums returned by photos.getAlbums.
+            if (this.Id < 0 && this._profileData != null && !string.IsNullOrWhiteSpace(this._profileData.PhotoMax))
+            {
+                string avatarUrl = this._profileData.PhotoMax;
+                Photo avatarPhoto = new Photo()
+                {
+                    id = 0,
+                    album_id = -6,
+                    owner_id = this.Id,
+                    width = 200,
+                    height = 200,
+                    photo_75 = avatarUrl,
+                    photo_130 = avatarUrl,
+                    photo_604 = avatarUrl,
+                    photo_807 = avatarUrl,
+                    photo_1280 = avatarUrl,
+                    photo_2560 = avatarUrl
+                };
+                Navigator.Current.NavigateToImageViewer(1, 0, 0, new List<long>() { 0L }, new List<long>() { this.Id }, new List<string>() { "" }, new List<Photo>() { avatarPhoto }, "PhotosByIds", false, false, (Func<int, Image>)(id => null), null, true);
+                return;
+            }
             Navigator.Current.NavigateToImageViewer("profile", 1, this.Id, this.Id < 0, -1, 0, new List<Photo>(), (Func<int, Image>)(id => null));
         }
 
@@ -1611,7 +1647,7 @@ namespace VKClient.Common.Profiles.Shared.ViewModels
         {
             if (this.Id == 0L || this.Id > 0L && this._userData == null || this.Id < 0L && this._groupData == null)
                 return "";
-            string str1 = "vk.com/";
+            string str1 = "openvk.org/";
             string str2;
             if (this.Id > 0L)
             {

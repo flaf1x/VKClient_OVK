@@ -21,6 +21,8 @@ namespace VKClient.Audio.Base
   public class MessagesService
   {
     private static MessagesService _instance;
+    private readonly object _localReadSync = new object();
+    private readonly Dictionary<long, long> _locallyReadThroughMessageId = new Dictionary<long, long>();
 
     public static MessagesService Instance
     {
@@ -103,9 +105,10 @@ namespace VKClient.Audio.Base
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["peer_id"] = this.GetPeerId(userOrChatId, isChat).ToString();
-      if (startMessageId.HasValue)
+      bool loadLatestMessages = startMessageId.HasValue && startMessageId.Value == -1;
+      if (startMessageId.HasValue && startMessageId.Value > 0)
         parameters["start_message_id"] = startMessageId.Value.ToString();
-      parameters["offset"] = offset.ToString();
+      parameters["offset"] = (loadLatestMessages ? 0 : offset).ToString();
       parameters["count"] = count.ToString();
       parameters["fields"] = "first_name_acc,last_name_acc,online,online_mobile,photo_max,sex,friend_status,photo_200,first_name_dat,is_messages_blocked";
       parameters["extended"] = "1";
@@ -113,20 +116,26 @@ namespace VKClient.Audio.Base
       {
         if (res.ResultCode == ResultCode.Succeeded)
         {
-          List<Message> messages = res.ResultData.Messages;
+          List<Message> messages = res.ResultData.Messages ?? new List<Message>();
+          res.ResultData.Messages = messages;
+          if (res.ResultData.Users == null)
+            res.ResultData.Users = new List<User>();
           UsersService.Instance.SetCachedUsers((IEnumerable<User>) res.ResultData.Users);
+          Logger.Instance.Info("OpenVK message history loaded: {0} items, {1} profiles", messages.Count, res.ResultData.Users.Count);
           int num = 1;
           List<long> list = Message.GetAssociatedUserIds(messages, num != 0).Select<long, long>((Func<long, long>) (uid => uid)).Distinct<long>().ToList<long>();
-          if (list.Count > res.ResultData.Users.Count)
-            UsersService.Instance.GetUsers(list.Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid))).ToList<long>(), (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
+          List<long> missingUserIds = list
+            .Where(uid => uid != 0L && uid > -2000000000L)
+            .Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid)))
+            .ToList<long>();
+          if (missingUserIds.Count > 0)
+            UsersService.Instance.GetUsers(missingUserIds, (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
             {
               if (resUsers.ResultCode == ResultCode.Succeeded)
-              {
-                res.ResultData.Users.AddRange((IEnumerable<User>) resUsers.ResultData);
-                callback(res);
-              }
+                res.ResultData.Users.AddRange((IEnumerable<User>) (resUsers.ResultData ?? new List<User>()));
               else
-                callback(new BackendResult<MessageListResponse, ResultCode>(resUsers.ResultCode));
+                Logger.Instance.Info("Message history profile enrichment failed; rendering messages without it.");
+              callback(res);
             }));
           else
             callback(res);
@@ -164,9 +173,9 @@ namespace VKClient.Audio.Base
       parameters["offset"] = request.Offset.ToString();
       parameters["count"] = request.Count.ToString();
       parameters["preview_length"] = request.PreviewLength.ToString();
-      parameters["fields"] = "first_name_acc,last_name_acc,online,online_mobile,photo_max,sex,friend_status,photo_200,first_name_dat,is_messages_blocked";
+      parameters["fields"] = "first_name_acc,last_name_acc,online,online_mobile,photo_max,sex,photo_200,first_name_dat,is_messages_blocked";
       parameters["extended"] = "1";
-      VKRequestsDispatcher.DispatchRequestToVK<MessageListResponse>("messages.getDialogs", parameters, (Action<BackendResult<MessageListResponse, ResultCode>>) (res =>
+      VKRequestsDispatcher.DispatchRequestToVK<MessageListResponse>("messages.getConversations", parameters, (Action<BackendResult<MessageListResponse, ResultCode>>) (res =>
       {
         if (res.ResultCode == ResultCode.Succeeded)
         {
@@ -174,8 +183,12 @@ namespace VKClient.Audio.Base
           UsersService.Instance.SetCachedUsers((IEnumerable<User>) res.ResultData.Users);
           int num = 0;
           List<long> list2 = Message.GetAssociatedUserIds(list1, num != 0).Select<long, long>((Func<long, long>) (uid => uid)).Distinct<long>().ToList<long>();
-          if (list2.Count > res.ResultData.Users.Count)
-            UsersService.Instance.GetUsers(list2.Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid))).ToList<long>(), (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
+          List<long> missingUserIds = list2
+            .Where(uid => uid != 0L && uid > -2000000000L)
+            .Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid)))
+            .ToList<long>();
+          if (missingUserIds.Count > 0)
+            UsersService.Instance.GetUsers(missingUserIds, (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
             {
               if (resUsers.ResultCode == ResultCode.Succeeded)
               {
@@ -190,7 +203,90 @@ namespace VKClient.Audio.Base
         }
         else
           callback(new BackendResult<MessageListResponse, ResultCode>(res.ResultCode));
-      }), new Func<string, MessageListResponse>(this.GetDialogInfoDataForJson), false, true, new CancellationToken?(),  null);
+      }), new Func<string, MessageListResponse>(this.GetConversationsDataForJson), false, true, new CancellationToken?(),  null);
+    }
+
+    private MessageListResponse GetConversationsDataForJson(string jsonStr)
+    {
+      GenericRoot<ConversationsWrapper> root =
+        JsonConvert.DeserializeObject<GenericRoot<ConversationsWrapper>>(jsonStr);
+      ConversationsWrapper response = root != null ? root.response : null;
+      if (response == null)
+        response = new ConversationsWrapper();
+      List<User> profiles = response.profiles ?? new List<User>();
+      foreach (VKClient.Common.Backend.DataObjects.Group group in response.groups ?? new List<VKClient.Common.Backend.DataObjects.Group>())
+      {
+        User user = new User();
+        user.InitFromGroup(group);
+        profiles.Add(user);
+      }
+
+      List<DialogHeaderInfo> dialogs = new List<DialogHeaderInfo>();
+      foreach (ConversationItem item in response.items ?? new List<ConversationItem>())
+      {
+        Message lastMessage = item.last_message ?? new Message();
+        long peerId = item.conversation != null && item.conversation.peer != null
+          ? item.conversation.peer.id
+          : (long) lastMessage.user_id;
+        // Current OpenVK responses identify a conversation through
+        // conversation.peer even when last_message is absent or lacks the
+        // legacy user_id/chat_id fields used by the WP client.
+        if (peerId >= 2000000000L && peerId < 3000000000L)
+        {
+          if (lastMessage.chat_id == 0)
+            lastMessage.chat_id = (int) (peerId - 2000000000L);
+        }
+        else if (peerId > 0L && peerId <= int.MaxValue && lastMessage.user_id == 0)
+        {
+          lastMessage.user_id = (int) peerId;
+        }
+        int unread = item.conversation != null ? item.conversation.unread_count : 0;
+        lock (this._localReadSync)
+        {
+          long readThrough;
+          if (peerId != 0L &&
+              this._locallyReadThroughMessageId.TryGetValue(peerId, out readThrough) &&
+              (long) lastMessage.id <= readThrough)
+            unread = 0;
+        }
+        dialogs.Add(new DialogHeaderInfo()
+        {
+          unread = unread,
+          message = lastMessage
+        });
+      }
+
+      return new MessageListResponse()
+      {
+        DialogHeaders = dialogs,
+        TotalCount = response.count,
+        Users = profiles
+      };
+    }
+
+    private sealed class ConversationsWrapper
+    {
+      public int count { get; set; }
+      public List<ConversationItem> items { get; set; }
+      public List<User> profiles { get; set; }
+      public List<VKClient.Common.Backend.DataObjects.Group> groups { get; set; }
+    }
+
+    private sealed class ConversationItem
+    {
+      public ConversationInfo conversation { get; set; }
+      public Message last_message { get; set; }
+    }
+
+    private sealed class ConversationInfo
+    {
+      public int unread_count { get; set; }
+      public ConversationPeer peer { get; set; }
+    }
+
+    private sealed class ConversationPeer
+    {
+      public long id { get; set; }
     }
 
     public void GetMessages(List<long> messageIds, Action<BackendResult<MessageListResponse, ResultCode>> callback)
@@ -214,11 +310,15 @@ namespace VKClient.Audio.Base
           if (res.ResultCode == ResultCode.Succeeded)
           {
             List<Message> messages = res.ResultData.Messages;
-            UsersService.Instance.SetCachedUsers((IEnumerable<User>) res.ResultData.Users);
-            int num = 1;
-            List<long> list = Message.GetAssociatedUserIds(messages, num != 0).Select<long, long>((Func<long, long>) (uid => uid)).Distinct<long>().ToList<long>();
-            if (list.Count > res.ResultData.Users.Count)
-              UsersService.Instance.GetUsers(list.Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid))).ToList<long>(), (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
+          UsersService.Instance.SetCachedUsers((IEnumerable<User>) res.ResultData.Users);
+          int num = 1;
+          List<long> list = Message.GetAssociatedUserIds(messages, num != 0).Select<long, long>((Func<long, long>) (uid => uid)).Distinct<long>().ToList<long>();
+          List<long> missingUserIds = list
+            .Where(uid => uid != 0L && uid > -2000000000L)
+            .Except<long>(res.ResultData.Users.Select<User, long>((Func<User, long>) (u => u.uid)))
+            .ToList<long>();
+          if (missingUserIds.Count > 0)
+            UsersService.Instance.GetUsers(missingUserIds, (Action<BackendResult<List<User>, ResultCode>>) (resUsers =>
               {
                 if (resUsers.ResultCode == ResultCode.Succeeded)
                 {
@@ -240,8 +340,8 @@ namespace VKClient.Audio.Base
     private MessageListResponse GetDialogInfoDataForJson(string jsonStr)
     {
       DialogWrapper response = JsonConvert.DeserializeObject<GenericRoot<DialogWrapper>>(jsonStr).response;
-      List<User> profiles = response.profiles;
-      foreach (VKClient.Common.Backend.DataObjects.Group group in response.groups)
+      List<User> profiles = response.profiles ?? new List<User>();
+      foreach (VKClient.Common.Backend.DataObjects.Group group in response.groups ?? new List<VKClient.Common.Backend.DataObjects.Group>())
       {
         User user = new User();
         user.InitFromGroup(group);
@@ -258,8 +358,8 @@ namespace VKClient.Audio.Base
     private MessageListResponse GetMessageHistoryDataForJson(string jsonStr)
     {
       MessageHistoryWrapper response = JsonConvert.DeserializeObject<GenericRoot<MessageHistoryWrapper>>(jsonStr).response;
-      List<User> profiles = response.profiles;
-      foreach (VKClient.Common.Backend.DataObjects.Group group in response.groups)
+      List<User> profiles = response.profiles ?? new List<User>();
+      foreach (VKClient.Common.Backend.DataObjects.Group group in response.groups ?? new List<VKClient.Common.Backend.DataObjects.Group>())
       {
         User user = new User();
         user.InitFromGroup(group);
@@ -267,11 +367,11 @@ namespace VKClient.Audio.Base
       }
       return new MessageListResponse()
       {
-        DialogHeaders = new List<DialogHeaderInfo>(response.items.Select<Message, DialogHeaderInfo>((Func<Message, DialogHeaderInfo>) (m => new DialogHeaderInfo()
+        DialogHeaders = new List<DialogHeaderInfo>((response.items ?? new List<Message>()).Select<Message, DialogHeaderInfo>((Func<Message, DialogHeaderInfo>) (m => new DialogHeaderInfo()
         {
           message = m
         }))),
-        Messages = response.items,
+        Messages = response.items ?? new List<Message>(),
         Skipped = response.skipped,
         Unread = response.unread,
         TotalCount = response.count,
@@ -374,17 +474,21 @@ namespace VKClient.Audio.Base
 
     public void MarkAsRead(List<long> messageIds, long peerId, Action<BackendResult<ResponseWithId, ResultCode>> callback)
     {
-      if (messageIds.IsNullOrEmpty())
+      if (!messageIds.IsNullOrEmpty() && peerId != 0L)
       {
-        callback(new BackendResult<ResponseWithId, ResultCode>(ResultCode.Succeeded));
+        long newestReadId = messageIds.Max();
+        lock (this._localReadSync)
+        {
+          long previousReadId;
+          if (!this._locallyReadThroughMessageId.TryGetValue(peerId, out previousReadId) ||
+              newestReadId > previousReadId)
+            this._locallyReadThroughMessageId[peerId] = newestReadId;
+        }
       }
-      else
-      {
-        Dictionary<string, string> parameters = new Dictionary<string, string>();
-        parameters["peer_id"] = peerId.ToString();
-        parameters["start_message_id"] = messageIds.Max().ToString();
-        VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("messages.markAsRead", parameters, callback, new Func<string, ResponseWithId>(JsonConvert.DeserializeObject<ResponseWithId>), false, true, new CancellationToken?(),  null);
-      }
+      // OpenVK master currently has no messages.markAsRead handler. Retain a
+      // per-peer read-through marker so refreshed conversation lists do not
+      // resurrect the same unread badge; a later message id becomes unread.
+      callback(new BackendResult<ResponseWithId, ResultCode>(ResultCode.Succeeded, new ResponseWithId() { response = 1 }));
     }
 
     public void SetUserIsTyping(long userOrChatId, bool isChatId, Action<BackendResult<ResponseWithId, ResultCode>> callback)

@@ -27,7 +27,7 @@ namespace VKClient.Common.Shared
     {
       get
       {
-        return this._group.photo_100;
+        return this._group.UiAvatarMedium;
       }
     }
 

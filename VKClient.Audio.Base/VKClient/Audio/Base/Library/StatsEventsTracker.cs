@@ -48,31 +48,15 @@ namespace VKClient.Audio.Base.Library
 
     private void HandleEvent(object message, bool forceNow, bool preventProcessing = false)
     {
-      Execute.ExecuteOnUIThread((Action) (() =>
-      {
-        Logger.Instance.Info("StatsEventsTracker.HandleEvent: " + message.ToString());
-        this._pendingEvents.Add(message);
-        if (((this._pendingEvents.Count < StatsEventsTracker.SEND_THRESHOLD ? 0 : (!preventProcessing ? 1 : 0)) | (forceNow ? 1 : 0)) == 0 && !AppGlobalStateManager.Current.GlobalState.ForceStatsSend)
-          return;
-        this.SendEvents();
-      }));
+      // OpenVK does not implement stats.trackEvents. Keeping these events in
+      // memory only leads to repeated failed execute requests and extra work on
+      // the UI thread, so analytics is deliberately disabled for this client.
+      this._pendingEvents.Clear();
     }
 
     private void SendEvents()
     {
-      List<object> inProgressEvents = new List<object>();
-      this._pendingEvents = this._pendingEvents.Where<object>((Func<object, bool>) (pe => (pe as StatEventBase).ShouldSendImmediately)).Concat<object>(this._pendingEvents.Where<object>((Func<object, bool>) (pe => !(pe as StatEventBase).ShouldSendImmediately))).ToList<object>();
-      List<AppEventBase> appEvents = StatsEventsTracker.ConvertToAppEvents((IEnumerable<object>) this._pendingEvents);
-      inProgressEvents.AddRange((IEnumerable<object>) this._pendingEvents);
       this._pendingEvents.Clear();
-      if (appEvents.Count <= 0)
-        return;
-      AccountService.Instance.StatsTrackEvents(appEvents, (Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>>) (res =>
-      {
-        if (res.ResultCode == ResultCode.Succeeded)
-          return;
-        Execute.ExecuteOnUIThread((Action) (() => this._pendingEvents.AddRange((IEnumerable<object>) inProgressEvents)));
-      }));
     }
 
     public static List<AppEventBase> ConvertToAppEvents(IEnumerable<object> enumerable)
@@ -526,20 +510,12 @@ namespace VKClient.Audio.Base.Library
 
     public void Handle(AdImpressionEvent message)
     {
-      if (this._handledAdImpressionEvents.Any<Tuple<DateTime, AdImpressionEvent>>((Func<Tuple<DateTime, AdImpressionEvent>, bool>) (t =>
-      {
-        if ((DateTime.Now - t.Item1).TotalMinutes <= 5.0)
-          return t.Item2.AdDataImpression == message.AdDataImpression;
-        return false;
-      })))
-        return;
-      this.HandleEvent((StatEventBase) message);
-      this._handledAdImpressionEvents.Add(new Tuple<DateTime, AdImpressionEvent>(DateTime.Now, message));
+      // Advertising statistics endpoints are not part of the OpenVK API.
     }
 
     public void Handle(AdPixelEvent message)
     {
-      this.LoadUris(message.UrlToLoad);
+      // Do not download third-party tracking pixels for unsupported VK ads.
     }
 
     private void LoadUris(List<string> list)

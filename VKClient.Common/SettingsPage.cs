@@ -73,7 +73,10 @@ namespace VKClient.Common
 
         private void Privacy_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            Navigator.Current.NavigateToSettingsPrivacy();
+            new WebBrowserTask
+            {
+                Uri = new Uri(VKConstants.OpenVKWebAddress + "/privacy", UriKind.Absolute)
+            }.Show();
         }
 
         private void Blacklist_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
@@ -98,7 +101,12 @@ namespace VKClient.Common
 
         private void Support_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            Navigator.Current.NavigateToHelpPage();
+            string supportUri = AppGlobalStateManager.Current.GlobalState.SupportUri;
+            Uri uri;
+            if (string.IsNullOrWhiteSpace(supportUri) ||
+                !Uri.TryCreate(supportUri, UriKind.Absolute, out uri))
+                uri = new Uri(VKConstants.OpenVKWebAddress, UriKind.Absolute);
+            new WebBrowserTask { Uri = uri }.Show();
         }
 
         private void About_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
@@ -110,6 +118,8 @@ namespace VKClient.Common
         {
             if (MessageBox.Show(CommonResources.Settings_LogOutMessage, CommonResources.Settings_LogOutTitle, MessageBoxButton.OKCancel) != MessageBoxResult.OK)
                 return;
+            ImageCache.Current.Clear();
+            CacheManager.ClearCachedData();
             ((Page)this).NavigationService.Navigate(new Uri("/WelcomePage.xaml", UriKind.Relative));
         }
 

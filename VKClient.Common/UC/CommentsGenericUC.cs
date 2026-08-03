@@ -49,6 +49,8 @@ namespace VKClient.Common.UC
     internal TextBlock textBlockError;
     private bool _contentLoaded;
 
+    public bool HideCommentsSection { get; set; }
+
     private ISupportCommentsAndLikes VM
     {
       get
@@ -391,15 +393,18 @@ label_6:
             virtualizableList.Add((IVirtualizable) this._moreVideosUCItem);
           }
         }
-        int totalCommentsCount = this.VM.TotalCommentsCount;
-        this._commentsCountSeparatorUC = new TextSeparatorUC()
+        if (!this.HideCommentsSection)
         {
-          Text = CommentsItemsGeneratorHelper.GetTextForCommentsCount(totalCommentsCount)
-        };
-        this._commentsCountItem = new UCItem(480.0, new Thickness(), (Func<UserControlVirtualizable>)(() => (UserControlVirtualizable)this._commentsCountSeparatorUC), (Func<double>)(() => 56.0), null, 0.0, false);
-        virtualizableList.Add((IVirtualizable) this._commentsCountItem);
+          int totalCommentsCount = this.VM.TotalCommentsCount;
+          this._commentsCountSeparatorUC = new TextSeparatorUC()
+          {
+            Text = CommentsItemsGeneratorHelper.GetTextForCommentsCount(totalCommentsCount)
+          };
+          this._commentsCountItem = new UCItem(480.0, new Thickness(), (Func<UserControlVirtualizable>)(() => (UserControlVirtualizable)this._commentsCountSeparatorUC), (Func<double>)(() => 56.0), null, 0.0, false);
+          virtualizableList.Add((IVirtualizable) this._commentsCountItem);
+        }
       }
-      if (this.CommentsCountForReload > 0 && !ListExtensions.IsNullOrEmpty((IList) this.VM.Comments))
+      if (!this.HideCommentsSection && this.CommentsCountForReload > 0 && !ListExtensions.IsNullOrEmpty((IList) this.VM.Comments))
       {
         ShowMoreCommentsUC showMoreCommentsUc = new ShowMoreCommentsUC();
         double num = 54.0;
@@ -416,7 +421,7 @@ label_6:
       CommentItem commentItem1 = Enumerable.FirstOrDefault<IVirtualizable>(this.virtPanel.VirtualizableItems, (Func<IVirtualizable, bool>)(i => i is CommentItem)) as CommentItem;
       if (commentItem1 != null)
         num5 = commentItem1.Comment.cid;
-      List<Comment>.Enumerator enumerator1 = this.VM.Comments.GetEnumerator();
+      List<Comment>.Enumerator enumerator1 = (this.HideCommentsSection ? new List<Comment>() : this.VM.Comments).GetEnumerator();
       try
       {
         while (enumerator1.MoveNext())

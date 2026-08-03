@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -55,7 +56,7 @@ namespace VKClient.Common.Library.VirtItems
             this._notification = notification;
             this._users = users;
             this._groups = groups;
-            this._showEarlierReplies = false;
+            this._showEarlierReplies = showEarliesReplies;
             this.GenerateLayout();
         }
 
@@ -63,18 +64,109 @@ namespace VKClient.Common.Library.VirtItems
         {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            if (this._notification.ParsedFeedback is List<FeedbackUser>)
-                this.ProcessUserFeedback((List<long>)Enumerable.ToList<long>(Enumerable.Select<FeedbackUser, long>((this._notification.ParsedFeedback as List<FeedbackUser>), (Func<FeedbackUser, long>)(u => u.owner_id))));
-            else if (this._notification.ParsedFeedback is List<FeedbackCopyInfo>)
-                this.ProcessUserFeedback((List<long>)Enumerable.ToList<long>(Enumerable.Select<FeedbackCopyInfo, long>((this._notification.ParsedFeedback as List<FeedbackCopyInfo>), (Func<FeedbackCopyInfo, long>)(u => u.owner_id))));
-            else if (this._notification.ParsedFeedback is WallPost)
+            object parsedFeedback = this._notification.ParsedFeedback;
+            if (this.ShouldShowActorCard() && this._notification.actor_id != 0L)
+                this.ProcessActor(this._notification.actor_id);
+            else if (parsedFeedback is List<FeedbackUser>)
+                this.ProcessUserFeedback((List<long>)Enumerable.ToList<long>(Enumerable.Select<FeedbackUser, long>((parsedFeedback as List<FeedbackUser>), (Func<FeedbackUser, long>)(u => u.owner_id))));
+            else if (parsedFeedback is List<FeedbackCopyInfo>)
+                this.ProcessUserFeedback((List<long>)Enumerable.ToList<long>(Enumerable.Select<FeedbackCopyInfo, long>((parsedFeedback as List<FeedbackCopyInfo>), (Func<FeedbackCopyInfo, long>)(u => u.owner_id))));
+            else if (parsedFeedback is WallPost)
                 this.ProcessWallPostFeedback();
-            else if (this._notification.ParsedFeedback is Comment)
+            else if (parsedFeedback is Comment)
                 this.ProcessCommentFeedback();
-            else if (this._notification.ParsedFeedback is MoneyTransfer)
+            else if (parsedFeedback is MoneyTransfer)
                 this.ProcessMoneyTransfer();
+            else if (parsedFeedback is User)
+                this.ProcessDirectUser(parsedFeedback as User);
+            else if (this._notification.ParsedParent is User)
+                this.ProcessDirectUser(this._notification.ParsedParent as User);
+            else if (this._notification.ParsedParent is Group)
+                this.ProcessDirectGroup(this._notification.ParsedParent as Group);
+            else
+                this.ProcessGenericFeedback();
             this._fixedHeight = this._fixedHeight + 2.0;
             stopwatch.Stop();
+        }
+
+        private bool ShouldShowActorCard()
+        {
+            switch (this._notification.NotType)
+            {
+                case NotificationType.copy_post:
+                case NotificationType.copy_photo:
+                case NotificationType.copy_video:
+                case NotificationType.comment_post:
+                case NotificationType.comment_photo:
+                case NotificationType.comment_video:
+                case NotificationType.mention:
+                case NotificationType.mention_comments:
+                case NotificationType.mention_comment_photo:
+                case NotificationType.mention_comment_video:
+                case NotificationType.wall:
+                case NotificationType.wall_publish:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void ProcessActor(long actorId)
+        {
+            if (actorId > 0L)
+            {
+                this.ProcessUserFeedback(new List<long>() { actorId });
+                return;
+            }
+            Group group = this._groups.FirstOrDefault(g => g.id == -actorId);
+            if (group != null)
+                this.ProcessDirectGroup(group);
+            else
+                this.ProcessGenericFeedback();
+        }
+
+        private void ProcessDirectUser(User user)
+        {
+            if (user == null)
+            {
+                this.ProcessGenericFeedback();
+                return;
+            }
+            if (!this._users.Any(u => u.uid == user.uid))
+                this._users.Add(user);
+            this.ProcessUserFeedback(new List<long>() { user.uid });
+        }
+
+        private void ProcessDirectGroup(Group group)
+        {
+            if (group == null)
+            {
+                this.ProcessGenericFeedback();
+                return;
+            }
+            User groupAsUser = new User()
+            {
+                id = -group.id,
+                first_name = group.name,
+                photo_max = group.UiAvatarSmall
+            };
+            if (!this._users.Any(u => u.uid == groupAsUser.uid))
+                this._users.Add(groupAsUser);
+            this.ProcessUserFeedback(new List<long>() { groupAsUser.uid });
+        }
+
+        private void ProcessGenericFeedback()
+        {
+            this._userNotTemplate = new UserNotificationTemplateUC();
+            this._userNotTemplate.Margin = new Thickness(0.0, 16.0, 0.0, 16.0);
+            this._fixedHeight = this._userNotTemplate.ConfigureGeneric(
+                this.GetGenericDisplayText(),
+                UIStringFormatterHelper.FormatDateTimeForUI(this._notification.Date),
+                this.GetThumb(),
+                this._notification.NotType,
+                this._showEarlierReplies) + 16.0;
+            this._userNotTemplate.Tap +=
+                ((EventHandler<System.Windows.Input.GestureEventArgs>)((s, e) => this.ProcessNavigationTap()));
         }
 
         private void ProcessCommentFeedback()
@@ -99,7 +191,18 @@ namespace VKClient.Common.Library.VirtItems
 
         private void ProcessNavigationTap()
         {
-            if (this._notification.ParsedParent is WallPost || this._notification.ParsedParent is Comment)
+            if (this._notification.NotType == NotificationType.sent_gift)
+            {
+                Navigator.Current.NavigateToGifts(AppGlobalStateManager.Current.LoggedInUserId, "", "");
+                return;
+            }
+            WallPost feedbackPost = this._notification.ParsedFeedback as WallPost;
+            if (feedbackPost != null)
+            {
+                Navigator.Current.NavigateToWallPostComments(
+                    feedbackPost.id, feedbackPost.to_id, true, 0, 0, "");
+            }
+            else if (this._notification.ParsedParent is WallPost || this._notification.ParsedParent is Comment)
             {
                 WallPost wallPost = this._notification.ParsedParent as WallPost;
                 if (wallPost == null)
@@ -152,6 +255,16 @@ namespace VKClient.Common.Library.VirtItems
                 Topic parsedParent = this._notification.ParsedParent as Topic;
                 Navigator.Current.NavigateToGroupDiscussion(-parsedParent.owner_id, parsedParent.tid, parsedParent.title, parsedParent.comments, true, parsedParent.is_closed == 0);
             }
+            else if (this._notification.ParsedParent is User)
+            {
+                User user = this._notification.ParsedParent as User;
+                Navigator.Current.NavigateToUserProfile(user.uid, user.Name, "", false);
+            }
+            else if (this._notification.ParsedParent is Group)
+            {
+                Group group = this._notification.ParsedParent as Group;
+                Navigator.Current.NavigateToGroup(group.id, group.name, false);
+            }
             else
             {
                 if (!(this._notification.ParsedFeedback is MoneyTransfer))
@@ -201,8 +314,15 @@ namespace VKClient.Common.Library.VirtItems
             this._userNotTemplate.Margin = new Thickness(0.0, 16.0, 0.0, 16.0);
             stopwatch.Stop();
             if (userIds == null || userIds.Count == 0 || Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == userIds[0])) == null)
+            {
+                this.ProcessGenericFeedback();
                 return;
-            this._fixedHeight = this._userNotTemplate.Configure((List<User>)Enumerable.ToList<User>(Enumerable.Select<long, User>(Enumerable.Take<long>(userIds, 6), (Func<long, User>)(fu => (User)Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == fu))))), this.GetLocalizableText(), UIStringFormatterHelper.FormatDateTimeForUI(this._notification.Date), this.GetHighlightedText(), this.GetThumb(), this._notification.NotType, userIds.Count, this._showEarlierReplies, null) + 16.0;
+            }
+            List<User> resolvedUsers = userIds.Take(6)
+                .Select(fu => this._users.FirstOrDefault(u => u.uid == fu))
+                .Where(u => u != null)
+                .ToList();
+            this._fixedHeight = this._userNotTemplate.Configure(resolvedUsers, this.GetLocalizableText(), UIStringFormatterHelper.FormatDateTimeForUI(this._notification.Date), this.GetHighlightedText(), this.GetThumb(), this._notification.NotType, userIds.Count, this._showEarlierReplies, null) + 16.0;
             this._userNotTemplate.Tap += ((EventHandler<System.Windows.Input.GestureEventArgs>)((s, e) => this.ProcessNavigationTap()));
         }
 
@@ -221,7 +341,7 @@ namespace VKClient.Common.Library.VirtItems
                     {
                         id = -group.id,
                         first_name = group.name,
-                        photo_max = group.photo_200
+                photo_max = group.UiAvatarSmall
                     };
                 if (user == null)
                     return;
@@ -278,7 +398,8 @@ namespace VKClient.Common.Library.VirtItems
 
         private string GetThumb()
         {
-            WallPost parsedParent1 = this._notification.ParsedParent as WallPost;
+            WallPost parsedParent1 = this._notification.ParsedParent as WallPost ??
+                                     this._notification.ParsedFeedback as WallPost;
             if (parsedParent1 != null && !((IList)parsedParent1.attachments).IsNullOrEmpty())
             {
                 Attachment attachment = (Attachment)Enumerable.FirstOrDefault<Attachment>(parsedParent1.attachments, (Func<Attachment, bool>)(a =>
@@ -316,7 +437,8 @@ namespace VKClient.Common.Library.VirtItems
 
         private string GetHighlightedText()
         {
-            WallPost parsedParent1 = this._notification.ParsedParent as WallPost;
+            WallPost parsedParent1 = this._notification.ParsedParent as WallPost ??
+                                     this._notification.ParsedFeedback as WallPost;
             if (parsedParent1 != null)
             {
                 if (!string.IsNullOrEmpty(parsedParent1.text))
@@ -354,6 +476,8 @@ namespace VKClient.Common.Library.VirtItems
             if (this._notification.ParsedFeedback is List<FeedbackUser>)
             {
                 List<FeedbackUser> list = this._notification.ParsedFeedback as List<FeedbackUser>;
+                if (list.Count == 0)
+                    return 0;
                 if (list.Count > 1)
                     return 2;
                 user = (User)Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == list[0].owner_id));
@@ -363,6 +487,8 @@ namespace VKClient.Common.Library.VirtItems
             else if (this._notification.ParsedFeedback is List<FeedbackCopyInfo>)
             {
                 List<FeedbackCopyInfo> list = this._notification.ParsedFeedback as List<FeedbackCopyInfo>;
+                if (list.Count == 0)
+                    return 0;
                 if (list.Count > 1)
                     return 2;
                 user = (User)Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == list[0].owner_id));
@@ -372,8 +498,30 @@ namespace VKClient.Common.Library.VirtItems
                 MoneyTransfer moneyTransfer = (MoneyTransfer)this._notification.ParsedFeedback;
                 user = moneyTransfer.IsOutbox ? (User)Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == moneyTransfer.to_id)) : (User)Enumerable.FirstOrDefault<User>(this._users, (Func<User, bool>)(u => u.uid == moneyTransfer.from_id));
             }
-            Logger.Instance.Assert(user != null, "User is null in GetGender");
+            else if (this._notification.ParsedFeedback is User)
+                user = this._notification.ParsedFeedback as User;
+            else if (this._notification.ParsedParent is User)
+                user = this._notification.ParsedParent as User;
             return user != null && user.sex == 1 ? 1 : 0;
+        }
+
+        private bool IsRussianUi
+        {
+            get { return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"; }
+        }
+
+        private string GetGenericDisplayText()
+        {
+            string action = this.GetLocalizableText();
+            if (!string.IsNullOrWhiteSpace(action))
+            {
+                if (this._notification.NotType == NotificationType.copy_post)
+                    return (this.IsRussianUi ? "Кто-то " : "Someone ") + action;
+                return action;
+            }
+            return this.IsRussianUi
+                ? "Новое уведомление OpenVK"
+                : "New OpenVK notification";
         }
 
         private string GetLocalizableText()
@@ -410,6 +558,11 @@ namespace VKClient.Common.Library.VirtItems
                             break;
                     }
                     break;//
+                case NotificationType.mention:
+                    str = this.IsRussianUi
+                        ? "упомянул(а) вас в записи"
+                        : "mentioned you in a post";
+                    break;
                 case NotificationType.mention_comments:
                     if (gender != 0)
                     {
@@ -421,6 +574,11 @@ namespace VKClient.Common.Library.VirtItems
                         break;
                     }
                     str = CommonResources.Notification_MentionCommentsMale;
+                    break;
+                case NotificationType.wall:
+                    str = this.IsRussianUi
+                        ? "оставил(а) запись на вашей стене"
+                        : "posted on your wall";
                     break;
                 case NotificationType.comment_post:
                     str = CommonResources.Notification_CommentPost;
@@ -574,6 +732,24 @@ namespace VKClient.Common.Library.VirtItems
                 case NotificationType.money_transfer_declined:
                     MoneyTransfer parsedFeedback3 = (MoneyTransfer)this._notification.ParsedFeedback;
                     str = string.Format(gender == 0 ? CommonResources.MoneyTransferDeclinedMale : CommonResources.MoneyTransferDeclinedFemale, ((string)parsedFeedback3.amount.text).Replace(' ', ' '));
+                    break;
+                case NotificationType.sent_gift:
+                    str = this.IsRussianUi ? "отправил(а) вам подарок" : "sent you a gift";
+                    break;
+                case NotificationType.voices_transfer:
+                    str = this.IsRussianUi ? "перевёл(а) вам голоса" : "sent you voices";
+                    break;
+                case NotificationType.up_rating:
+                    str = this.IsRussianUi ? "повысил(а) ваш рейтинг" : "increased your rating";
+                    break;
+                case NotificationType.make_you_admin:
+                    str = this.IsRussianUi ? "назначило вас администратором" : "made you an administrator";
+                    break;
+                case NotificationType.new_posts_in_club:
+                    str = this.IsRussianUi ? "опубликовало новые записи" : "published new posts";
+                    break;
+                case NotificationType.wall_publish:
+                    str = this.IsRussianUi ? "опубликовал(а) запись на вашей стене" : "posted on your wall";
                     break;
             }
             return str;

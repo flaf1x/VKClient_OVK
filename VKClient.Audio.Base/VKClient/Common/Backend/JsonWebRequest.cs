@@ -393,7 +393,7 @@ namespace VKClient.Common.Backend
                 {
                     string stringContent = Encoding.UTF8.GetString(asyncState.readBytes.ToArray(), 0, asyncState.readBytes.Count);
                     JsonWebRequest.SafeClose(asyncState);
-                    Logger.Instance.Info("<<<<<<<<<<<<JSONWebRequest duration {0} ms. URI {1} ---->>>>> {2}", (DateTime.Now - asyncState.startTime).TotalMilliseconds, ((WebRequest)asyncState.request).RequestUri.OriginalString, stringContent);
+                    Logger.Instance.Info("<<<<<<<<<<<<JSONWebRequest duration {0} ms. URI {1}; response length = {2}", (DateTime.Now - asyncState.startTime).TotalMilliseconds, ((WebRequest)asyncState.request).RequestUri.AbsolutePath, stringContent != null ? stringContent.Length : 0);
                     JsonWebRequest.SafeInvokeCallback(asyncState.resultCallback, true, stringContent);
                 }
             }
@@ -439,7 +439,21 @@ namespace VKClient.Common.Backend
         {
             string str = "";
             foreach (KeyValuePair<string, string> parameter in parameters)
-                str = str + parameter.Key + " = " + parameter.Value + Environment.NewLine;
+            {
+                string key = parameter.Key ?? "";
+                bool isSensitive = key.Equals("access_token", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("password", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("username", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("sig", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("code", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("message", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("text", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("attachment", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("attachments", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("photo", StringComparison.OrdinalIgnoreCase) ||
+                                   key.Equals("hash", StringComparison.OrdinalIgnoreCase);
+                str = str + key + " = " + (isSensitive ? "<redacted>" : parameter.Value) + Environment.NewLine;
+            }
             return str;
         }
 

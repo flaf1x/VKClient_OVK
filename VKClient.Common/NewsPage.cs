@@ -60,8 +60,6 @@ namespace VKClient.Common
         {
             get
             {
-                if ((FramePageUtils.CurrentPage).GetType() == (this).GetType() && ((UIElement)MenuUC.Instance).Opacity <= 0.0 && !this.ImageViewerDecorator.IsShown)
-                    return this._photoFeedMoveTutorialDialog == null;
                 return false;
             }
         }
@@ -543,10 +541,5 @@ namespace VKClient.Common
             Navigator.Current.NavigateToNewWallPost(0, false, 0, false, false, false);
         }
 
-        private void StackPanel_Tap_1(object sender, System.Windows.Input.GestureEventArgs e)
-        {
-            Dictionary<string, string> s = new Dictionary<string, string>();
-            VKRequestsDispatcher.DispatchRequestToVK2("stories.get", s);
-        }
     }
 }

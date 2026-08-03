@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Windows;
 using VKClient.Audio.Base.DataObjects;
+using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
 using VKClient.Common.Library;
@@ -68,7 +69,7 @@ namespace VKClient.Common.Profiles.Users.ViewModels
       {
         if (this._userData == null)
           return true;
-        return ProfileHeaderViewModelBase.IsValidAvatarUrl(this.ProfileImageUrl ?? this._userData.user.photo_max ?? this._userData.user.photo_big);
+        return ProfileHeaderViewModelBase.IsValidAvatarUrl(this.ProfileImageUrl ?? this._userData.user.UiAvatarLarge ?? this._userData.user.photo_big);
       }
     }
 
@@ -185,9 +186,15 @@ namespace VKClient.Common.Profiles.Users.ViewModels
       this.ProfileImageClipRect = new Rect(0.0, 0.0, 480.0, 320.0);
       this.ProfileImageMargin = new Thickness(0.0);
       this.UpdateProfilePhoto(480.0, 1.5);
-      if (this._userData == null || AppGlobalStateManager.Current.LoggedInUserId != this._userData.Id || (AppGlobalStateManager.Current.GlobalState.LoggedInUser == null || !(AppGlobalStateManager.Current.GlobalState.LoggedInUser.photo_max != this._userData.user.photo_max)))
+      if (this._userData == null ||
+          this._userData.user == null ||
+          AppGlobalStateManager.Current.LoggedInUserId != this._userData.Id)
         return;
-      AppGlobalStateManager.Current.GlobalState.LoggedInUser.photo_max = this._userData.user.photo_max;
+
+      // Keep the menu identity in sync with the complete users.get response,
+      // not just with the avatar returned by the lightweight base-data call.
+      AppGlobalStateManager.Current.GlobalState.LoggedInUser = this._userData.user;
+      UsersService.Instance.SetCachedUser(this._userData.user);
       EventAggregator.Current.Publish(new BaseDataChangedEvent());
     }
 
@@ -274,7 +281,7 @@ namespace VKClient.Common.Profiles.Users.ViewModels
       }
       else
       {
-        avatarUrl = this._userData.user.photo_max ?? this._userData.user.photo_big;
+        avatarUrl = this._userData.user.UiAvatarLarge ?? this._userData.user.photo_big;
         this.ProfileImageWidth = (int) width;
         this.ProfileImageHeight = (int) requiredHeight;
       }

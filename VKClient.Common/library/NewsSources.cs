@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Localization;
@@ -10,9 +11,22 @@ namespace VKClient.Common.Library
 {
   public class NewsSources
   {
-    public static PickableNewsfeedSourceItemViewModel NewsFeed = new PickableNewsfeedSourceItemViewModel(new PickableItem() { ID = -10L, Name = CommonResources.NEWS.ToLowerInvariant(), ImageSource = new Uri("/Resources/NotUsed", UriKind.Relative) });
+    public static PickableNewsfeedSourceItemViewModel NewsFeed = new PickableNewsfeedSourceItemViewModel(new PickableItem() { ID = -10L, Name = GetFeedTitle(false), Alias = GetFeedTitle(false), ImageSource = new Uri("/Resources/NotUsed", UriKind.Relative) });
 
-    public static PickableNewsfeedSourceItemViewModel Suggestions = new PickableNewsfeedSourceItemViewModel(new PickableItem() { ID = -9L, Name = CommonResources.NewsFeedSuggestions, Alias = CommonResources.NewsFeedSuggestions });
+    public static PickableNewsfeedSourceItemViewModel Suggestions = new PickableNewsfeedSourceItemViewModel(new PickableItem() { ID = -9L, Name = GetFeedTitle(true), Alias = GetFeedTitle(true) });
+
+    private static string GetFeedTitle(bool global)
+    {
+      switch (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)
+      {
+        case "ru": return global ? "Глобальная лента" : "Моя лента";
+        case "uk": return global ? "Глобальна стрічка" : "Моя стрічка";
+        case "be": return global ? "Глабальная стужка" : "Мая стужка";
+        case "kk": return global ? "Ғаламдық таспа" : "Менің таспам";
+        case "pt": return global ? "Feed global" : "Meu feed";
+        default: return global ? "Global feed" : "My feed";
+      }
+    }
 
     public static PickableNewsfeedSourceItemViewModel Photos = new PickableNewsfeedSourceItemViewModel(new PickableItem() { ID = -101L, Name = CommonResources.MainMenu_Photos.ToLowerInvariant(), Alias = CommonResources.MainMenu_Photos.ToLowerInvariant() });
 
@@ -39,76 +53,12 @@ namespace VKClient.Common.Library
       observableCollection.Add(newsFeed);
       PickableNewsfeedSourceItemViewModel suggestions = NewsSources.Suggestions;
       observableCollection.Add(suggestions);
-      PickableNewsfeedSourceItemViewModel friends = NewsSources.Friends;
-      observableCollection.Add(friends);
-      PickableNewsfeedSourceItemViewModel photos = NewsSources.Photos;
-      observableCollection.Add(photos);
-      PickableNewsfeedSourceItemViewModel videos = NewsSources.Videos;
-      observableCollection.Add(videos);
       return observableCollection;
     }
 
     public static ObservableCollection<PickableNewsfeedSourceItemViewModel> GetNewsSources(NewsFeedSectionsAndLists sectionsAndLists, PickableItem currentNewsSource = null)
     {
-      ObservableCollection<PickableNewsfeedSourceItemViewModel> predefinedNewsSources = NewsSources.GetPredefinedNewsSources();
-      if (currentNewsSource != null)
-      {
-        switch ((NewsSourcesPredefined) currentNewsSource.ID)
-        {
-          case NewsSourcesPredefined.Friends:
-            predefinedNewsSources.Add(NewsSources.Friends);
-            break;
-          case NewsSourcesPredefined.Communities:
-            predefinedNewsSources.Add(NewsSources.Groups);
-            break;
-          case NewsSourcesPredefined.Photo:
-            predefinedNewsSources.Add(NewsSources.Photos);
-            break;
-          case NewsSourcesPredefined.Video:
-            predefinedNewsSources.Add(NewsSources.Videos);
-            break;
-        }
-      }
-      List<NewsFeedSection> newsFeedSectionList = (sectionsAndLists != null ? sectionsAndLists.sections :  null) ?? new List<NewsFeedSection>();
-      if (newsFeedSectionList != null)
-      {
-        foreach (NewsFeedSection newsFeedSection in newsFeedSectionList)
-        {
-          if (newsFeedSection.enabled == 1)
-          {
-            string name = newsFeedSection.name;
-            if (!(name == "photos"))
-            {
-              if (!(name == "videos"))
-              {
-                if (!(name == "friends"))
-                {
-                  if (name == "groups" && !predefinedNewsSources.Contains(NewsSources.Groups))
-                    predefinedNewsSources.Insert(Math.Min(4, predefinedNewsSources.Count), NewsSources.Groups);
-                }
-                else if (!predefinedNewsSources.Contains(NewsSources.Friends))
-                  predefinedNewsSources.Insert(Math.Min(4, predefinedNewsSources.Count), NewsSources.Friends);
-              }
-              else if (!predefinedNewsSources.Contains(NewsSources.Videos))
-                predefinedNewsSources.Insert(Math.Min(3, predefinedNewsSources.Count), NewsSources.Videos);
-            }
-            else if (!predefinedNewsSources.Contains(NewsSources.Photos))
-              predefinedNewsSources.Insert(Math.Min(2, predefinedNewsSources.Count), NewsSources.Photos);
-          }
-        }
-      }
-      List<NewsFeedList> newsFeedListList = (sectionsAndLists != null ? sectionsAndLists.lists :  null) ?? new List<NewsFeedList>();
-      if (newsFeedListList != null)
-      {
-        foreach (NewsFeedList newsFeedList in newsFeedListList)
-          predefinedNewsSources.Add(new PickableNewsfeedSourceItemViewModel(new PickableItem()
-          {
-            ID = newsFeedList.id,
-            Name = newsFeedList.title,
-            Alias = newsFeedList.title
-          }));
-      }
-      return predefinedNewsSources;
+      return NewsSources.GetPredefinedNewsSources();
     }
   }
 }

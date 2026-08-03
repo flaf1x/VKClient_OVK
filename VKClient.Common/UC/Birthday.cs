@@ -20,7 +20,7 @@ namespace VKClient.Common.UC
     {
       get
       {
-        return this.User.photo_max;
+        return this.User.UiAvatarSmall;
       }
     }
 

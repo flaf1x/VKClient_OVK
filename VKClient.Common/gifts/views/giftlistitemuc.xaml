@@ -136,7 +136,7 @@
                    Height="24" />
 
         <Grid Height="64"
-              Visibility="{Binding SendBackVisibility}">
+              Visibility="Collapsed">
             <Rectangle Height="1"
                        VerticalAlignment="Top"
                        Margin="16 0"

@@ -339,7 +339,9 @@ namespace VKMessenger.Views
             // ISSUE: method pointer
             ((UIElement)this.ucNewPost.TextBoxPost).LostFocus += (new RoutedEventHandler((this.textBoxNewMessage_LostFocus)));
             this.ucNewPost.TextBlockWatermarkText.Text = CommonResources.Group_SendAMessage;
-            this.ucNewMessage.OnAddAttachTap = new Action(this.AddAttachTap);
+            // Messages on OpenVK support text and emoji/stickers only in this client.
+            this.ucNewMessage.OnAddAttachTap = null;
+            this.ucNewMessage.SetAttachmentsAndVoiceAvailable(false);
             this.ucNewMessage.OnSendTap = new Action(this.SendTap);
             this.ucNewMessage.PanelControl.IsOpenedChanged += new EventHandler<bool>(this.PanelOpenClosed);
             Binding binding = new Binding("OutboundMessageVM.Attachments");
@@ -407,7 +409,8 @@ namespace VKMessenger.Views
 
         private void _appbarMenuItemShowMaterials_Click(object sender, EventArgs e)
         {
-            Navigator.Current.NavigateToConversationMaterials(MessagesService.Instance.GetPeerId(this.ConversationVM.UserOrCharId, this.ConversationVM.IsChat));
+            // Showing conversation attachments is not available in the OpenVK client.
+            return;
         }
 
         private void _appBarMenuItemDisableEnableNotifications_Click(object sender, EventArgs e)
@@ -456,12 +459,25 @@ namespace VKMessenger.Views
 
         private void _appBarButtonAddAttachment_Click(object sender, EventArgs e)
         {
-            this._pickerUC = PickerUC.PickAttachmentTypeAndNavigate(AttachmentTypes.AttachmentTypesWithPhotoFromGalleryAndLocation, null, (() => Navigator.Current.NavigateToPhotoPickerPhotos(10, false, false)));
+            List<NamedAttachmentType> attachmentTypes = AttachmentTypes.AttachmentTypesWithPhotoFromGalleryAndLocation
+                .Where(type => !IsDocumentAttachmentType(type.AttachmentType) &&
+                               type.AttachmentType != VKClient.Common.Library.Posts.AttachmentType.Location)
+                .ToList();
+            this._pickerUC = PickerUC.PickAttachmentTypeAndNavigate(attachmentTypes, null, (() => Navigator.Current.NavigateToPhotoPickerPhotos(10, false, false)));
+        }
+
+        private static bool IsDocumentAttachmentType(VKClient.Common.Library.Posts.AttachmentType attachmentType)
+        {
+            return attachmentType == VKClient.Common.Library.Posts.AttachmentType.Document ||
+                   attachmentType == VKClient.Common.Library.Posts.AttachmentType.DocumentFromPhone ||
+                   attachmentType == VKClient.Common.Library.Posts.AttachmentType.DocumentMy ||
+                   attachmentType == VKClient.Common.Library.Posts.AttachmentType.DocumentPhoto;
         }
 
         private void _appBarMenuItemAddMember_Click(object sender, EventArgs e)
         {
-            Navigator.Current.NavigateToPickUser(true, this._userOrChatId, false, 0, PickUserMode.PickForMessage, "", 0, false);
+            // Creating group chats is not available in the OpenVK client.
+            return;
         }
 
         private void _appBarMenuItemRefresh_Click(object sender, EventArgs e)
@@ -471,19 +487,8 @@ namespace VKMessenger.Views
 
         private void _appBarMenuItemDeleteDialog_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show(CommonResources.Conversation_ConfirmDeletion, CommonResources.Conversation_DeleteDialog, (MessageBoxButton)1) != MessageBoxResult.OK)
-                return;
-            this.ConversationVM.DeleteDialog();
-            ObservableCollection<ConversationHeader> conversations = ConversationsViewModel.Instance.Conversations;
-            ConversationHeader conversationHeader = conversations.FirstOrDefault<ConversationHeader>((Func<ConversationHeader, bool>)(c =>
-            {
-                if (c.IsChat == this._isChat)
-                    return c.UserOrChatId == this._userOrChatId;
-                return false;
-            }));
-            if (conversationHeader != null)
-                conversations.Remove(conversationHeader);
-            ((Page)this).NavigationService.GoBackSafe();
+            // Deleting a conversation is not available in the OpenVK client.
+            return;
         }
 
         private void _appBarMenuItemManageChat_Click(object sender, EventArgs e)
@@ -622,15 +627,11 @@ namespace VKMessenger.Views
             this._appBarAttachments.Opacity = 0.9;
             this._defaultAppBar.Buttons.Add(this._appBarButtonSend);
             this._defaultAppBar.Buttons.Add(this._appBarButtonEmojiToggle);
-            this._defaultAppBar.Buttons.Add(this._appBarButtonAddAttachment);
             this._defaultAppBar.Buttons.Add(this._appBarButtonСhoose);
             this._defaultAppBar.MenuItems.Add(this._appbarMenuItemPinToStart);
             this._appBarAttachments.MenuItems.Add(this._appbarMenuItemPinToStart);
-            this._defaultAppBar.MenuItems.Add(this._appbarMenuItemShowMaterials);
-            this._appBarAttachments.MenuItems.Add(this._appbarMenuItemShowMaterials);
             this._appBarAttachments.Buttons.Add(this._appBarButtonSend);
             this._appBarAttachments.Buttons.Add(this._appBarButtonEmojiToggle);
-            this._appBarAttachments.Buttons.Add(this._appBarButtonAttachments);
             this._appBarAttachments.Buttons.Add(this._appBarButtonСhoose);
             this._appBarSelection.Buttons.Add(this._appBarButtonForward);
             this._appBarSelection.Buttons.Add(this._appBarButtonDelete);
@@ -646,13 +647,9 @@ namespace VKMessenger.Views
             }
             else
             {
-                this._defaultAppBar.MenuItems.Add(this._appBarMenuItemAddMember);
-                this._appBarAttachments.MenuItems.Add(this._appBarMenuItemAddMember);
                 if (this._userOrChatId < 0L && this._userOrChatId > -2000000000L)
                     this._defaultAppBar.MenuItems.Add(this._appBarMenuItemAllowDenyMessagesFromGroup);
             }
-            this._defaultAppBar.MenuItems.Add(this._appBarMenuItemDeleteDialog);
-            this._appBarAttachments.MenuItems.Add(this._appBarMenuItemDeleteDialog);
         }
 
         private void _defaultAppBar_StateChanged(object sender, ApplicationBarStateChangedEventArgs e)
@@ -770,12 +767,37 @@ namespace VKMessenger.Views
             this.ConversationVM.EnsureConversationIsUpToDate(e.NavigationMode == 0, this._startMessageId, null);
             this._startMessageId = -1L;
             this.ConversationVM.LoadHeaderInfoAsync();
-            this.ConversationVM.AddAttachmentsFromRepository();
+            // OpenVK messaging in this client deliberately supports text and
+            // emoji only. Discard files left by system picker continuations.
+            this.ConversationVM.OutboundMessageVM.Attachments.Clear();
             this.ConversationVM.Scroll = (IScroll)this;
             this.UpdateAppBar();
             if (ParametersRepository.Contains(NavigationParametersNames.NewMessageContents))
             {
                 string str = ParametersRepository.GetParameterForIdAndReset(NavigationParametersNames.NewMessageContents).ToString();
+                // OpenVK messaging in this client is text-only. Turn shared
+                // objects into OpenVK links instead of silently dropping them.
+                List<string> sharedContentLinks = new List<string>();
+                WallPost sharedWallPost = ParametersRepository.GetParameterForIdAndReset("WallPostAttachment") as WallPost;
+                if (sharedWallPost != null)
+                    sharedContentLinks.Add(string.Format("https://openvk.org/wall{0}_{1}", sharedWallPost.to_id, sharedWallPost.id));
+                Photo sharedPhoto = ParametersRepository.GetParameterForIdAndReset("PickedPhoto") as Photo;
+                if (sharedPhoto != null)
+                    sharedContentLinks.Add(string.Format("https://openvk.org/photo{0}_{1}", sharedPhoto.owner_id, sharedPhoto.pid));
+                VKClient.Common.Backend.DataObjects.Video sharedVideo = ParametersRepository.GetParameterForIdAndReset("PickedVideo") as VKClient.Common.Backend.DataObjects.Video;
+                if (sharedVideo != null)
+                    sharedContentLinks.Add(string.Format("https://openvk.org/video{0}_{1}", sharedVideo.owner_id, sharedVideo.vid));
+                Doc sharedDocument = ParametersRepository.GetParameterForIdAndReset("PickedDocument") as Doc;
+                if (sharedDocument != null)
+                    sharedContentLinks.Add(string.Format("https://openvk.org/doc{0}_{1}", sharedDocument.owner_id, sharedDocument.id));
+                Product sharedProduct = ParametersRepository.GetParameterForIdAndReset("ShareProduct") as Product;
+                if (sharedProduct != null)
+                    sharedContentLinks.Add(string.Format("https://openvk.org/market{0}?w=product{0}_{1}", sharedProduct.owner_id, sharedProduct.id));
+                if (sharedContentLinks.Count > 0)
+                {
+                    string links = string.Join("\n", sharedContentLinks);
+                    str = string.IsNullOrWhiteSpace(str) ? links : links + "\n" + str;
+                }
                 if (!string.IsNullOrWhiteSpace(str))
                 {
                     this.textBoxNewMessage.Text = str;
@@ -1105,11 +1127,12 @@ namespace VKMessenger.Views
             ConversationViewModel conversationVm = this.ConversationVM;
             ConversationInfo conversationInfo = new ConversationInfo(conversationVm.IsChat, conversationVm.UserOrCharId, conversationVm.User, conversationVm.Chat);
             AppGlobalStateData globalState = AppGlobalStateManager.Current.GlobalState;
-            List<NamedAttachmentType> attachmentTypes = new List<NamedAttachmentType>((IEnumerable<NamedAttachmentType>)AttachmentTypes.AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation);
+            List<NamedAttachmentType> attachmentTypes = AttachmentTypes.AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation
+                .Where(type => !IsDocumentAttachmentType(type.AttachmentType) &&
+                               type.AttachmentType != VKClient.Common.Library.Posts.AttachmentType.Location)
+                .ToList();
             if (conversationVm.IsDialogWithOtherUser && globalState.CanSendMoneyTransfers || conversationVm.IsDialogWithCommunity && globalState.CanSendMoneyTransfersToGroups)
                 attachmentTypes.Insert(4, AttachmentTypes.MoneyAttachmentType);
-            if (conversationVm.IsDialogWithUserOrChat)
-                attachmentTypes.Insert(5, AttachmentTypes.GiftAttachmentType);
             AttachmentPickerUC.Show(attachmentTypes, this.ConversationVM.OutboundMessageVM.NumberOfAttAllowedToAdd, (Action)(() =>
             {
                 this.ConversationVM.AddAttachmentsFromRepository();
@@ -1128,6 +1151,7 @@ namespace VKMessenger.Views
             ((UIElement)this.menuItemAllowDenyMessagesFromGroup).Visibility = (this._defaultAppBar.MenuItems.Contains(this._appBarMenuItemAllowDenyMessagesFromGroup) ? Visibility.Visible : Visibility.Collapsed);
             this.menuItemAllowDenyMessagesFromGroup.Header = this._appBarMenuItemAllowDenyMessagesFromGroup.Text;
             ((UIElement)this.menuItemPinToStart).Visibility = (!this._defaultAppBar.MenuItems.Contains(this._appbarMenuItemPinToStart) || !this._appbarMenuItemPinToStart.IsEnabled ? Visibility.Collapsed : Visibility.Visible);
+            ((UIElement)this.menuItemShowMaterials).Visibility = (this._defaultAppBar.MenuItems.Contains(this._appbarMenuItemShowMaterials) ? Visibility.Visible : Visibility.Collapsed);
             ((UIElement)this.menuItemDisableEnableNotifications).Visibility = (this._defaultAppBar.MenuItems.Contains(this._appBarMenuItemDisableEnableNotifications) ? Visibility.Visible : Visibility.Collapsed);
             this.menuItemDisableEnableNotifications.Header = this._appBarMenuItemDisableEnableNotifications.Text;
             if (this.ConversationVM.CanAddMembers && this._defaultAppBar.MenuItems.Contains(this._appBarMenuItemAddMember))
@@ -1144,7 +1168,9 @@ namespace VKMessenger.Views
 
         private void MenuShowMaterialsClick(object sender, RoutedEventArgs e)
         {
-            this._appbarMenuItemShowMaterials_Click(null, null);
+            // Kept as a harmless compatibility handler for the legacy XAML
+            // menu entry; the entry itself is no longer added to the app bar.
+            return;
         }
 
         private void MenuDisableEnableNotificationsClick(object sender, RoutedEventArgs e)
@@ -1159,12 +1185,16 @@ namespace VKMessenger.Views
 
         private void MenuAddMemberClick(object sender, RoutedEventArgs e)
         {
-            this._appBarMenuItemAddMember_Click(null, null);
+            // Kept as a harmless compatibility handler for the legacy XAML
+            // menu entry; the entry itself is no longer added to the app bar.
+            return;
         }
 
         private void MenuDeleteDialogClick(object sender, RoutedEventArgs e)
         {
-            this._appBarMenuItemDeleteDialog_Click(null, null);
+            // Kept as a harmless compatibility handler for the legacy XAML
+            // menu entry; the entry itself is no longer added to the app bar.
+            return;
         }
 
         public void ScrollToOffset(double offset)

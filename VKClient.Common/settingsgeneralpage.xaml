@@ -119,8 +119,6 @@
 
 
                     <CheckBox Content="Скрывать строку состояния в новостях" IsChecked="{Binding HideSystemTray, Mode=TwoWay}"/>
-                    <CheckBox Content="Скрывать рекламу" IsChecked="{Binding HideADs, Mode=TwoWay}"/>
-                    <CheckBox Content="Скрывать возможных друзей" IsChecked="{Binding HideFriendsRecommended, Mode=TwoWay}"/>
                     
                     <TextBlock Text="Скругление аватарок пользователей"/>
                     <Slider ValueChanged="Slider_ValueChanged" Value="{Binding UserAvatarRadius, Mode=TwoWay}" SmallChange="1" />
@@ -155,12 +153,8 @@
                                           Margin="-12 0 -12 0"
                                           HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"
                                           Header="{Binding LocalizedResources.Settings_AllowAccessToLocation, Source={StaticResource LocalizedStrings}}" />-->
-                    <uc_w10m:ToggleSwitch IsChecked="{Binding IsPhoneIntegrationEnabled, Mode=TwoWay}"
-                                              Margin="0 12 0 0"
-                                              Title="{Binding LocalizedResources.Privacy_General_SyncNewsFeedAndContacts, Source={StaticResource LocalizedStrings}}"
-                                           />
                     <uc_w10m:ToggleSwitch IsChecked="{Binding IsAllowUseLocation, Mode=TwoWay}"
-                                              Margin="0 0 0 0"
+                                              Margin="0 12 0 0"
                                               Title="{Binding LocalizedResources.Settings_AllowAccessToLocation, Source={StaticResource LocalizedStrings}}"
                                           />
                     <Grid Background="Transparent"
@@ -171,30 +165,6 @@
                         Text="{Binding LocalizedResources.Privacy_General_ConfigureLockScreen, Source={StaticResource LocalizedStrings}}" FontWeight="Bold"
                                />
                     </Grid>
-
-                    <Grid Background="{StaticResource PhoneGreyDividerBrush}"
-                          Height="2"
-                          Margin="-16 12 -16 0" />
-                    
-                    <!-- CONTACTS SYNCHRONIZATION -->
-                    <TextBlock Margin="0 20 0 12"
-                               FontFamily="Segoe WP Semibold"
-                               Foreground="{StaticResource PhoneVKSubtleBrush}"
-                               Text="{Binding LocalizedResources.Privacy_General_ContactsSynchronization, Source={StaticResource LocalizedStrings}}" />
-
-                    <!--<toolkit:ToggleSwitch IsChecked="{Binding IsAllowSendContacts, Mode=TwoWay}"
-                                          Margin="-12 12 -12 -3"
-                                          HeaderTemplate="{StaticResource ToggleSwitchHeaderTemplate}"
-                                          Header="{Binding LocalizedResources.Privacy_General_PhoneBookImport, Source={StaticResource LocalizedStrings}}" />-->
-                    <uc_w10m:ToggleSwitch IsChecked="{Binding IsAllowSendContacts, Mode=TwoWay}"
-                                              Margin="0 12 0 0"
-                                              Title="{Binding LocalizedResources.Privacy_General_PhoneBookImport, Source={StaticResource LocalizedStrings}}"
-                                          Description="{Binding LocalizedResources.Settings_ContactsSynchronization_Description, Source={StaticResource LocalizedStrings}}"
-                                         />
-                    <!--<TextBlock Margin="0 -14 0 0"
-                               TextWrapping="Wrap"                            
-                               Foreground="{StaticResource PhoneVKSubtleBrush}"
-                               Text="{Binding LocalizedResources.Settings_ContactsSynchronization_Description, Source={StaticResource LocalizedStrings}}" />-->
 
                     <Grid Background="{StaticResource PhoneGreyDividerBrush}" Height="2" Margin="-16 23 -16 0"/>
 

@@ -17,7 +17,10 @@ namespace VKClient.Common.Framework
 {
   public static class BrowserNavigationService
   {
-    private static string _searchFeedPrefix = "vk.com/feed?section=search&q=";
+    private static string SearchFeedPrefix
+    {
+      get { return VKConstants.OpenVKWebAddress.TrimEnd('/') + "/feed?section=search&q="; }
+    }
     public static readonly DependencyProperty TextProperty = DependencyProperty.RegisterAttached("Text", typeof(string), typeof(BrowserNavigationService), new PropertyMetadata(null, new PropertyChangedCallback(BrowserNavigationService.OnTextChanged)));
     public static readonly DependencyProperty DisableHyperlinksProperty = DependencyProperty.RegisterAttached("DisableHyperlinks", typeof(bool), typeof(BrowserNavigationService), new PropertyMetadata(false));
     public static readonly DependencyProperty TextIdProperty = DependencyProperty.RegisterAttached("TextId", typeof(string), typeof(BrowserNavigationService), new PropertyMetadata(""));
@@ -27,6 +30,8 @@ namespace VKClient.Common.Framework
     private static List<string> _smilesModificators = new List<string>() { "D83CDFFB", "D83CDFFC", "D83CDFFD", "D83CDFFF", "D83CDFFE" };
     private static List<string> _domainsList = new List<string>() { "AC", "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AN", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "EU", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RU", "RS", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SU", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TP", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UK", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "YE", "YT", "YU", "ZA", "ZM", "ZW", "ARPA", "AERO", "ASIA", "BIZ", "CAT", "COM", "COOP", "INFO", "INT", "JOBS", "MEDIA", "MOBI", "MUSEUM", "NAME", "NET", "ORG", "POST", "PRO", "TEL", "TRAVEL", "XXX", "CLUB", "ACADEMY", "EDU", "GOV", "MIL", "LOCAL", "INTERNATIONAL", "XN--LGBBAT1AD8J", "XN--54B7FTA0CC", "XN--FIQS8S", "XN--FIQZ9S", "XN--WGBH1C", "XN--NODE", "XN--J6W193G", "XN--H2BRJ9C", "XN--MGBBH1A71E", "XN--FPCRJ9C3D", "XN--GECRJ9C", "XN--S9BRJ9C", "XN--XKC2DL3A5EE0H", "XN--45BRJ9C", "XN--MGBA3A4F16A", "XN--MGBAYH7GPA", "XN--80AO21A", "XN--MGBX4CD0AB", "XN--L1ACC", "XN--MGBC0A9AZCG", "XN--MGB9AWBF", "XN--MGBAI9AZGQP6J", "XN--YGBI2AMMX", "XN--WGBL6A", "XN--P1AI", "XN--MGBERP4A5D4AR", "XN--90A3AC", "XN--YFRO4I67O", "XN--CLCHC0EA0B2G2A9GCD", "XN--3E0B707E", "XN--FZC2C9E2C", "XN--XKC2AL3HYE2A", "XN--MGBTF8FL", "XN--KPRW13D", "XN--KPRY57D", "XN--O3CW4H", "XN--PGBS0DH", "XN--J1AMH", "XN--MGBAAM7A8H", "XN--MGB2DDES", "XN--80ASEHDB", "XN--80ASWG", "XN--OGBPF8FL", "рф", "РФ", "укр", "УКР", "онлайн", "ОНЛАЙН", "сайт", "САЙТ", "срб", "СРБ" };
     public static Regex Regex_Mention = new Regex("\\[(id|club)(\\d+)(?:\\:([a-z0-9_\\-]+))?\\|([^\\$]+?)\\]", RegexOptions.IgnoreCase);
+    // Domain mentions are emitted by OpenVK as [domain|visible text].
+    public static Regex Regex_OpenVkDomainMention = new Regex("\\[([a-z0-9_\\-]+)\\|([^\\]]+)\\]", RegexOptions.IgnoreCase);
     public static Regex Regex_DomainMention = new Regex("(\\*|@)((id|club|event|public)\\d+)\\s*\\((.+?)\\)", RegexOptions.IgnoreCase);
     private static Regex _regex_Uri = new Regex("(?<![A-Za-z\\$0-9А-Яа-яёЁєЄҐґЇїІіЈј\\-_@])(https?:\\/\\/)?((?:[A-Za-z\\$0-9А-Яа-яёЁєЄҐґЇїІіЈј](?:[A-Za-z\\$0-9\\-_А-Яа-яёЁєЄҐґЇїІіЈј]*[A-Za-z\\$0-9А-Яа-яёЁєЄҐґЇїІіЈј])?\\.){1,5}[A-Za-z\\$рфуконлайстбРФУКОНЛАЙСТБ\\-\\d]{2,22}(?::\\d{2,5})?)((?:\\/(?:(?:\\&|\\!|,[_%]|[A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.~=;:]+|\\[[A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.,~=;:]*\\]|\\([A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.,~=;:]*\\))*(?:,[_%]|[A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.~=;:]*[A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј_@#%?+\\/\\$~=]|\\[[A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.,~=;:]*\\]|\\([A-Za-z0-9¨¸À-ÿєЄҐґЇїІіЈј\\-_@#%?+\\/\\$.,~=;:]*\\)))?)?)", RegexOptions.IgnoreCase);
     private static Regex _regex_Email = new Regex("([^#]|^)(?<![a-zA-Z\\-_\\.0-9])([a-zA-Z\\-_\\.0-9]+@[a-zA-Z\\-_0-9]+\\.[a-zA-Z\\-_\\.0-9]+[a-zA-Z\\-_0-9])", RegexOptions.IgnoreCase);
@@ -130,9 +135,9 @@ namespace VKClient.Common.Framework
           }
           else
           {
-            if (innerSplit[0].Contains(BrowserNavigationService._searchFeedPrefix))
+            if (innerSplit[0].Contains(BrowserNavigationService.SearchFeedPrefix))
             {
-              int num = innerSplit[0].IndexOf(BrowserNavigationService._searchFeedPrefix) + BrowserNavigationService._searchFeedPrefix.Length;
+              int num = innerSplit[0].IndexOf(BrowserNavigationService.SearchFeedPrefix) + BrowserNavigationService.SearchFeedPrefix.Length;
               string str2 = innerSplit[0].Substring(num);
               innerSplit[0] = innerSplit[0].Substring(0, num) + WebUtility.UrlEncode(str2);
             }
@@ -404,19 +409,14 @@ namespace VKClient.Common.Framework
     {
       if (string.IsNullOrEmpty(navstr))
         return;
-      if (!navstr.Contains("@") || navstr.Contains("#"))
-      {
-        Navigator.Current.NavigateToWebUri(navstr, false, false);
-      }
-      else
+      if (navstr.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
       {
         EmailComposeTask emailComposeTask = new EmailComposeTask();
-        if (navstr.StartsWith("http://"))
-          navstr = navstr.Remove(0, 7);
-        string str = navstr;
-        emailComposeTask.To = str;
+        emailComposeTask.To = navstr.Substring("mailto:".Length);
         emailComposeTask.Show();
       }
+      else
+        Navigator.Current.NavigateToWebUri(navstr, false, false);
     }
 
     public static string PreprocessTextForGroupBoardMentions(string s)
@@ -491,7 +491,8 @@ namespace VKClient.Common.Framework
           str4 = str4.Substring(0, 35) + "...";
         return string.Format("\a{0}\b{1}\a", (str2 + str3), str4).Replace("#", "\0");
       }));
-      text = text.ReplaceByRegex(BrowserNavigationService._regex_Email, "\amailto:$2\b$2\a").ReplaceByRegex(BrowserNavigationService.Regex_DomainMention, "[$2|$4]").ReplaceByRegex(BrowserNavigationService.Regex_Mention, "\ahttps://vk.com/$1$2$3\b$4\b\a").ReplaceByRegex(BrowserNavigationService.Regex_Tag, string.Format("$1\ahttps://{0}$3$4\b$3$4\a", BrowserNavigationService._searchFeedPrefix)).Replace("\n ", "\n").Replace(" \n", "\n").Replace("\0", "#");
+      string origin = VKConstants.OpenVKWebAddress.TrimEnd('/');
+      text = text.ReplaceByRegex(BrowserNavigationService._regex_Email, "\amailto:$2\b$2\a").ReplaceByRegex(BrowserNavigationService.Regex_DomainMention, "[$2|$4]").ReplaceByRegex(BrowserNavigationService.Regex_Mention, "\a" + origin + "/$1$2$3\b$4\b\a").ReplaceByRegex(BrowserNavigationService.Regex_OpenVkDomainMention, "\a" + origin + "/$1\b$2\b\a").ReplaceByRegex(BrowserNavigationService.Regex_Tag, "$1\a" + BrowserNavigationService.SearchFeedPrefix + "$3$4\b$3$4\a").Replace("\n ", "\n").Replace(" \n", "\n").Replace("\0", "#");
       if (text.StartsWith(" "))
         text = text.Remove(0, 1);
       return (List<string>) Enumerable.ToList<string>(text.Split('\a'));

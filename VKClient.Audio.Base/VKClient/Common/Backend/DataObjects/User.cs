@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using VKClient.Audio.Base.DataObjects;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Framework;
 
 namespace VKClient.Common.Backend.DataObjects
@@ -379,6 +380,40 @@ namespace VKClient.Common.Backend.DataObjects
             set
             {
                 this._photo_max = value;
+            }
+        }
+
+        public string UiAvatarSmall
+        {
+            get
+            {
+                string url = this.photo_50;
+                if (string.IsNullOrEmpty(url))
+                    url = this.photo_200;
+                if (string.IsNullOrEmpty(url))
+                    url = this.photo_max;
+                return AvatarHelper.Prepare(url);
+            }
+        }
+
+        public string UiAvatarMedium
+        {
+            get
+            {
+                string url = this.photo_200;
+                if (string.IsNullOrEmpty(url))
+                    url = this.photo_max;
+                if (string.IsNullOrEmpty(url))
+                    url = this.photo_50;
+                return AvatarHelper.Prepare(url);
+            }
+        }
+
+        public string UiAvatarLarge
+        {
+            get
+            {
+                return AvatarHelper.Prepare(this.photo_max);
             }
         }
 

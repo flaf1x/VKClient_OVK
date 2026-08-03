@@ -27,6 +27,7 @@ namespace XamlAnimatedGif
         private readonly int _stride;
         private readonly byte[] _previousBackBuffer;
         private readonly byte[] _indexStreamBuffer;
+        private readonly byte[] _rowIndexBuffer;
         private readonly TimingManager _timingManager;
         private bool _isStarted;
         private CancellationTokenSource _cancellationTokenSource;
@@ -102,21 +103,20 @@ namespace XamlAnimatedGif
             this._stride = 4 * ((screenDescriptor.Width * 32 + 31) / 32);
             this._previousBackBuffer = new byte[screenDescriptor.Height * this._stride];
             this._indexStreamBuffer = Animator.CreateIndexStreamBuffer(metadata, this._sourceStream);
+            this._rowIndexBuffer = new byte[screenDescriptor.Width];
             this._timingManager = this.CreateTimingManager(metadata, repeatBehavior);
         }
 
         ~Animator()
         {
-            //try
-            //{
+            try
+            {
                 this.Dispose(false);
-            //}
-            //finally
-            //{
-                // ISSUE: explicit finalizer call
-                // ISSUE: explicit non-virtual call
-            //    this.Finalize();
-            //}
+            }
+            catch
+            {
+                // Finalizers must never propagate failures to the application.
+            }
         }
 
         internal static async Task<Animator> CreateAsync(Image image, Uri sourceUri, CancellationToken cancellationToken, RepeatBehavior repeatBehavior = default(RepeatBehavior))
@@ -298,26 +298,19 @@ namespace XamlAnimatedGif
                     this.ClearArea((IGifRect)this._metadata.Header.LogicalScreenDescriptor);
                 else
                     this.DisposePreviousFrame(frame);
-                int length = 4 * desc.Width;
-                byte[] buffer = new byte[desc.Width];
-                byte[] numArray = new byte[length];
                 Animator.GifPalette palette = this._palettes[frameIndex];
                 int num1 = palette.TransparencyIndex ?? -1;
                 foreach (int num2 in frame.Descriptor.Interlace ? Animator.InterlacedRows(frame.Descriptor.Height) : Animator.NormalRows(frame.Descriptor.Height))
                 {
-                    if (indexStreamAsync.Read(buffer, 0, desc.Width) != desc.Width)
+                    if (indexStreamAsync.Read(this._rowIndexBuffer, 0, desc.Width) != desc.Width)
                         throw new EndOfStreamException();
-                    int offset = (desc.Top + num2) * this._stride + desc.Left * 4;
-                    if (num1 >= 0)
-                        Animator.CopyFromBitmap(numArray, this._bitmap, offset, length);
+                    int pixelOffset = (desc.Top + num2) * this._bitmap.PixelWidth + desc.Left;
                     for (int index = 0; index < desc.Width; ++index)
                     {
-                        byte num3 = buffer[index];
-                        int startIndex = 4 * index;
+                        byte num3 = this._rowIndexBuffer[index];
                         if ((int)num3 != num1)
-                            Animator.WriteColor(numArray, palette[(int)num3], startIndex);
+                            this._bitmap.Pixels[pixelOffset + index] = Animator.ToArgb(palette[(int)num3]);
                     }
-                    Animator.CopyToBitmap(numArray, this._bitmap, offset, length);
                 }
                 this._bitmap.Invalidate();
                 this._previousFrame = frame;
@@ -394,6 +387,11 @@ namespace XamlAnimatedGif
             lineBuffer[startIndex + 3] = color.A;
         }
 
+        private static int ToArgb(Color color)
+        {
+            return color.A << 24 | color.R << 16 | color.G << 8 | color.B;
+        }
+
         private void DisposePreviousFrame(GifFrame currentFrame)
         {
             GifFrame previousFrame = this._previousFrame;
@@ -418,12 +416,10 @@ namespace XamlAnimatedGif
 
         private void ClearArea(IGifRect rect)
         {
-            int length = 4 * rect.Width;
-            byte[] buffer = new byte[length];
             for (int index = 0; index < rect.Height; ++index)
             {
-                int offset = (rect.Top + index) * this._stride + 4 * rect.Left;
-                Animator.CopyToBitmap(buffer, this._bitmap, offset, length);
+                int offset = (rect.Top + index) * this._bitmap.PixelWidth + rect.Left;
+                Array.Clear(this._bitmap.Pixels, offset, rect.Width);
             }
         }
 
@@ -450,7 +446,7 @@ namespace XamlAnimatedGif
         {
             GifGraphicControlExtension graphicControl = frame.GraphicControl;
             if (graphicControl != null && graphicControl.Delay != 0)
-                return TimeSpan.FromMilliseconds((double)graphicControl.Delay);
+                return TimeSpan.FromMilliseconds((double)Math.Max(66, graphicControl.Delay));
             return TimeSpan.FromMilliseconds(100.0);
         }
 
@@ -472,7 +468,8 @@ namespace XamlAnimatedGif
             if (this._disposed)
                 return;
             this._disposing = true;
-            this._timingManager.Completed -= new EventHandler(this.TimingManagerCompleted);
+            if (this._timingManager != null)
+                this._timingManager.Completed -= new EventHandler(this.TimingManagerCompleted);
             CancellationTokenSource cancellationTokenSource = this._cancellationTokenSource;
             if (cancellationTokenSource != null)
                 cancellationTokenSource.Cancel();

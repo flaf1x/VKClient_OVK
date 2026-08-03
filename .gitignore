@@ -1,0 +1,30 @@
+# Visual Studio and Windows Phone build output
+[Bb]in/
+[Oo]bj/
+.vs/
+*.suo
+*.user
+*.csproj_backup
+*.userosscache
+*.sln.docstates
+
+# Packages and deployment artifacts
+*.xap
+*.appx
+*.appxbundle
+*.appxupload
+*.cer
+deploy_*.log
+
+# Local diagnostics and device snapshots
+.wp-*/
+.wp-debug-snapshot/
+device_snapshot_*/
+*_snapshot_*/
+*.g.resources
+*_verify.res
+_verify_*.dll
+
+# Temporary reference material used during porting
+official_xap_extracted/
+openvk_source_audit/

@@ -177,9 +177,9 @@ namespace VKClient.Common.Library
             get
             {
                 if (this._user != null)
-                    return this._user.photo_max;
+                    return this._user.UiAvatarMedium;
                 if (this._group != null)
-                    return this._group.photo_200;
+                    return this._group.UiAvatarMedium;
                 if (this._friendsList == null)
                     return "";
                 return MultiResolutionHelper.Instance.AppendResolutionSuffix("/Resources/New/PlaceholderGroup62Light.png", true, "");

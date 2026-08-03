@@ -135,7 +135,7 @@ namespace VKClient.Common.UC
                     return;
             }
             this.RequestName.Text = user1.Name;
-            ImageLoader.SetUriSource(this.RequestPhoto, user1.photo_max);
+            ImageLoader.SetUriSource(this.RequestPhoto, user1.UiAvatarMedium);
             if (user1.occupation != null && string.IsNullOrWhiteSpace(user1.occupation.name))
             {
                 this.RequestOccupation.Text = user1.occupation.name;
@@ -194,7 +194,7 @@ namespace VKClient.Common.UC
                             image1.Stretch = ((Stretch)num9);
                             image1.Height = 40.0;
                             image1.Width = 40.0;
-                            ImageLoader.SetUriSource(image1, profile.photo_max);
+                            ImageLoader.SetUriSource(image1, profile.UiAvatarSmall);
                             ((PresentationFrameworkCollection<UIElement>)((Panel)this.MutualFriendsPhotosPanel).Children).Add(image1);
                             break;
                         }
@@ -224,69 +224,48 @@ namespace VKClient.Common.UC
         {
             if (this.Model.RequestHandledAction == null)
                 return;
-            string format = "\r\n\r\nvar result=API.friends.{0}({{user_id:{3}}});\r\nif (({1}&&result>0)||({2}&&result.success==1)) \r\n    return API.execute.getFriendsWithRequests({{requests_count:1,requests_offset:0,without_friends:1,requests_only:{4},suggested_only:{5}}});\r\nreturn 0;";
-            object[] objArray = new object[6]
-      {
-        (sender == this.AddButton ? "add" : "delete"),
-        (sender == this.AddButton ? "true" : "false"),
-        (sender == this.AddButton ? "false" : "true"),
-        this.Model.user_id,
-        null,
-        null
-      };
-            int index1 = 4;
-            bool? isSuggestedFriend;
-            string str1;
-            if (this.NeedBottomSeparatorLine)
-            {
-                isSuggestedFriend = this.IsSuggestedFriend;
-                bool flag = false;
-                if ((isSuggestedFriend.GetValueOrDefault() == flag ? (isSuggestedFriend.HasValue ? 1 : 0) : 0) != 0)
-                {
-                    str1 = "1";
-                    goto label_5;
-                }
-            }
-            str1 = "0";
-        label_5:
-            objArray[index1] = str1;
-            int index2 = 5;
-            string str2;
-            if (this.NeedBottomSeparatorLine)
-            {
-                isSuggestedFriend = this.IsSuggestedFriend;
-                if (isSuggestedFriend.Value)
-                {
-                    str2 = "1";
-                    goto label_9;
-                }
-            }
-            str2 = "0";
-        label_9:
-            objArray[index2] = str2;
-            string str3 = string.Format(format, objArray);
             FriendRequest model = this.Model;
-            Action<BackendResult<FriendRequests, ResultCode>> action = (Action<BackendResult<FriendRequests, ResultCode>>)(result => Execute.ExecuteOnUIThread((Action)(() =>
-            {
-                if (result.ResultCode == ResultCode.Succeeded)
-                {
-                    FriendRequests resultData = result.ResultData;
-                    model.RequestHandledAction(resultData);
-                    CountersManager.Current.Counters.friends = resultData.menu_counter;
-                    EventAggregator.Current.Publish((object)new CountersChanged(CountersManager.Current.Counters));
-                }
-                PageBase.SetInProgress(false);
-            })));
+            string methodName = sender == this.AddButton
+                ? "friends.add"
+                : "friends.delete";
             PageBase.SetInProgress(true);
-            string str4 = "execute";
-            Dictionary<string, string> dictionary = new Dictionary<string, string>();
-            string key = "code";
-            string str5 = str3;
-            dictionary.Add(key, str5);
-            // ISSUE: variable of the null type
-            CancellationToken? nullable = new CancellationToken?();
-            // ISSUE: variable of the null type
-            VKRequestsDispatcher.DispatchRequestToVK<FriendRequests>(str4, dictionary, action, null, false, true, nullable, null);
+            VKRequestsDispatcher.DispatchRequestToVK<int>(
+                methodName,
+                new Dictionary<string, string>()
+                {
+                    { "user_id", model.user_id.ToString() }
+                },
+                (Action<BackendResult<int, ResultCode>>)(result =>
+                {
+                    if (result.ResultCode != ResultCode.Succeeded)
+                    {
+                        Execute.ExecuteOnUIThread((Action)(() =>
+                            PageBase.SetInProgress(false)));
+                        return;
+                    }
+
+                    UsersService.Instance.GetFriendRequests(false, 0, 100,
+                        (Action<BackendResult<FriendRequests, ResultCode>>)(requestsResult =>
+                            Execute.ExecuteOnUIThread((Action)(() =>
+            {
+                                if (requestsResult.ResultCode == ResultCode.Succeeded)
+                                {
+                                    FriendRequests resultData = requestsResult.ResultData;
+                                    model.RequestHandledAction(resultData);
+                                    CountersManager.Current.Counters.friends =
+                                        resultData.menu_counter;
+                                    EventAggregator.Current.Publish(
+                                        (object)new CountersChanged(
+                                            CountersManager.Current.Counters));
+                                }
+                                PageBase.SetInProgress(false);
+                            }))));
+                }),
+                (Func<string, int>)(json => 1),
+                false,
+                true,
+                new CancellationToken?(),
+                null);
         }
 
         private void RecommenderName_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)

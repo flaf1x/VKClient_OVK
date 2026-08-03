@@ -114,7 +114,7 @@
             <phone:Pivot x:Name="pivot"
                          Foreground="White"
                          Style="{StaticResource PivotStyleNoHeader}">
-                <phone:PivotItem>
+                <phone:PivotItem x:Name="pivotItemPages">
                     <phone:PivotItem.Header>
                         <TextBlock FontSize="46"
                                    FontFamily="Segoe WP SemiLight"
@@ -136,7 +136,7 @@
                     </framework:ExtendedLongListSelector>
                 </phone:PivotItem>
 
-                <phone:PivotItem>
+                <phone:PivotItem x:Name="pivotItemGroups">
                     <phone:PivotItem.Header>
                         <TextBlock FontSize="46"
                                    FontFamily="Segoe WP SemiLight"

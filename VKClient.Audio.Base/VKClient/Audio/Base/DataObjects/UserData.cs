@@ -129,7 +129,8 @@ namespace VKClient.Audio.Base.DataObjects
       get
       {
         if (this.user != null)
-          return this.user.wall_default == "all";
+          return string.IsNullOrEmpty(this.user.wall_default) ||
+                 this.user.wall_default == "all";
         return true;
       }
     }

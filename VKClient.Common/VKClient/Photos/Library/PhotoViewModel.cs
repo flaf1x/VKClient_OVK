@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using VKClient.Audio.Base;
-using VKClient.Audio.Base.BackendServices;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.CommonExtensions;
@@ -28,10 +27,9 @@ namespace VKClient.Photos.Library
     private bool _isLoading;
     private readonly long _ownerId;
     private readonly long _pid;
-    private bool _isGifAdded;
+    private readonly bool _isGifAdded;
     private bool _isSavingInSavedPhotos;
     private readonly Doc _doc;
-    private bool _isAddingDoc;
     private bool _adding;
 
     public int KnownCommentsCount
@@ -174,9 +172,39 @@ namespace VKClient.Photos.Library
       {
         if (this._photo == null)
           return  null;
+        if (!string.IsNullOrEmpty(this._photo.photo_2560))
+          return this._photo.photo_2560;
+        if (!string.IsNullOrEmpty(this._photo.src_xxbig))
+          return this._photo.src_xxbig;
         if (!string.IsNullOrEmpty(this._photo.src_xbig))
           return this._photo.src_xbig;
         return this._photo.src_big;
+      }
+    }
+
+    public string OriginalImageSrc
+    {
+      get
+      {
+        if (this._photo == null)
+          return null;
+        if (!string.IsNullOrEmpty(this._photo.src_original))
+          return this._photo.src_original;
+        return this.ImageSrc;
+      }
+    }
+
+    public string PreviewImageSrc
+    {
+      get
+      {
+        if (this._photo == null)
+          return null;
+        if (!string.IsNullOrEmpty(this._photo.photo_1280))
+          return this._photo.photo_1280;
+        if (!string.IsNullOrEmpty(this._photo.photo_807))
+          return this._photo.photo_807;
+        return this._photo.photo_604;
       }
     }
 
@@ -240,6 +268,22 @@ namespace VKClient.Photos.Library
             if (user != null)
               str = user.photo_max;
           }
+        }
+        if (string.IsNullOrEmpty(str) && this.AuthorId < 0L)
+        {
+          Group cachedGroup = GroupsService.Current.GetCachedGroup(-this.AuthorId);
+          if (cachedGroup != null)
+            str = cachedGroup.photo_200 ?? cachedGroup.photo_100 ?? cachedGroup.photo_50;
+        }
+        if (string.IsNullOrEmpty(str) && this.AuthorId > 0L)
+        {
+          User cachedUser = UsersService.Instance.GetCachedUser(this.AuthorId);
+          if (cachedUser != null)
+            str = cachedUser.photo_max;
+          if (string.IsNullOrEmpty(str) &&
+              this.AuthorId == AppGlobalStateManager.Current.LoggedInUserId &&
+              AppGlobalStateManager.Current.GlobalState.LoggedInUser != null)
+            str = AppGlobalStateManager.Current.GlobalState.LoggedInUser.photo_max;
         }
         return str;
       }
@@ -305,6 +349,22 @@ namespace VKClient.Photos.Library
               str = user.Name;
           }
         }
+        if (string.IsNullOrEmpty(str) && this.AuthorId < 0L)
+        {
+          Group cachedGroup = GroupsService.Current.GetCachedGroup(-this.AuthorId);
+          if (cachedGroup != null)
+            str = cachedGroup.name;
+        }
+        if (string.IsNullOrEmpty(str) && this.AuthorId > 0L)
+        {
+          User cachedUser = UsersService.Instance.GetCachedUser(this.AuthorId);
+          if (cachedUser != null)
+            str = cachedUser.Name;
+          if (string.IsNullOrEmpty(str) &&
+              this.AuthorId == AppGlobalStateManager.Current.LoggedInUserId &&
+              AppGlobalStateManager.Current.GlobalState.LoggedInUser != null)
+            str = AppGlobalStateManager.Current.GlobalState.LoggedInUser.Name;
+        }
         return str;
       }
     }
@@ -359,11 +419,11 @@ namespace VKClient.Photos.Library
 
     public bool IsGif { get;set; }
 
-    public Visibility CanAddVisibility
+    public bool IsGifAdded
     {
       get
       {
-        return (!this._isGifAdded).ToVisiblity();
+        return this.IsGif && this._doc != null && this._isGifAdded;
       }
     }
 
@@ -371,7 +431,7 @@ namespace VKClient.Photos.Library
     {
       get
       {
-        return this._isGifAdded.ToVisiblity();
+        return this.IsGifAdded.ToVisiblity();
       }
     }
 
@@ -498,7 +558,7 @@ namespace VKClient.Photos.Library
     {
       get
       {
-        return this._ownerId != AppGlobalStateManager.Current.LoggedInUserId;
+        return false;
       }
     }
 
@@ -539,38 +599,13 @@ namespace VKClient.Photos.Library
     {
       this._doc = doc;
       this.IsGif = true;
+      this._isGifAdded = doc != null && doc.owner_id == AppGlobalStateManager.Current.LoggedInUserId;
       this.Photo = doc.ConvertToPhotoPreview();
     }
 
     private PhotoViewModel()
     {
       EventAggregator.Current.Subscribe(this);
-    }
-
-    public void AddDocument()
-    {
-      if (this._doc == null || this._isGifAdded || this._isAddingDoc)
-        return;
-      this._isAddingDoc = true;
-      this.SetInProgressMain(true, "");
-      DocumentsService.Current.Add(this._doc.owner_id, this._doc.id, this._doc.access_key, (Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>>) (res =>
-      {
-        this._isAddingDoc = false;
-        this.SetInProgressMain(false, "");
-        if (res.ResultCode == ResultCode.Succeeded)
-        {
-          this._isGifAdded = true;
-          // ISSUE: type reference
-          // ISSUE: method reference
-          this.NotifyPropertyChanged<Visibility>((System.Linq.Expressions.Expression<Func<Visibility>>)(() => this.CanAddVisibility));
-                    this.NotifyPropertyChanged<Visibility>((System.Linq.Expressions.Expression<Func<Visibility>>)(() => this.AddedVisibility));
-                    GenericInfoUC.ShowBasedOnResult(0, CommonResources.FileIsSavedInDocuments, (VKRequestsDispatcher.Error) null);
-        }
-        else if (res.ResultCode == ResultCode.WrongParameter && res.Error.error_msg.Contains("already added"))
-          GenericInfoUC.ShowBasedOnResult(0, CommonResources.FileIsAlreadySavedInDocuments, (VKRequestsDispatcher.Error) null);
-        else
-          GenericInfoUC.ShowBasedOnResult((int) res.ResultCode, "", null);
-      }));
     }
 
     public void LoadInfoWithComments(Action<bool, int> callback)
@@ -623,6 +658,118 @@ namespace VKClient.Photos.Library
           callback.Invoke(res.ResultCode == ResultCode.Succeeded, num1);
         }));
       }
+    }
+
+    public void LoadInfoWithoutComments(Action<bool, int> callback)
+    {
+      if (this._isLoading)
+        return;
+
+      this._isLoading = true;
+      this.SetInProgress(true, "");
+      string photoId = this._ownerId + "_" + this._pid;
+      if (!string.IsNullOrWhiteSpace(this._accessKey))
+        photoId += "_" + this._accessKey;
+
+      PhotosService.Current.GetPhotoById(photoId, res =>
+      {
+        if (res.ResultCode != ResultCode.Succeeded ||
+            res.ResultData == null || res.ResultData.Count == 0 ||
+            res.ResultData[0] == null)
+        {
+          this.FinishDirectPhotoLoad(false, 0, callback);
+          return;
+        }
+
+        this._photo = res.ResultData[0];
+        if (string.IsNullOrEmpty(this._photo.access_key) && !string.IsNullOrEmpty(this._accessKey))
+          this._photo.access_key = this._accessKey;
+        if (this._photo.likes == null)
+          this._photo.likes = new Likes();
+        if (this._photo.comments == null)
+          this._photo.comments = new VKClient.Common.Backend.DataObjects.Comments();
+        this._photo.can_comment = 0;
+        this._knownCommentsCount = 0;
+
+        this._photoWithFullInfo = new PhotoWithFullInfo()
+        {
+          Photo = this._photo,
+          RepostsCount = 0,
+          Comments = new List<Comment>(),
+          LikesAllIds = new List<long>(),
+          Users = new List<User>(),
+          Groups = new List<Group>(),
+          Users2 = new List<User>(),
+          Users3 = new List<User>(),
+          PhotoTags = new List<PhotoVideoTag>()
+        };
+
+        LikesService.Current.GetLikesList(LikeObjectType.photo, this._photo.owner_id,
+          this._photo.pid, 1000, 0, false, false, likesResult =>
+        {
+          if (likesResult.ResultCode == ResultCode.Succeeded && likesResult.ResultData != null)
+          {
+            this._photo.likes.count = likesResult.ResultData.AllCount;
+            this._photo.likes.user_likes = likesResult.ResultData.AllIds.Contains(
+              AppGlobalStateManager.Current.LoggedInUserId) ? 1 : 0;
+            this._photoWithFullInfo.LikesAllIds.AddRange(likesResult.ResultData.AllIds);
+            this._photoWithFullInfo.Users.AddRange(likesResult.ResultData.All);
+            this._photoWithFullInfo.Groups.AddRange(likesResult.ResultData.AllGroups);
+          }
+          this.LoadDirectPhotoAuthor(callback);
+        });
+      });
+    }
+
+    private void LoadDirectPhotoAuthor(Action<bool, int> callback)
+    {
+        long authorId = this.AuthorId;
+        if (authorId < 0L)
+        {
+          GroupsService.Current.GetGroupInfo(-authorId, groupResult =>
+          {
+            int adminLevel = 0;
+            if (groupResult.ResultCode == ResultCode.Succeeded &&
+                groupResult.ResultData != null && groupResult.ResultData.group != null)
+            {
+              Group group = groupResult.ResultData.group;
+              this._photoWithFullInfo.Groups.Add(group);
+              adminLevel = group.admin_level;
+            }
+            this.FinishDirectPhotoLoad(true, adminLevel, callback);
+          });
+          return;
+        }
+
+        if (authorId > 0L)
+        {
+          UsersService.Instance.GetUsers(new List<long>() { authorId }, usersResult =>
+          {
+            if (usersResult.ResultCode == ResultCode.Succeeded && usersResult.ResultData != null)
+              this._photoWithFullInfo.Users.AddRange(usersResult.ResultData);
+            this.FinishDirectPhotoLoad(true, 0, callback);
+          });
+          return;
+        }
+
+        this.FinishDirectPhotoLoad(true, 0, callback);
+    }
+
+    private void FinishDirectPhotoLoad(bool succeeded, int adminLevel, Action<bool, int> callback)
+    {
+      if (succeeded)
+      {
+        this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.ImageSrc));
+        this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.OriginalImageSrc));
+        this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Text));
+        this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.LikesCountStr));
+        this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.UserLiked));
+        this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.IsLoadedFullInfo));
+        this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>) (() => this.IsFullInfoLoadedVisibility));
+      }
+      this.SetInProgress(false, "");
+      this._isLoading = false;
+      callback(succeeded, adminLevel);
     }
 
     public void LikeUnlike()

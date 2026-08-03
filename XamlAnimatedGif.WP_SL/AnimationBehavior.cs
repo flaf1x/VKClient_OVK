@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Threading;
@@ -15,12 +16,17 @@ namespace XamlAnimatedGif
   {
       public static readonly DependencyProperty SourceUriProperty = DependencyProperty.RegisterAttached("SourceUri", typeof(Uri), typeof(AnimationBehavior), new PropertyMetadata(null, new PropertyChangedCallback( AnimationBehavior.SourceChanged)));
       public static readonly DependencyProperty SourceStreamProperty = DependencyProperty.RegisterAttached("SourceStream", typeof(Stream), typeof(AnimationBehavior), new PropertyMetadata(null, new PropertyChangedCallback( AnimationBehavior.SourceChanged)));
-      public static readonly DependencyProperty RepeatBehaviorProperty = DependencyProperty.RegisterAttached("RepeatBehavior", typeof(RepeatBehavior), typeof(AnimationBehavior), new PropertyMetadata(null, new PropertyChangedCallback( AnimationBehavior.SourceChanged)));
+      // Windows Phone Silverlight rejects default(RepeatBehavior) while
+      // registering an attached property even though RepeatBehavior is a
+      // value type. Store the optional value as object and translate null to
+      // the framework default. This prevents the whole type initializer from
+      // failing before the first image is loaded.
+      public static readonly DependencyProperty RepeatBehaviorProperty = DependencyProperty.RegisterAttached("RepeatBehavior", typeof(object), typeof(AnimationBehavior), new PropertyMetadata(null, new PropertyChangedCallback(AnimationBehavior.SourceChanged)));
     public static readonly DependencyProperty AutoStartProperty = DependencyProperty.RegisterAttached("AutoStart", typeof (bool), typeof (AnimationBehavior), new PropertyMetadata(true));
     public static readonly DependencyProperty AnimateInDesignModeProperty = DependencyProperty.RegisterAttached("AnimateInDesignMode", typeof(bool), typeof(AnimationBehavior), new PropertyMetadata(false, new PropertyChangedCallback( AnimationBehavior.AnimateInDesignModeChanged)));
     public static readonly DependencyProperty AnimatorProperty = DependencyProperty.RegisterAttached("Animator", typeof (Animator), typeof (AnimationBehavior), new PropertyMetadata( null));
     private static readonly DependencyProperty SeqNumProperty = DependencyProperty.RegisterAttached("SeqNum", typeof (int), typeof (AnimationBehavior), new PropertyMetadata(0));
-    private static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+    private static readonly Dictionary<Image, CancellationTokenSource> _cancellationTokenSources = new Dictionary<Image, CancellationTokenSource>();
 
     public static event EventHandler<AnimationErrorEventArgs> Error;
 
@@ -50,7 +56,8 @@ namespace XamlAnimatedGif
 
     public static RepeatBehavior GetRepeatBehavior(DependencyObject obj)
     {
-      return (RepeatBehavior) obj.GetValue(AnimationBehavior.RepeatBehaviorProperty);
+      object value = obj.GetValue(AnimationBehavior.RepeatBehaviorProperty);
+      return value is RepeatBehavior ? (RepeatBehavior) value : default(RepeatBehavior);
     }
 
     public static void SetRepeatBehavior(DependencyObject obj, RepeatBehavior value)
@@ -154,14 +161,9 @@ namespace XamlAnimatedGif
       if (AnimationBehavior.IsLoaded((FrameworkElement) image))
       {
         // ISSUE: method pointer
+          ((FrameworkElement)image).Unloaded-=(new RoutedEventHandler( AnimationBehavior.Image_Unloaded));
           ((FrameworkElement)image).Unloaded+=(new RoutedEventHandler( AnimationBehavior.Image_Unloaded));
-        if (AnimationBehavior._cancellationTokenSource != null)
-        {
-          AnimationBehavior._cancellationTokenSource.Cancel();
-          AnimationBehavior._cancellationTokenSource.Dispose();
-          AnimationBehavior._cancellationTokenSource =  null;
-        }
-        AnimationBehavior._cancellationTokenSource = new CancellationTokenSource();
+        AnimationBehavior.CancelLoading(image);
         int seqNum = AnimationBehavior.GetSeqNum((DependencyObject) image) + 1;
         AnimationBehavior.SetSeqNum((DependencyObject) image, seqNum);
         image.Source=( null);
@@ -178,7 +180,9 @@ namespace XamlAnimatedGif
             Uri absoluteUri = AnimationBehavior.GetAbsoluteUri(image);
             if (!(absoluteUri !=  null))
               return;
-            AnimationBehavior.InitAnimationAsync(image, absoluteUri, AnimationBehavior._cancellationTokenSource.Token, AnimationBehavior.GetRepeatBehavior((DependencyObject) image), seqNum);
+            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            AnimationBehavior._cancellationTokenSources[image] = cancellationTokenSource;
+            AnimationBehavior.InitAnimationAsync(image, absoluteUri, cancellationTokenSource.Token, AnimationBehavior.GetRepeatBehavior((DependencyObject) image), seqNum);
           }
         }
         catch (Exception ex)
@@ -198,7 +202,7 @@ namespace XamlAnimatedGif
       Image image = (Image) sender;
       // ISSUE: method pointer
       RoutedEventHandler routedEventHandler = new RoutedEventHandler( AnimationBehavior.Image_Loaded);
-      ((FrameworkElement) image).Loaded+=(routedEventHandler);
+      ((FrameworkElement) image).Loaded-=(routedEventHandler);
       AnimationBehavior.InitAnimation(image);
     }
 
@@ -211,6 +215,7 @@ namespace XamlAnimatedGif
       // ISSUE: method pointer
       RoutedEventHandler routedEventHandler2 = new RoutedEventHandler( AnimationBehavior.Image_Loaded);
       ((FrameworkElement)image).Loaded += (routedEventHandler2);
+      AnimationBehavior.CancelLoading(image);
       AnimationBehavior.ClearAnimatorCore(image);
     }
 
@@ -316,10 +321,22 @@ namespace XamlAnimatedGif
 
     public static void CancelLoading()
     {
-      if (AnimationBehavior._cancellationTokenSource == null || AnimationBehavior._cancellationTokenSource.IsCancellationRequested)
+      List<Image> images = new List<Image>(AnimationBehavior._cancellationTokenSources.Keys);
+      foreach (Image image in images)
+        AnimationBehavior.CancelLoading(image);
+    }
+
+    private static void CancelLoading(Image image)
+    {
+      CancellationTokenSource cancellationTokenSource;
+      if (image == null ||
+          !AnimationBehavior._cancellationTokenSources.TryGetValue(image, out cancellationTokenSource))
         return;
-      AnimationBehavior._cancellationTokenSource.Cancel();
-      AnimationBehavior._cancellationTokenSource =  null;
+
+      if (!cancellationTokenSource.IsCancellationRequested)
+        cancellationTokenSource.Cancel();
+      cancellationTokenSource.Dispose();
+      AnimationBehavior._cancellationTokenSources.Remove(image);
     }
   }
 }
