@@ -129,7 +129,7 @@ namespace VKClient.Common.Backend
             }
             else
             {
-                Logger.Instance.Info(">>>>>>>>>>>>>>>Starting GETAsync concurrentRequestsNo = {0} ; baseUri = {1}; parameters = {2}", JsonWebRequest._currentNumberOfRequests, baseUri, JsonWebRequest.GetAsLogString(parameters));
+                Logger.Instance.Info(">>>>>>>>>>>>>>>Starting GETAsync concurrentRequestsNo = {0} ; baseUri = {1}", JsonWebRequest._currentNumberOfRequests, baseUri);
                 Interlocked.Increment(ref JsonWebRequest._currentNumberOfRequests);
                 string queryString = JsonWebRequest.ConvertDictionaryToQueryString(parameters, true);
                 JsonWebRequest.RequestState myRequestState = new JsonWebRequest.RequestState();

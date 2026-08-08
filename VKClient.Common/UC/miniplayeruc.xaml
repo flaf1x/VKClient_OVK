@@ -5,24 +5,29 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:framework="clr-namespace:VKClient.Common.Framework;assembly=VKClient.Common"
              mc:Ignorable="d"
-             
              FontFamily="{StaticResource PhoneFontFamilyNormal}"
              FontSize="{StaticResource PhoneFontSizeNormal}"
              Foreground="{StaticResource PhoneForegroundBrush}"
-             
-             d:DesignHeight="72" 
+             d:DesignHeight="72"
              d:DesignWidth="416">
 
-    <Grid Background="{StaticResource PhoneMiniPlayerBackgroundBrush}" 
+    <Grid x:Name="miniPlayerRoot"
+          Background="{StaticResource PhoneMiniPlayerBackgroundBrush}"
           Visibility="{Binding CurrentTrackVisibility}"
-          Height="72">
+          Height="72"
+          ManipulationStarted="MiniPlayer_OnManipulationStarted"
+          ManipulationDelta="MiniPlayer_OnManipulationDelta"
+          ManipulationCompleted="MiniPlayer_OnManipulationCompleted">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="miniPlayerTranslate"/>
+        </Grid.RenderTransform>
 
         <Rectangle Height="2"
                    HorizontalAlignment="Left"
                    VerticalAlignment="Top"
                    Width="{Binding MiniPlayerProgressWidth}"
                    Fill="{StaticResource PhoneBlue300Brush}"/>
-        
+
         <Grid Background="Transparent"
               Tap="PlayButton_OnClicked"
               HorizontalAlignment="Left"
@@ -65,18 +70,18 @@
               Name="trackPanel">
             <TextBlock FontSize="25.333"
                        Foreground="White"
-                       Margin="0,7,16,0"
+                       Margin="0,7,8,0"
                        HorizontalAlignment="Left"
                        framework:CorrectableTextBlock.Text="{Binding TrackName}"
-                       MaxWidth="320"/>
+                       MaxWidth="320"
+                       TextTrimming="WordEllipsis"/>
             <TextBlock Foreground="{StaticResource PhoneMainMenuStatusForegroundBrush}"
-                       Margin="0,36,16,0"
+                       Margin="0,36,8,0"
                        HorizontalAlignment="Left"
                        FontSize="20"
                        framework:CorrectableTextBlock.Text="{Binding ArtistName}"
-                       MaxWidth="320"/>
+                       MaxWidth="320"
+                       TextTrimming="WordEllipsis"/>
         </Grid>
-
     </Grid>
-    
 </UserControl>

@@ -629,7 +629,9 @@ namespace VKClient.Common.UC
 
         private void Search_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
         {
-            SearchHintsUC.ShowPopup();
+            // Search is a child page of the current screen. Keep the current
+            // page in the stack so the hardware Back button can return to it.
+            this.NavigateOnMenuClick((Action)(() => Navigator.Current.NavigateToUsersSearch()), false);
         }
 
         [DebuggerNonUserCode]

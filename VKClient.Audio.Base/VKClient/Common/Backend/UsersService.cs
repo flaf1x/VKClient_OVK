@@ -861,57 +861,30 @@ namespace VKClient.Common.Backend
         return;
       Dictionary<string, string> parameters = new Dictionary<string, string>()
       {
-        {
-          "offset",
-          offset.ToString()
-        },
-        {
-          "count",
-          count.ToString()
-        }
+        { "q", query ?? string.Empty },
+        { "offset", offset.ToString() },
+        { "count", count.ToString() }
       };
-      if (!string.IsNullOrWhiteSpace(query))
-        parameters.Add("q", query);
-      Country country = searchParams.GetValue<Country>("country");
-      long id;
-      if (country != null && country.id > 0L)
-      {
-        Dictionary<string, string> dictionary = parameters;
-        string key = "country";
-        id = country.id;
-        string str = id.ToString();
-        dictionary.Add(key, str);
-      }
+
+      // OpenVK users.search currently supports city, sex, status and online from
+      // the legacy WP filter set. country/age/has_photo are not method arguments.
       City city = searchParams.GetValue<City>("city");
-      if (city != null && city.id > 0L)
-      {
-        Dictionary<string, string> dictionary = parameters;
-        string key = "city";
-        id = city.id;
-        string str = id.ToString();
-        dictionary.Add(key, str);
-      }
-      if (searchParams.GetValue<int>("age_from") > 0)
-      {
-        int num1 = searchParams.GetValue<int>("age_from");
-        int num2 = searchParams.GetValue<int>("age_to");
-        if (num1 > 0)
-          parameters.Add("age_from", num1.ToString());
-        if (num2 > 0)
-          parameters.Add("age_to", num2.ToString());
-      }
-      int num3 = searchParams.GetValue<int>("sex");
-      if (num3 > 0)
-        parameters.Add("sex", num3.ToString());
-      int num4 = searchParams.GetValue<int>("status");
-      if (num4 > 0)
-        parameters.Add("status", num4.ToString());
-      if (searchParams.GetValue<bool>("has_photo"))
-        parameters.Add("has_photo", "1");
+      if (city != null && !string.IsNullOrWhiteSpace(city.title))
+        parameters["city"] = city.title;
+
+      int sex = searchParams.GetValue<int>("sex");
+      if (sex > 0)
+        parameters["sex"] = sex.ToString();
+
+      int status = searchParams.GetValue<int>("status");
+      if (status > 0)
+        parameters["status"] = status.ToString();
+
       if (searchParams.GetValue<bool>("online"))
-        parameters.Add("online", "1");
-      parameters.Add("fields", "photo_max,verified,occupation,city,country,friend_status");
-      VKRequestsDispatcher.DispatchRequestToVK<VKList<User>>("users.search", parameters, callback,  null, false, true, new CancellationToken?(),  null);
+        parameters["online"] = "1";
+
+      parameters["fields"] = "photo_50,photo_100,photo_200,photo_max,verified,city,friend_status,online,last_seen";
+      VKRequestsDispatcher.DispatchRequestToVK<VKList<User>>("users.search", parameters, callback, null, false, true, new CancellationToken?(), null);
     }
 
     public void GetNearby(double lat, double lon, uint? accuracy, Action<BackendResult<VKList<User>, ResultCode>> callback)

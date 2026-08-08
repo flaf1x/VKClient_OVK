@@ -1761,6 +1761,15 @@
   <data name="About_Version" xml:space="preserve">
     <value>Версия {0}</value>
   </data>
+  <data name="About_PatchVersion" xml:space="preserve">
+    <value>Патч 1.1</value>
+  </data>
+  <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
+    <value>Об OpenVK</value>
+  </data>
+  <data name="OpenVK_DisclaimerText" xml:space="preserve">
+    <value>Данное приложение построено на основе оригинального приложения «ВКонтакте», но впоследствии было адаптировано и переработано для работы с проектом OpenVK.</value>
+  </data>
   <data name="DiagnosticsDescription" xml:space="preserve">
     <value>При появлении ошибок в работе приложения Вы можете отправить диагностическую информацию разработчикам ВКонтакте.</value>
   </data>

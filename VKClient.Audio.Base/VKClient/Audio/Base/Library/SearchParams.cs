@@ -42,7 +42,10 @@ namespace VKClient.Audio.Base.Library
 
     public SearchParams Copy()
     {
-      return (SearchParams) this.MemberwiseClone();
+      SearchParams copy = new SearchParams();
+      foreach (KeyValuePair<string, object> parameter in this._parameters)
+        copy._parameters[parameter.Key] = parameter.Value;
+      return copy;
     }
   }
 }

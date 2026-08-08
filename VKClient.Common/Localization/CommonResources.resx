@@ -1766,6 +1766,15 @@ in the Friends section</value>
   <data name="About_Version" xml:space="preserve">
     <value>Version {0}</value>
   </data>
+  <data name="About_PatchVersion" xml:space="preserve">
+    <value>Patch 1.1</value>
+  </data>
+  <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
+    <value>About OpenVK</value>
+  </data>
+  <data name="OpenVK_DisclaimerText" xml:space="preserve">
+    <value>This application is based on the original VKontakte application, but was later adapted and reworked to work with the OpenVK project.</value>
+  </data>
   <data name="DiagnosticsDescription" xml:space="preserve">
     <value>If an error occurs in the application, you can send diagnostic information to VK developers.</value>
   </data>

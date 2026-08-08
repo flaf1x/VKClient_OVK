@@ -229,7 +229,7 @@ namespace VKClient.Audio.ViewModels
 
         internal async void DeleteAudios(List<AudioHeader> list)//todo:IsSavedAudiosAlbum
         {
-            AudioService.Instance.DeleteAudios((List<long>)Enumerable.ToList<long>(Enumerable.Select<AudioHeader, long>(list, (Func<AudioHeader, long>)(a => a.Track.aid))));
+            AudioService.Instance.DeleteAudios((List<AudioObj>)Enumerable.ToList<AudioObj>(Enumerable.Select<AudioHeader, AudioObj>(list, (Func<AudioHeader, AudioObj>)(a => a.Track))));
             await AudioCacheManager.Instance.ClearCache((IEnumerable<string>)Enumerable.Select<AudioHeader, string>(list, (Func<AudioHeader, string>)(h => h.Track.Id)));
             List<AudioHeader>.Enumerator enumerator = list.GetEnumerator();
             try
@@ -253,7 +253,7 @@ namespace VKClient.Audio.ViewModels
 
         internal void MoveTracksToAlbum(List<AudioHeader> headersToMove, AudioAlbum pickedAlbum, Action<bool> callback)
         {
-            AudioService.Instance.MoveToAlbum((List<long>)Enumerable.ToList<long>(Enumerable.Select<AudioHeader, long>(headersToMove, (Func<AudioHeader, long>)(h => h.Track.aid))), pickedAlbum.album_id, (Action<BackendResult<object, ResultCode>>)(res =>
+            AudioService.Instance.MoveToAlbum((List<string>)Enumerable.ToList<string>(Enumerable.Select<AudioHeader, string>(headersToMove, (Func<AudioHeader, string>)(h => h.Track.UniqueId))), pickedAlbum.album_id, (Action<BackendResult<object, ResultCode>>)(res =>
           {
               if (res.ResultCode == ResultCode.Succeeded)
                   callback(true);

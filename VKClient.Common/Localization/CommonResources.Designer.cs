@@ -95,6 +95,33 @@ namespace VKClient.Common.Localization {
                 return ResourceManager.GetString("About_Version", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up the localized OpenVK patch version label.
+        /// </summary>
+        public static string About_PatchVersion {
+            get {
+                return ResourceManager.GetString("About_PatchVersion", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up the localized OpenVK disclaimer title.
+        /// </summary>
+        public static string OpenVK_DisclaimerTitle {
+            get {
+                return ResourceManager.GetString("OpenVK_DisclaimerTitle", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up the localized OpenVK disclaimer text.
+        /// </summary>
+        public static string OpenVK_DisclaimerText {
+            get {
+                return ResourceManager.GetString("OpenVK_DisclaimerText", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Ищет локализованную строку, похожую на Service info.

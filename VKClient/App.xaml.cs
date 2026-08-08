@@ -26,6 +26,7 @@ using VKClient.Common.Framework;
 using VKClient.Common.Library;
 using VKClient.Common.Library.Events;
 using VKClient.Common.Library.Games;
+using VKClient.Common.Localization;
 using VKClient.Common.Stickers.AutoSuggest;
 using VKClient.Common.Utils;
 using VKClient.Common.VideoCatalog;
@@ -42,8 +43,10 @@ namespace VKClient
     public partial class App : Application, IAppStateInfo
     {
         private static string _imageDictionaryKey = "ImageDict";
+        private const string OpenVkDisclaimerShownSettingKey = "OpenVKDisclaimerShown";
         //public static TelemetryClient TelemetryClient;
         private static CustomUriMapper _uriMapper;
+        private readonly string _systemUiLanguageName = CultureInfo.CurrentUICulture.Name;
         private bool phoneApplicationInitialized;
     //    private bool _wasReset;
         private bool _handlingPreLoginNavigation;
@@ -490,8 +493,42 @@ namespace VKClient
         {
             if (this.RootVisual != this.RootFrame)
                 this.RootVisual = ((UIElement)this.RootFrame);
-            
+
+            this.RootFrame.Dispatcher.BeginInvoke((Action)this.ShowOpenVkDisclaimerIfNeeded);
             this.RootFrame.Navigated -= (new NavigatedEventHandler(this.CompleteInitializePhoneApplication));
+        }
+
+        private void ShowOpenVkDisclaimerIfNeeded()
+        {
+            try
+            {
+                if (this.Settings.Contains(OpenVkDisclaimerShownSettingKey) &&
+                    this.Settings[OpenVkDisclaimerShownSettingKey] is bool &&
+                    (bool)this.Settings[OpenVkDisclaimerShownSettingKey])
+                    return;
+
+                string language = "en";
+                if (!string.IsNullOrEmpty(this._systemUiLanguageName))
+                    language = new CultureInfo(this._systemUiLanguageName).TwoLetterISOLanguageName;
+
+                CultureInfo disclaimerCulture = language == "ru"
+                    ? new CultureInfo("ru-RU")
+                    : language == "uk"
+                        ? new CultureInfo("uk-UA")
+                        : new CultureInfo("en-US");
+
+                MessageBox.Show(
+                    CommonResources.ResourceManager.GetString("OpenVK_DisclaimerText", disclaimerCulture),
+                    CommonResources.ResourceManager.GetString("OpenVK_DisclaimerTitle", disclaimerCulture),
+                    MessageBoxButton.OK);
+
+                this.Settings[OpenVkDisclaimerShownSettingKey] = true;
+                this.Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Logger.Instance.Error("Unable to show the OpenVK disclaimer", ex);
+            }
         }
 
         private void MenuItem_Click_1(object sender, RoutedEventArgs e)

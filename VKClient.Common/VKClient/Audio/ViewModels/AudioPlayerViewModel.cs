@@ -571,7 +571,15 @@ namespace VKClient.Audio.ViewModels
         {
             if (active)
             {
-                this.OnPlayerStateChanged(null);
+                if (BGAudioPlayerWrapper.Instance.IsManuallyClosed)
+                {
+                    this.StopTrackingPosition();
+                    this.IsStopped = true;
+                }
+                else
+                {
+                    this.OnPlayerStateChanged(null);
+                }
                 EventAggregator.Current.Subscribe(this);
             }
             else
@@ -646,6 +654,12 @@ namespace VKClient.Audio.ViewModels
 
         private void OnPlayerStateChanged(AudioPlayerStateChanged args = null)
         {
+            if (BGAudioPlayerWrapper.Instance.IsManuallyClosed)
+            {
+                this.StopTrackingPosition();
+                this.IsStopped = true;
+                return;
+            }
             this.IsStopped = false;
             PlayState playState = args != null ? args.PlayState : BGAudioPlayerWrapper.Instance.PlayerState;
             this._lastTimeOnStateChanged = DateTime.Now;

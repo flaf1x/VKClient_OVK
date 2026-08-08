@@ -24,11 +24,27 @@
                       Width="416">
             <StackPanel>
 
+                <Grid Margin="0,32,0,0"
+                      Tap="Search_OnClicked"
+                      Background="Transparent"
+                      HorizontalAlignment="Stretch"
+                      framework:MetroInMotion.Tilt="1.5">
+                    <Rectangle Fill="{StaticResource PhoneMainMenuSearchBoxBackgroundBrush}"
+                               Margin="16,8,16,8"
+                               Height="48" />
+                    <TextBlock Text="{Binding Path=LocalizedResources.MainMenu_Search, Source={StaticResource LocalizedStrings}}"
+                               IsHitTestVisible="False"
+                               Margin="32,14,0,0"
+                               FontSize="22.777"
+                               Foreground="White"
+                               Opacity="0.4" />
+                </Grid>
+
                 <Grid framework:MetroInMotion.Tilt="2.5"
                       Tap="Profile_OnClicked"
                       Hold="Profile_OnHolding"
                       Background="Transparent"
-                      Margin="0,32,0,0"
+                      Margin="0,10,0,0"
                       Height="60">
                     <Ellipse Fill="{StaticResource PhoneMenuImagePlaceholderBackgroundBrush}"
                              HorizontalAlignment="Left"
@@ -43,9 +59,6 @@
                            Height="48"
                            Width="48">
                         <Image.Clip>
-                            <!--<EllipseGeometry Center="24,24"
-                                             RadiusX="24"
-                                             RadiusY="24" />-->
                             <RectangleGeometry Rect="0 0 48 48" x:Name="rectangleGeometry"
 					            RadiusX="24"
 					            RadiusY="24"/>

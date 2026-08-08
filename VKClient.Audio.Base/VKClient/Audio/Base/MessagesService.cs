@@ -599,7 +599,7 @@ namespace VKClient.Audio.Base
       CancellationToken? cancellationToken = new CancellationToken?();
       // ISSUE: variable of the null type
       
-      VKRequestsDispatcher.DispatchRequestToVK<AudioObj>(methodName, parameters, callback1, (Func<string, AudioObj>) (jsonStr => JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<List<AudioObj>>>(jsonStr).response.First<AudioObj>()), num1 != 0, num2 != 0, cancellationToken, null);
+      VKRequestsDispatcher.DispatchRequestToVK<AudioObj>(methodName, parameters, callback1, (Func<string, AudioObj>) (jsonStr => (JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<VKList<AudioObj>>>(jsonStr).response.items ?? new List<AudioObj>()).FirstOrDefault<AudioObj>()), num1 != 0, num2 != 0, cancellationToken, null);
     }
 
     public void DeleteDialog(long userOrChatId, bool isChat, Action<BackendResult<ResponseWithId, ResultCode>> callback)

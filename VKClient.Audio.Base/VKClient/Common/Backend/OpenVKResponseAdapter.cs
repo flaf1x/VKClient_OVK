@@ -234,6 +234,13 @@ namespace VKClient.Common.Backend
       if (obj["aid"] != null && obj["aid"].Type == JTokenType.Null)
         obj["aid"] = 0;
 
+      // Audio is still being processed when OpenVK returns url:false. The
+      // legacy model stores url as a string, so keep the track deserializable.
+      if (obj["artist"] != null && obj["title"] != null &&
+          (obj["url"] == null || obj["url"].Type == JTokenType.Null ||
+           (obj["url"].Type == JTokenType.Boolean && !obj["url"].Value<bool>())))
+        obj["url"] = string.Empty;
+
       // Some OpenVK forks (including VepurOVK) expose modern wall/feed ids
       // only. The legacy WP feed resolves the author exclusively through
       // source_id and opens the post through post_id.

@@ -88,7 +88,6 @@ namespace VKClient.Common.Library
       set
       {
         this._searchParams.SetValue<City>("city", value, value == null || value.id == 0L);
-        this._searchParams.SetValue<City>("city", value, false);
         this.NotifyPropertyChanged("City");
       }
     }
@@ -366,6 +365,14 @@ namespace VKClient.Common.Library
       else
       {
         this._searchParams = searchParams;
+        // These legacy VK filters are not accepted by OpenVK users.search.
+        // Remove old values so they cannot keep IsAnySet=true or break a request.
+        this._searchParams.ResetValue("country");
+        this._searchParams.ResetValue("city");
+        this._searchParams.ResetValue("DisableAnyAge");
+        this._searchParams.ResetValue("age_from");
+        this._searchParams.ResetValue("age_to");
+        this._searchParams.ResetValue("has_photo");
         if (!this.IsAnyAge)
         {
           int minAge = searchParams.GetValue<int>("age_from");
@@ -399,29 +406,12 @@ namespace VKClient.Common.Library
         VKClient.Common.Backend.DataObjects.Sex sex2 = (VKClient.Common.Backend.DataObjects.Sex) sex1;
         stringList.Add(sex2.GetSexStr());
       }
-      int num1 = !searchParams.GetValue<bool>("DisableAnyAge") ? 1 : 0;
-      int number1 = searchParams.GetValue<int>("age_from");
-      int number2 = searchParams.GetValue<int>("age_to");
-      if (num1 == 0 && number1 > 0 && (number2 > 0 && number2 > number1))
+      int statusId = searchParams.GetValue<int>("status");
+      if (statusId > 0)
       {
-        string str1 = UIStringFormatterHelper.FormatNumberOfSomething(number1, CommonResources.OneFromAgeFrm, CommonResources.TwoFourFromAgeFrm, CommonResources.FiveFromAgeFrm, true,  null, false);
-        string str2 = UIStringFormatterHelper.FormatNumberOfSomething(number2, CommonResources.OneToAgeFrm, CommonResources.TwoFourToAgeFrm, CommonResources.FiveToAgeFrm, true,  null, false);
-        stringList.Add(string.Format("{0} {1}", str1, str2));
-      }
-      int num2 = searchParams.GetValue<int>("status");
-      if (num2 > 0)
-      {
-        RelationshipStatus status = (RelationshipStatus) num2;
+        RelationshipStatus status = (RelationshipStatus) statusId;
         stringList.Add(((string) status.GetRelationshipStr(sex1)).ToLowerInvariant());
       }
-      Country country = searchParams.GetValue<Country>("country");
-      if (country != null && country.id > 0L)
-        stringList.Add(country.title);
-      City city = searchParams.GetValue<City>("city");
-      if (city != null && city.id > 0L)
-        stringList.Add(city.name);
-      if (searchParams.GetValue<bool>("has_photo"))
-        stringList.Add(((string) CommonResources.UsersSearch_WithPhoto).ToLowerInvariant());
       if (searchParams.GetValue<bool>("online"))
         stringList.Add(((string) CommonResources.UsersSearch_OnlineNow).ToLowerInvariant());
       return string.Join(", ", (IEnumerable<string>) stringList).Capitalize();

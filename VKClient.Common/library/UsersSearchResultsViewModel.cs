@@ -76,7 +76,7 @@ namespace VKClient.Common.Library
     {
       get
       {
-        if (!this._searchParamsViewModel.SearchParams.IsAnySet)
+        if (string.IsNullOrWhiteSpace(this.SearchName) && !this._searchParamsViewModel.SearchParams.IsAnySet)
           return CommonResources.UsersSearch_OnlineNow.ToUpperInvariant();
         return UIStringFormatterHelper.FormatNumberOfSomething(this._searchVM.TotalCount, CommonResources.UsersSearch_OnePersonFoundFrm, CommonResources.UsersSearch_TwoFourPersonsFoundFrm, CommonResources.UsersSearch_FivePersonsFoundFrm, true,  null, false).ToUpperInvariant();
       }
@@ -149,7 +149,13 @@ namespace VKClient.Common.Library
 
     public void GetData(GenericCollectionViewModel2<VKList<User>, SubscriptionItemHeader> caller, int offset, int count, Action<BackendResult<VKList<User>, ResultCode>> callback)
     {
-      UsersService.Instance.Search(this._searchParamsViewModel.SearchParams, this.SearchName, offset, count, callback);
+      SearchParams searchParams = this._searchParamsViewModel.SearchParams;
+      if (string.IsNullOrWhiteSpace(this.SearchName) && !searchParams.IsAnySet)
+      {
+        searchParams = searchParams.Copy();
+        searchParams.SetValue<bool>("online", true, false);
+      }
+      UsersService.Instance.Search(searchParams, this.SearchName, offset, count, callback);
     }
 
     public string GetFooterTextForCount(GenericCollectionViewModel2<VKList<User>, SubscriptionItemHeader> caller, int count)

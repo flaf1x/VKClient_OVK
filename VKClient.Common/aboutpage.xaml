@@ -25,7 +25,7 @@
                     Width="144" Margin="0,8,0,0" Tap="AboutImage_OnTap"/>
                 <TextBlock Name="VersionBlock" HorizontalAlignment="Center" Margin="0,14,0,0"
                     FontSize="20" Foreground="{StaticResource PhoneVKSubtleBrush}"/>
-                <TextBlock Name="PatchVersionBlock" Text="Patch 1.0" HorizontalAlignment="Center" Margin="0,2,0,48"
+                <TextBlock Name="PatchVersionBlock" HorizontalAlignment="Center" Margin="0,2,0,48"
                     FontSize="20" Foreground="{StaticResource PhoneVKSubtleBrush}"/>
 
                 <TextBlock Text="{Binding Path=LocalizedResources.Action_SendFeedback, Source={StaticResource LocalizedStrings}}"

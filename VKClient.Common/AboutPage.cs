@@ -27,6 +27,7 @@ namespace VKClient.Common
             this.InitializeComponent();
             this.Header.TextBlockTitle.Text = (CommonResources.Menu_About.ToUpper());
             this.VersionBlock.Text = string.Format(CommonResources.About_Version, "4.12");
+            this.PatchVersionBlock.Text = CommonResources.About_PatchVersion;
         }
 
         protected override void HandleOnNavigatedTo(NavigationEventArgs e)

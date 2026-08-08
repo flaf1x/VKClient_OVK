@@ -187,8 +187,6 @@ namespace VKClient.Common.Backend
                     if (IsOpenVKRequest(baseUrl))
                         responseJson = OpenVKResponseAdapter.Adapt(methodName, responseJson);
 
-                    TraceOpenVkResponse(methodName, responseJson);
-
                     JObject responseObject;
                     try
                     {
@@ -207,6 +205,8 @@ namespace VKClient.Common.Backend
                     }
 
                     VKRequestsDispatcher.ResultData resultFromJson = VKRequestsDispatcher.GetResultFromJson(responseObject);
+                    if (resultFromJson.ResultCode != ResultCode.Succeeded)
+                      TraceOpenVkResponse(methodName, responseJson);
                     if (string.IsNullOrEmpty(methodName) && resultFromJson.ResultCode == (ResultCode)28)
                         resultFromJson.ResultCode = ResultCode.WrongUsernameOrPassword;
                     backendResult.ResultCode = resultFromJson.ResultCode;

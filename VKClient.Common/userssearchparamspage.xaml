@@ -50,41 +50,6 @@
             <ScrollViewer>
                 <StackPanel Margin="24 0">
 
-                    <TextBlock Margin="0 18"
-                               FontFamily="Segoe WP Semibold"
-                               Foreground="{StaticResource PhoneVKSubtleBrush}"
-                               Text="{Binding LocalizedResources.UsersSearch_Region_Title, Source={StaticResource LocalizedStrings}}" />
-
-                    <Grid framework:MetroInMotion.Tilt="1.5"
-                          Tap="CountryPicker_OnTap">
-                        <StackPanel>
-                            <TextBlock FontSize="25.33"
-                                       Text="{Binding LocalizedResources.CountryPicker_Title, Source={StaticResource LocalizedStrings}}" />
-
-                            <TextBlock Foreground="{StaticResource PhoneVKSubtleBrush}"
-                                       Margin="1 -3 0 0"
-                                       Text="{Binding Country.title, FallbackValue='Russia'}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0 20 0 0"
-                          Visibility="{Binding CitySelectorVisibility}"
-                          framework:MetroInMotion.Tilt="1.5"
-                          Tap="CityPicker_OnTap">
-                        <StackPanel>
-                            <TextBlock FontSize="25.33"
-                                       Text="{Binding LocalizedResources.CityPicker_Title, Source={StaticResource LocalizedStrings}}" />
-
-                            <TextBlock Foreground="{StaticResource PhoneVKSubtleBrush}"
-                                       Margin="1 -3 0 0"
-                                       Text="{Binding City.title, FallbackValue='Saint Petersburg'}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Background="{StaticResource PhoneGreyDividerBrush}"
-                            Height="2"
-                            Margin="-23 21 -23 0" />
-
                     <TextBlock Margin="0 18 0 19"
                                FontFamily="Segoe WP Semibold"
                                Foreground="{StaticResource PhoneVKSubtleBrush}"
@@ -124,46 +89,12 @@
 
                     <Border Background="{StaticResource PhoneGreyDividerBrush}"
                             Height="2"
-                            Margin="-23 21 -23 0" />
+                            Margin="-23 21 -23 19" />
 
-                    <TextBlock Margin="0 18 0 19"
-                               FontFamily="Segoe WP Semibold"
-                               Foreground="{StaticResource PhoneVKSubtleBrush}"
-                               Text="{Binding LocalizedResources.UsersSearch_Age_Title, Source={StaticResource LocalizedStrings}}" />
-
-                    <CheckBox Content="{Binding LocalizedResources.AnyAge, Source={StaticResource LocalizedStrings}}"
-                              Checked="AnyAgeCheckBox_OnChecked"
-                              Unchecked="AnyAgeCheckBox_OnUnchecked"
-                              IsChecked="{Binding IsAnyAge, Mode=TwoWay}"
-                              Margin="-12 -12 -12 -5" />
-
+                    <!-- Kept only because the generated code/storyboards reference this name. -->
                     <Border x:Name="customAgeContainer"
-                            Height="90"
-                            Margin="0 -7 0 0">
-                        <Grid Margin="0 20">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition />
-                                <ColumnDefinition />
-                            </Grid.ColumnDefinitions>
-
-                            <uc:ListPickerControl Title="{Binding LocalizedResources.UsersSearch_AgeFrom, Source={StaticResource LocalizedStrings}}"
-                                                  PickerWidth="160"
-                                                  ItemsSource="{Binding AgesFrom}"
-                                                  SelectedItem="{Binding AgeFromSelected, Mode=TwoWay}"
-                                                  ItemPrefix="{Binding LocalizedResources.UsersSearch_AgeFrom, Source={StaticResource LocalizedStrings}}" />
-
-                            <uc:ListPickerControl Grid.Column="1"
-                                                  Title="{Binding LocalizedResources.UsersSearch_AgeTo, Source={StaticResource LocalizedStrings}}"
-                                                  PickerWidth="160"
-                                                  ItemsSource="{Binding AgesTo}"
-                                                  SelectedItem="{Binding AgeToSelected, Mode=TwoWay}"
-                                                  ItemPrefix="{Binding LocalizedResources.UsersSearch_AgeTo, Source={StaticResource LocalizedStrings}}" />
-                        </Grid>
-                    </Border>
-
-                    <Border Background="{StaticResource PhoneGreyDividerBrush}"
-                            Height="2"
-                            Margin="-23 1 -23 19" />
+                            Height="0"
+                            Visibility="Collapsed" />
 
                     <TextBlock Margin="0 0 0 25"
                                FontFamily="Segoe WP Semibold"
@@ -178,9 +109,6 @@
                             Height="2"
                             Margin="-23 21 -23 13" />
 
-                    <CheckBox Content="{Binding LocalizedResources.UsersSearch_WithPhoto, Source={StaticResource LocalizedStrings}}"
-                              IsChecked="{Binding IsWithPhoto, Mode=TwoWay}"
-                              Margin="-12 0" />
                     <CheckBox Content="{Binding LocalizedResources.UsersSearch_OnlineNow, Source={StaticResource LocalizedStrings}}"
                               IsChecked="{Binding IsOnlineNow, Mode=TwoWay}"
                               Margin="-12 -4" />

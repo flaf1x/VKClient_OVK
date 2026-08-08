@@ -58,10 +58,10 @@ namespace VKClient.Common.Backend
             }, userOrGroupId, isGroup, 0, VKConstants.AlbumsReadCount);
         }
 
-        public void MoveToAlbum(List<long> aids, long albumId, Action<BackendResult<object, ResultCode>> callback)
+        public void MoveToAlbum(List<string> audioIds, long albumId, Action<BackendResult<object, ResultCode>> callback)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
-            parameters["audio_ids"] = aids.GetCommaSeparated();
+            parameters["audio_ids"] = audioIds.GetCommaSeparated(",");
             parameters["album_id"] = albumId.ToString();
             VKRequestsDispatcher.DispatchRequestToVK<object>("audio.moveToAlbum", parameters, callback, null, false, true, new CancellationToken?(), null);
         }
@@ -85,7 +85,16 @@ namespace VKClient.Common.Backend
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             parameters["title"] = albumName;
-            VKRequestsDispatcher.DispatchRequestToVK<AudioAlbum>("audio.addAlbum", parameters, callback, null, false, true, new CancellationToken?(), null);
+            VKRequestsDispatcher.DispatchRequestToVK<AudioAlbum>("audio.addAlbum", parameters, callback, (Func<string, AudioAlbum>)(jsonStr =>
+            {
+                VKRequestsDispatcher.GenericRoot<long> root = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<long>>(jsonStr);
+                return new AudioAlbum()
+                {
+                    album_id = root != null ? root.response : 0L,
+                    owner_id = AppGlobalStateManager.Current.LoggedInUserId,
+                    title = albumName
+                };
+            }), false, true, new CancellationToken?(), null);
         }
 
         public void GetAllAudio(Action<BackendResult<List<AudioObj>, ResultCode>> callback, long? userOrGroupId = null, bool isGroup = false, long? albumId = null, int offset = 0, int count = 0)
@@ -114,7 +123,7 @@ namespace VKClient.Common.Backend
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             parameters["offset"] = offset.ToString();
             parameters["count"] = count.ToString();
-            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.getPopular", parameters, callback, null, false, true, new CancellationToken?(), null);
+            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.getPopular", parameters, callback, AudioService._deserializeAudioList, false, true, new CancellationToken?(), null);
         }
 
         public void GetUserAlbums(Action<BackendResult<ListResponse<AudioAlbum>, ResultCode>> callback, long? userOrGroupId = null, bool isGroup = false, int offset = 0, int count = 0)
@@ -137,7 +146,27 @@ namespace VKClient.Common.Backend
 
         public void GetAllAudioForUser(long uid, long guid, long albumId, List<long> aids, int count, int offset, Action<BackendResult<List<AudioObj>, ResultCode>> callback)
         {
-            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.get", new Dictionary<string, string>(), callback, AudioService._deserializeAudioList, false, true, new CancellationToken?(), null);
+            Dictionary<string, string> parameters = new Dictionary<string, string>();
+            long ownerId = guid != 0L ? -Math.Abs(guid) : uid;
+            if (ownerId != 0L)
+                parameters["owner_id"] = ownerId.ToString();
+            if (albumId != 0L)
+                parameters["album_id"] = albumId.ToString();
+            if (aids != null && aids.Count > 0)
+            {
+                if (ownerId != 0L)
+                {
+                    List<string> audioIds = new List<string>();
+                    foreach (long aid in aids)
+                        audioIds.Add(ownerId.ToString() + "_" + aid.ToString());
+                    parameters["audio_ids"] = audioIds.GetCommaSeparated(",");
+                }
+                else
+                    parameters["audio_ids"] = aids.GetCommaSeparated();
+            }
+            parameters["offset"] = offset.ToString();
+            parameters["count"] = (count > 0 ? count : VKConstants.TracksReadCount).ToString();
+            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.get", parameters, callback, AudioService._deserializeAudioList, false, true, new CancellationToken?(), null);
         }
 
         public void SearchTracks(string query, int offset, int count, Action<BackendResult<VKList<AudioObj>, ResultCode>> callback)
@@ -146,7 +175,8 @@ namespace VKClient.Common.Backend
             parameters["q"] = query;
             parameters["count"] = count.ToString();
             parameters["offset"] = offset.ToString();
-            parameters["search_own"] = "1";
+            // OpenVK rejects the legacy search_own flag. Own tracks are part
+            // of the normal search result when they match the query.
             VKRequestsDispatcher.DispatchRequestToVK<VKList<AudioObj>>("audio.search", parameters, callback, null, false, true, new CancellationToken?(), null);
         }
 
@@ -154,7 +184,7 @@ namespace VKClient.Common.Backend
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             parameters["audios"] = ids.GetCommaSeparated(",");
-            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.getById", parameters, callback, null, false, true, new CancellationToken?(), null);
+            VKRequestsDispatcher.DispatchRequestToVK<List<AudioObj>>("audio.getById", parameters, callback, AudioService._deserializeAudioList, false, true, new CancellationToken?(), null);
         }
 
         public void AddAudio(long ownerId, long aid, Action<BackendResult<long, ResultCode>> callback)
@@ -173,32 +203,29 @@ namespace VKClient.Common.Backend
             }), false, true, new CancellationToken?(), null);
         }
 
-        public void DeleteAudios(List<long> list)
+        public void DeleteAudios(List<AudioObj> tracks)
         {
-            string format = "API.audio.delete({{ \"audio_id\":{0}, \"owner_id\":{1} }});";
-            long loggedInUserId = AppGlobalStateManager.Current.LoggedInUserId;
-            string str = "";
-            foreach (long num in list)
-                str = str + string.Format(format, num, loggedInUserId) + Environment.NewLine;
-            
-            Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> action = (Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>>)(res => { });
-            
-            CancellationToken? cancellationToken = new CancellationToken?();
-            Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>> callback = (Action<BackendResult<VKClient.Common.Backend.DataObjects.ResponseWithId, ResultCode>>)(res => { });
-            VKRequestsDispatcher.Execute<VKClient.Common.Backend.DataObjects.ResponseWithId>(str, callback, (Func<string, VKClient.Common.Backend.DataObjects.ResponseWithId>)(jsonStr => new VKClient.Common.Backend.DataObjects.ResponseWithId()), false, true, cancellationToken);
+            if (tracks == null || tracks.Count == 0)
+                return;
+
+            foreach (AudioObj track in tracks)
+            {
+                if (track == null)
+                    continue;
+                Dictionary<string, string> parameters = new Dictionary<string, string>();
+                parameters["audio_id"] = track.aid.ToString();
+                parameters["owner_id"] = track.owner_id.ToString();
+                VKRequestsDispatcher.DispatchRequestToVK<long>("audio.delete", parameters, res => { }, null, false, true, new CancellationToken?(), null);
+            }
         }
 
         public void ReorderAudio(long aid, long oid, long album_id, long after, long before, Action<BackendResult<long, ResultCode>> callback)
         {
-            Dictionary<string, string> parameters = new Dictionary<string, string>();
-            parameters["audio_id"] = aid.ToString();
-            if (oid != 0L)
-                parameters["owner_id"] = oid.ToString();
-            if (album_id != 0L)
-                parameters["album_id"] = album_id.ToString();
-            parameters["after"] = after.ToString();
-            parameters["before"] = before.ToString();
-            VKRequestsDispatcher.DispatchRequestToVK<long>("audio.reorder", parameters, callback, null, false, true, new CancellationToken?(), null);
+            // OpenVK currently exposes playlist add/remove/move methods but no
+            // audio.reorder equivalent. Keep the client-side order responsive
+            // and do not generate a guaranteed API error.
+            if (callback != null)
+                callback(new BackendResult<long, ResultCode>(ResultCode.Succeeded, 1L));
         }
 
         public void StatusSet(string text, string audio, Action<BackendResult<long, ResultCode>> callback)
@@ -206,9 +233,11 @@ namespace VKClient.Common.Backend
             Dictionary<string, string> parameters = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(audio))
             {
-                string str = string.Format("API.audio.setBroadcast({{\"audio\":\"{0}\"}});", audio);
-                parameters["code"] = str;
-                VKRequestsDispatcher.DispatchRequestToVK<long>("execute", parameters, callback, (Func<string, long>)(res => 1L), false, true, new CancellationToken?(), null);
+                // OpenVK has no VKScript/execute. The current handler accepts the
+                // legacy ownerId_audioId descriptor and requires explicit targets.
+                parameters["audio"] = audio;
+                parameters["target_ids"] = AppGlobalStateManager.Current.LoggedInUserId.ToString();
+                VKRequestsDispatcher.DispatchRequestToVK<long>("audio.setBroadcast", parameters, callback, (Func<string, long>)(res => 1L), false, true, new CancellationToken?(), null);
             }
             else
             {
@@ -219,7 +248,10 @@ namespace VKClient.Common.Backend
 
         public void ResetBroadcast(Action<BackendResult<long, ResultCode>> callback)
         {
-            VKRequestsDispatcher.DispatchRequestToVK<long>("audio.setBroadcast", new Dictionary<string, string>(), callback, (Func<string, long>)(res => 1L), false, true, new CancellationToken?(), null);
+            // Current OpenVK requires both audio and target_ids for setBroadcast
+            // and exposes no separate clear method. Avoid an invalid empty request.
+            if (callback != null)
+                callback(new BackendResult<long, ResultCode>(ResultCode.Succeeded, 1L));
         }
 
         public void EditAudio(long ownerId, long id, string artist, string title, Action<BackendResult<long, ResultCode>> callback)

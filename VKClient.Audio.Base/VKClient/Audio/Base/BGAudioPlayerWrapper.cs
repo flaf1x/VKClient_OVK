@@ -1,6 +1,7 @@
 using Microsoft.Phone.BackgroundAudio;
 using System;
 using System.Collections.Generic;
+using System.IO.IsolatedStorage;
 using VKClient.Audio.Base.BLExtensions;
 using VKClient.Audio.Base.Library;
 using VKClient.Common.Backend;
@@ -17,6 +18,36 @@ namespace VKClient.Audio.Base
         private AudioTrack _audioTrack;
         private bool _fetchingTrackHeader;
         private bool _inSync;
+        private const string ManuallyClosedSettingKey = "AudioPlayerManuallyClosed";
+
+        public bool IsManuallyClosed
+        {
+            get
+            {
+                try
+                {
+                    object value;
+                    if (IsolatedStorageSettings.ApplicationSettings.TryGetValue(ManuallyClosedSettingKey, out value) && value is bool)
+                        return (bool)value;
+                }
+                catch
+                {
+                }
+                return false;
+            }
+        }
+
+        private void SetManuallyClosed(bool value)
+        {
+            try
+            {
+                IsolatedStorageSettings.ApplicationSettings[ManuallyClosedSettingKey] = value;
+                IsolatedStorageSettings.ApplicationSettings.Save();
+            }
+            catch
+            {
+            }
+        }
 
         public bool BackgroundAppMode { get; set; }
 
@@ -84,6 +115,8 @@ namespace VKClient.Audio.Base
                 {
                 }
                 BackgroundAudioPlayer.Instance.Track = value;
+                if (value != null)
+                    this.SetManuallyClosed(false);
                 this.FirePlayChanged();
             }
         }
@@ -110,6 +143,7 @@ namespace VKClient.Audio.Base
 
         public void Play()
         {
+            this.SetManuallyClosed(false);
             BackgroundAudioPlayer.Instance.Play();
         }
 
@@ -125,8 +159,17 @@ namespace VKClient.Audio.Base
 
         public void Close()
         {
-            BackgroundAudioPlayer.Instance.Close();
-            EventAggregator.Current.Publish(new AudioPlayerClosedEvent());
+            this.SetManuallyClosed(true);
+            try
+            {
+                BackgroundAudioPlayer.Instance.Close();
+            }
+            finally
+            {
+                this._audioTrack = null;
+                EventAggregator.Current.Publish(new AudioPlayerClosedEvent());
+                this.FirePlayChanged();
+            }
         }
 
         private void RefetchTrack(AudioTrack track, Action<AudioTrack> callback)

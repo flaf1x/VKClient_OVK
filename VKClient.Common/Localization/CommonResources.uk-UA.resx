@@ -1764,6 +1764,15 @@
   <data name="About_Version" xml:space="preserve">
     <value>Версія {0}</value>
   </data>
+  <data name="About_PatchVersion" xml:space="preserve">
+    <value>Патч 1.1</value>
+  </data>
+  <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
+    <value>Про OpenVK</value>
+  </data>
+  <data name="OpenVK_DisclaimerText" xml:space="preserve">
+    <value>Цей застосунок створено на основі оригінального застосунку «ВКонтакті», але згодом його було адаптовано та перероблено для роботи з проєктом OpenVK.</value>
+  </data>
   <data name="DiagnosticsDescription" xml:space="preserve">
     <value>При появі помилок в роботі додатку Ви можете надіслати діагностичну інформацію розробникам ВКонтакті.</value>
   </data>
