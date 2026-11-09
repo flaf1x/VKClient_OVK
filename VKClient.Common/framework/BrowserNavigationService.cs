@@ -469,13 +469,23 @@ namespace VKClient.Common.Framework
         if (match.Index <= val1 && match.Index + match.Length - 1 >= val1)
           val1 = Math.Max(val1, match.Index + match.Length - 1);
       }
+      foreach (Match match in VKClient.Common.Utils.OpenVKMentions.Tokens.Matches(text))
+      {
+        if (match.Index <= val1 && match.Index + match.Length - 1 >= val1)
+          val1 = Math.Max(val1, match.Index + match.Length - 1);
+      }
       return text.Substring(0, val1 + 1);
     }
 
     public static List<string> ParseText(string text)
     {
+      if (string.IsNullOrEmpty(text)) return new List<string> { text ?? "" };
+      // Internal link separators must never originate from message contents.
+      text = text.Replace("\a", "").Replace("\b", "");
+      string origin = VKConstants.OpenVKWebAddress.TrimEnd('/');
       text = text.Replace("\n", " \n ");
-      text = BrowserNavigationService._regex_Uri.Replace(text, (MatchEvaluator) (m =>
+      text = VKClient.Common.Utils.OpenVKMentions.LinkBrackets(text, origin);
+      text = MapPlainText(text, plain => BrowserNavigationService._regex_Uri.Replace(plain, (MatchEvaluator) (m =>
       {
         string str1 = m.Groups.Count > 2 ? m.Groups[2].Value : string.Empty;
         if (!BrowserNavigationService.DomainsList.Contains((str1.Contains(".") ? str1.Remove(0, str1.LastIndexOf(".") + 1) : string.Empty).ToUpper()) && (m.Groups.Count <= 1 || m.Groups[1].Value.ToLower() != "http://" && m.Groups[1].Value.ToLower() != "https://"))
@@ -490,12 +500,20 @@ namespace VKClient.Common.Framework
         if (str4.Length > 38)
           str4 = str4.Substring(0, 35) + "...";
         return string.Format("\a{0}\b{1}\a", (str2 + str3), str4).Replace("#", "\0");
-      }));
-      string origin = VKConstants.OpenVKWebAddress.TrimEnd('/');
-      text = text.ReplaceByRegex(BrowserNavigationService._regex_Email, "\amailto:$2\b$2\a").ReplaceByRegex(BrowserNavigationService.Regex_DomainMention, "[$2|$4]").ReplaceByRegex(BrowserNavigationService.Regex_Mention, "\a" + origin + "/$1$2$3\b$4\b\a").ReplaceByRegex(BrowserNavigationService.Regex_OpenVkDomainMention, "\a" + origin + "/$1\b$2\b\a").ReplaceByRegex(BrowserNavigationService.Regex_Tag, "$1\a" + BrowserNavigationService.SearchFeedPrefix + "$3$4\b$3$4\a").Replace("\n ", "\n").Replace(" \n", "\n").Replace("\0", "#");
+      })));
+      text = MapPlainText(text, plain => plain.ReplaceByRegex(BrowserNavigationService._regex_Email, "$1\amailto:$2\b$2\a"));
+      text = MapPlainText(text, plain => VKClient.Common.Utils.OpenVKMentions.LinkHandles(plain, origin));
+      text = MapPlainText(text, plain => plain.ReplaceByRegex(BrowserNavigationService.Regex_Tag, "$1\a" + BrowserNavigationService.SearchFeedPrefix + "$3$4\b$3$4\a"));
+      text = text.Replace("\n ", "\n").Replace(" \n", "\n").Replace("\0", "#");
       if (text.StartsWith(" "))
         text = text.Remove(0, 1);
       return (List<string>) Enumerable.ToList<string>(text.Split('\a'));
+    }
+    private static string MapPlainText(string text, Func<string, string> transform)
+    {
+      string[] chunks = text.Split('\a');
+      for (int i = 0; i < chunks.Length; i += 2) chunks[i] = transform(chunks[i]);
+      return string.Join("\a", chunks);
     }
   }
 }

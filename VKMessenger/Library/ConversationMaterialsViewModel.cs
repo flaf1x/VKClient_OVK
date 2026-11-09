@@ -180,6 +180,8 @@ namespace VKMessenger.Library
             while (enumerator.MoveNext())
             {
               ConversationMaterial current = enumerator.Current;
+              if (current == null || current.attachment == null || current.attachment.link == null)
+                continue;
               LinkHeader linkHeader = new LinkHeader(current.attachment.link, current.message_id);
               listWithCount.List.Add(linkHeader);
             }
@@ -217,7 +219,8 @@ namespace VKMessenger.Library
           this._photosNextFrom =  null;
         MessagesService.Instance.GetConversationMaterials(this._peerId, "photo", this._photosNextFrom, count, (Action<BackendResult<VKList<ConversationMaterial>, ResultCode>>) (result =>
         {
-          this._photosNextFrom = result.ResultData.next_from;
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null)
+            this._photosNextFrom = string.IsNullOrEmpty(result.ResultData.next_from) ? null : result.ResultData.next_from;
           callback(result);
         }));
       }
@@ -242,7 +245,8 @@ namespace VKMessenger.Library
           this._videosNextFrom =  null;
         MessagesService.Instance.GetConversationMaterials(this._peerId, "video", this._videosNextFrom, count, (Action<BackendResult<VKList<ConversationMaterial>, ResultCode>>) (result =>
         {
-          this._videosNextFrom = result.ResultData.next_from;
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null)
+            this._videosNextFrom = string.IsNullOrEmpty(result.ResultData.next_from) ? null : result.ResultData.next_from;
           callback(result);
         }));
       }
@@ -267,7 +271,8 @@ namespace VKMessenger.Library
           this._audiosNextFrom =  null;
         MessagesService.Instance.GetConversationMaterials(this._peerId, "audio", this._audiosNextFrom, count, (Action<BackendResult<VKList<ConversationMaterial>, ResultCode>>) (result =>
         {
-          this._audiosNextFrom = result.ResultData.next_from;
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null)
+            this._audiosNextFrom = string.IsNullOrEmpty(result.ResultData.next_from) ? null : result.ResultData.next_from;
           callback(result);
         }));
       }
@@ -292,7 +297,8 @@ namespace VKMessenger.Library
           this._documentsNextFrom =  null;
         MessagesService.Instance.GetConversationMaterials(this._peerId, "doc", this._documentsNextFrom, count, (Action<BackendResult<VKList<ConversationMaterial>, ResultCode>>) (result =>
         {
-          this._documentsNextFrom = result.ResultData.next_from;
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null)
+            this._documentsNextFrom = string.IsNullOrEmpty(result.ResultData.next_from) ? null : result.ResultData.next_from;
           callback(result);
         }));
       }
@@ -317,7 +323,8 @@ namespace VKMessenger.Library
           this._linksNextFrom =  null;
         MessagesService.Instance.GetConversationMaterials(this._peerId, "link", this._linksNextFrom, count, (Action<BackendResult<VKList<ConversationMaterial>, ResultCode>>) (result =>
         {
-          this._linksNextFrom = result.ResultData.next_from;
+          if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null)
+            this._linksNextFrom = string.IsNullOrEmpty(result.ResultData.next_from) ? null : result.ResultData.next_from;
           callback(result);
         }));
       }

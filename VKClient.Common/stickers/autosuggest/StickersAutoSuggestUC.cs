@@ -20,7 +20,6 @@ namespace VKClient.Common.Stickers.AutoSuggest
   public class StickersAutoSuggestUC : UserControl
   {
     private int currentStickerId;
-    private DateTime _lastHiddenTime;
     internal Grid LayoutRoot;
     internal ScrollViewer scrollViewer;
     private bool _contentLoaded;
@@ -54,31 +53,15 @@ namespace VKClient.Common.Stickers.AutoSuggest
 
     public void ShowHide(bool show)
     {
-        if (show && this.Visibility == Visibility.Collapsed)
-        {
-            this.Visibility = Visibility.Visible;
-            if ((DateTime.Now - this._lastHiddenTime).TotalMilliseconds < 700.0)
-            {
-                this.Opacity = 1.0;
-            }
-            else
-            {
-                this.Opacity = 0.0;
-                this.Animate(0.0, 1.0, (object)UIElement.OpacityProperty, 250, new int?(0), null, null, false);
-            }
-        }
-        else
-        {
-            if (show || this.Visibility != Visibility.Visible)
-                return;
-            this.Visibility = Visibility.Collapsed;
-            this.Opacity = 0.0;
-            this._lastHiddenTime = DateTime.Now;
-        }
+      // Avoid HoldEnd opacity animations retaining an obsolete visible state
+      // while typing quickly or reopening the keyboard.
+      this.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+      this.Opacity = show ? 1.0 : 0.0;
     }
 
     public void SetData(IEnumerable<StickersAutoSuggestItem> items, string keyword)
     {
+      items = (items ?? Enumerable.Empty<StickersAutoSuggestItem>()).ToList();
       this.scrollViewer.ScrollToHorizontalOffset(0.0);
       ((FrameworkElement)this.scrollViewer).Margin=(Enumerable.Count<StickersAutoSuggestItem>(items) == 1 ? new Thickness(17.0, 0.0, 0.0, 0.0) : new Thickness());
       this.VM.SetItems(items);
@@ -89,7 +72,9 @@ namespace VKClient.Common.Stickers.AutoSuggest
     {
       if (PreviewBehavior.JustShown)
         return;
-      StickersAutoSuggestItem dataContext = (sender as FrameworkElement).DataContext as StickersAutoSuggestItem;
+      var element = sender as FrameworkElement;
+      var dataContext = element == null ? null : element.DataContext as StickersAutoSuggestItem;
+      if (dataContext == null || dataContext.StickerData == null) return;
       if (!dataContext.IsPromoted)
       {
         Action stickerSendingCallback = this.AutoSuggestStickerSendingCallback;

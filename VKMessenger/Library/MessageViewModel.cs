@@ -693,6 +693,8 @@ namespace VKMessenger.Library
         {
             this._outboundMessage = outboundMessage;
             Message message = new Message();
+            message.reply_message = outboundMessage.ReplyMessage;
+            message.from_id = AppGlobalStateManager.Current.LoggedInUserId;
             message.@out = 1;
             if (outboundMessage.IsChat)
                 message.chat_id = (int)outboundMessage.UserOrChatId;
@@ -911,7 +913,7 @@ namespace VKMessenger.Library
                     }
                     else
                     {
-                        foreach (Attachment attachment2 in this._message.attachments)
+                        foreach (Attachment attachment2 in this._message.attachments.Where(a => a != null && !a.IsUnavailable))
                             this.Attachments.Add(new AttachmentViewModel(attachment2, this._message));
                     }
                 }
@@ -957,6 +959,8 @@ namespace VKMessenger.Library
             Execute.ExecuteOnUIThread((Action)(() =>
             {
                 this.UIMessageText = this._message.body;
+                if (this._message.attachments != null && this._message.attachments.Any(a => a == null || a.IsUnavailable))
+                    this.UIMessageText = (string.IsNullOrWhiteSpace(this.UIMessageText) ? "" : this.UIMessageText + Environment.NewLine) + CommonResources.Unavailable;
                 this.ProcessMessageAction();
                 this.UIDate = this._outboundMessage == null || this._outboundMessage.OutboundMessageStatus != OutboundMessageStatus.Failed ? UIStringFormatterHelper.FormatDateForMessageUI(Extensions.UnixTimeStampToDateTime((double)this._message.date, true)) : string.Empty;
                 this.UpdateUIOpacity();
@@ -964,6 +968,7 @@ namespace VKMessenger.Library
                     this.UIImageUrl = this._associatedUser.UiAvatarSmall;
                 this.UIUserName = this._associatedUser.first_name;
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.UIStatusDelivered));
+                this.NotifyPropertyChanged("StatusImage");
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.UIStatusFailed));
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.DateTimeVisibility));
                 this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.UIStatusMessageNotRead));

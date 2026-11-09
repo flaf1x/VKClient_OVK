@@ -1,4 +1,5 @@
 using VKClient.Common.Backend.DataObjects;
+using System.Collections.Generic;
 
 namespace VKClient.Audio.Base.DataObjects
 {
@@ -35,6 +36,25 @@ namespace VKClient.Audio.Base.DataObjects
     }
 
     public string admin_id { get; set; }
+
+    public long owner_id { get; set; }
+    public List<long> admin_ids { get; set; }
+    public Dictionary<string, bool> acl { get; set; }
+
+    public bool IsAdministrator(long userId)
+    {
+      long legacyAdmin;
+      return userId > 0 && (owner_id == userId ||
+        long.TryParse(admin_id, out legacyAdmin) && legacyAdmin == userId ||
+        admin_ids != null && admin_ids.Contains(userId));
+    }
+
+    public bool CanManage(long userId, string permission)
+    {
+      bool allowed;
+      return IsAdministrator(userId) &&
+        (acl == null || !acl.TryGetValue(permission, out allowed) || allowed);
+    }
 
     public string photo_100 { get; set; }
 

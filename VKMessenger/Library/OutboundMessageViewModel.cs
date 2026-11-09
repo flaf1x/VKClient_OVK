@@ -29,6 +29,24 @@ namespace VKMessenger.Library
         private bool _isChat;
         private long _userOrChatId;
         private double _uploadProgress;
+        private int _randomId = MessagesService.NewRandomId();
+        public int RandomId { get { return this._randomId; } }
+        private Message _replyMessage;
+        public Message ReplyMessage
+        {
+            get { return this._replyMessage; }
+            set
+            {
+                this._replyMessage = value == null ? null : value.CreateReplySnapshot();
+                this.NotifyPropertyChanged("ReplyMessage");
+                this.NotifyPropertyChanged("HasReply");
+                this.NotifyPropertyChanged("ReplyAuthor");
+                this.NotifyPropertyChanged("ReplySummary");
+            }
+        }
+        public bool HasReply { get { return this._replyMessage != null; } }
+        public string ReplyAuthor { get { return ReplyPresentation.Author(this._replyMessage); } }
+        public string ReplySummary { get { return ReplyPresentation.Summary(this._replyMessage); } }
 
         public OutboundMessageStatus OutboundMessageStatus
         {
@@ -292,6 +310,8 @@ namespace VKMessenger.Library
         private void DoSend()
         {
             SendMessageRequest sendMessageRequest = new SendMessageRequest();
+            sendMessageRequest.RandomId = this._randomId;
+            sendMessageRequest.ReplyTo = this.ReplyMessage == null ? 0 : this.ReplyMessage.id;
             int num1 = this._isChat ? 1 : 0;
             sendMessageRequest.IsChat = num1 != 0;
             long userOrChatId = this._userOrChatId;
@@ -312,7 +332,7 @@ namespace VKMessenger.Library
             else if (this.Attachments.Count > 0)
             {
                 request.AttachmentIds = new List<string>();
-                foreach (IOutboundAttachment outboundAttachment in this.Attachments.Where<IOutboundAttachment>((Func<IOutboundAttachment, bool>)(a => !a.IsGeo)))
+                foreach (IOutboundAttachment outboundAttachment in this.Attachments.Where<IOutboundAttachment>((Func<IOutboundAttachment, bool>)(a => !a.IsGeo && !(a is OutboundForwardedMessages))))
                     request.AttachmentIds.Add(outboundAttachment.AttachmentId);
             }
             OutboundGeoAttachment outboundGeoAttachment = this.Attachments.FirstOrDefault<IOutboundAttachment>((Func<IOutboundAttachment, bool>)(a => a.IsGeo)) as OutboundGeoAttachment;
@@ -352,7 +372,7 @@ namespace VKMessenger.Library
 
         public void Write(BinaryWriter writer)
         {
-            writer.Write(3);
+            writer.Write(5);
             writer.WriteString(this._messageText);
             writer.WriteList<OutboundAttachmentContainer>((IList<OutboundAttachmentContainer>)this._attachments.Select<IOutboundAttachment, OutboundAttachmentContainer>((Func<IOutboundAttachment, OutboundAttachmentContainer>)(a => new OutboundAttachmentContainer(a))).ToList<OutboundAttachmentContainer>(), 10000);
             writer.Write((int)this._outboundMessageStatus);
@@ -363,6 +383,8 @@ namespace VKMessenger.Library
             writer.Write<StickerItemData>(this.StickerItem, false);
             writer.WriteString(this.StickerReferrer);
             writer.Write<GraffitiAttachmentItem>(this.GraffitiAttachmentItem, false);
+            writer.Write(this._randomId);
+            writer.Write<Message>(this.ReplyMessage, false);
         }
 
         public void Read(BinaryReader reader)
@@ -386,6 +408,10 @@ namespace VKMessenger.Library
             if (num < 3)
                 return;
             this.GraffitiAttachmentItem = reader.ReadGeneric<GraffitiAttachmentItem>();
+            if (num >= 4)
+                this._randomId = reader.ReadInt32();
+            if (num >= 5)
+                this.ReplyMessage = reader.ReadGeneric<Message>();
         }
 
         internal void RemoveForwardedMessages()

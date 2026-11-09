@@ -120,6 +120,7 @@
                                      VerticalAlignment="Top"
                                      Text="{Binding Title}"
                                      IsHitTestVisible="{Binding IsTitleBoxEnabled}"
+                                     IsReadOnly="{Binding IsTitleReadOnly}"
                                      KeyDown="TitleBox_OnKeyDown"
                                      GotFocus="TitleBox_OnGotFocus"
                                      LostFocus="TitleBox_OnLostFocus"/>
@@ -252,6 +253,7 @@
                               framework:MetroInMotion.Tilt="2.5"
                               VerticalAlignment="Top"
                               Tap="AddMember_OnClicked"
+                              Visibility="{Binding CanManageMembers, Converter={StaticResource BoolToVisibilityConverter}}"
                               Margin="0,64,0,0">
                             <Border Background="{StaticResource PhoneBlue300_GrayBlue100Brush}"
                                     HorizontalAlignment="Left"
@@ -308,6 +310,8 @@
             </framework:ExtendedLongListSelector.ListFooter>
             
         </framework:ExtendedLongListSelector>
+
+        <uc:GenericPageLoadInfoUC Grid.Row="1" />
 
     </Grid>
     

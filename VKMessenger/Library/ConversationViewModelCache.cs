@@ -33,6 +33,13 @@ namespace VKMessenger.Library
     private void ReceivedUpdates(List<LongPollServerUpdateData> updates)
     {
       List<ConversationViewModel> conversationViewModelList = new List<ConversationViewModel>();
+      if (updates.Any(update => update.UpdateType == LongPollServerUpdateType.SynchronizationRequired))
+      {
+        List<ConversationViewModel> cached;
+        lock (this._inMemoryCachedData)
+          cached = this._inMemoryCachedData.Values.ToList();
+        Execute.ExecuteOnUIThread(() => cached.Where(vm => vm.IsOnScreen).ToList().ForEach(vm => vm.RefreshConversations()));
+      }
       foreach (LongPollServerUpdateData update in updates)
       {
         bool isChat = update.isChat;

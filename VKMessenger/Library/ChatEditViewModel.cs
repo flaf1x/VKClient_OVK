@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Windows;
 using System.Windows.Navigation;
 using VKClient.Audio.Base;
+using VKClient.Audio.Base.Events;
 using VKClient.Audio.Base.Utils;
 using VKClient.Common;
 using VKClient.Common.Backend;
@@ -20,7 +21,7 @@ using VKMessenger.Backend;
 
 namespace VKMessenger.Library
 {
-  public class ChatEditViewModel : ViewModelStatefulBase
+  public class ChatEditViewModel : ViewModelStatefulBase, IHandle<NotificationSettingsChangedEvent>
   {
     private bool _isTitleBoxEnabled = true;
     private long _chatId;
@@ -28,7 +29,27 @@ namespace VKMessenger.Library
     private NavigationService _navigationService;
     private bool _isPhotoChanging;
 
-    public ObservableCollection<ChatMember> Members = new ObservableCollection<ChatMember>();
+    public bool CanManageChat
+    {
+      get { return this._chatInformation != null && this._chatInformation.chat.CanManage(
+        AppGlobalStateManager.Current.LoggedInUserId, "can_change_info"); }
+    }
+
+    public bool CanManageMembers
+    {
+      get { return this._chatInformation != null && this._chatInformation.chat.CanManage(
+        AppGlobalStateManager.Current.LoggedInUserId, "can_invite"); }
+    }
+    public bool IsTitleReadOnly { get { return !this.CanManageChat; } }
+
+    private void PublishMetadata()
+    {
+      EventAggregator.Current.Publish(new NotificationSettingsChangedEvent {
+        ChatId = this.ChatId, IsChatMetadataChange = true, Title = this.Title,
+        Photo = this._chatInformation.chat.photo_200 });
+    }
+
+    public ObservableCollection<ChatMember> Members { get; private set; }
 
     public long ChatId
     {
@@ -78,7 +99,7 @@ namespace VKMessenger.Library
     {
       get
       {
-          if (this.PhotoPlaceholderVisibility == Visibility.Collapsed)
+          if (this.CanManageChat && this.PhotoPlaceholderVisibility == Visibility.Collapsed)
           return !this.IsPhotoChanging;
         return false;
       }
@@ -109,7 +130,7 @@ namespace VKMessenger.Library
     {
       get
       {
-        return this._isTitleBoxEnabled;
+        return this.CanManageChat && this._isTitleBoxEnabled;
       }
       set
       {
@@ -140,8 +161,19 @@ namespace VKMessenger.Library
 
     public ChatEditViewModel(long chatId, NavigationService navigationService)
     {
+      this.Members = new ObservableCollection<ChatMember>();
       this._chatId = chatId;
       this._navigationService = navigationService;
+      EventAggregator.Current.Subscribe(this);
+    }
+
+    public void Handle(NotificationSettingsChangedEvent message)
+    {
+      if (message.ChatId != this.ChatId || message.IsChatMetadataChange || this._chatInformation == null) return;
+      this._chatInformation.chat.push_settings = message.PushSettings ?? new VKMessenger.Backend.PushSettings {
+        disabled_until = message.AreNotificationsDisabled ? -1 : 0, sound = message.AreNotificationsDisabled ? 0 : 1 };
+      this.NotifyPropertyChanged<bool>(() => this.IsNotificationsSoundEnabled);
+      this.NotifyPropertyChanged<string>(() => this.NotificationsSoundMode);
     }
 
     public override void Load(Action<ResultCode> callback)
@@ -153,19 +185,38 @@ namespace VKMessenger.Library
           this._chatInformation = result.ResultData;
           Execute.ExecuteOnUIThread((Action) (() =>
           {
-            long chatCreatorId = long.Parse(this._chatInformation.chat.admin_id);
+            long chatCreatorId;
+            long.TryParse(this._chatInformation.chat.admin_id, out chatCreatorId);
+            this.Members.Clear();
             foreach (ChatUser chatParticipant in this._chatInformation.chat_participants)
             {
               ChatUser member = chatParticipant;
               User invitedByUser = this._chatInformation.invited_by_users.FirstOrDefault<User>((Func<User, bool>) (u => u.id == member.invited_by));
-              if (invitedByUser != null)
-                this.Members.Add(new ChatMember(member, invitedByUser, chatCreatorId));
+              var item = new ChatMember(member, invitedByUser, chatCreatorId);
+              if (!this._chatInformation.chat.IsAdministrator(AppGlobalStateManager.Current.LoggedInUserId))
+                item.ExcludeButtonVisibility = Visibility.Collapsed;
+              this.Members.Add(item);
             }
             this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Title));
             this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Photo));
             this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>) (() => this.PhotoPlaceholderVisibility));
             this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.IsPhotoMenuEnabled));
+            this.NotifyPropertyChanged<bool>(() => this.CanManageChat);
+            this.NotifyPropertyChanged<bool>(() => this.IsTitleReadOnly);
+            this.NotifyPropertyChanged<bool>(() => this.CanManageMembers);
+            this.NotifyPropertyChanged<bool>(() => this.IsTitleBoxEnabled);
             this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.NotificationsSoundMode));
+            this.PublishMetadata();
+            this.IsNotificationsSoundModeSwitching = true;
+            AccountService.Instance.GetPeerPushSettings(this.PeerId, settings => Execute.ExecuteOnUIThread(() => {
+              this.IsNotificationsSoundModeSwitching = false;
+              if (settings.ResultCode != ResultCode.Succeeded || settings.ResultData == null) return;
+              this._chatInformation.chat.push_settings = settings.ResultData;
+              this.NotifyPropertyChanged<bool>(() => this.IsNotificationsSoundEnabled);
+              this.NotifyPropertyChanged<string>(() => this.NotificationsSoundMode);
+              EventAggregator.Current.Publish(new NotificationSettingsChangedEvent {
+                ChatId = this.ChatId, AreNotificationsDisabled = settings.ResultData.AreDisabledNow, PushSettings = settings.ResultData });
+            }));
           }));
         }
         callback(result.ResultCode);
@@ -174,6 +225,10 @@ namespace VKMessenger.Library
 
     public void ChangeTitle(string newTitle, Action errorAction)
     {
+      if (!this.CanManageChat) { errorAction(); return; }
+      if (!this._isTitleBoxEnabled) return;
+      newTitle = (newTitle ?? "").Trim();
+      if (newTitle == this.Title) return;
       if (string.IsNullOrWhiteSpace(newTitle) || newTitle.Length < 2)
       {
         errorAction();
@@ -188,6 +243,7 @@ namespace VKMessenger.Library
           {
             this._chatInformation.chat.title = newTitle;
             this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Title));
+            this.PublishMetadata();
           }
           else
           {
@@ -202,18 +258,25 @@ namespace VKMessenger.Library
 
     public void UpdatePhoto(Stream photoStream, Rect crop)
     {
+      if (!this.CanManageChat || this.IsPhotoChanging || photoStream == null) return;
       this.IsPhotoChanging = true;
       this.SetInProgress(true, "");
-      ImagePreprocessor.PreprocessImage(photoStream, VKConstants.ResizedImageSize, true, (Action<ImagePreprocessResult>) (resized =>
+      ImagePreprocessor.PrepareChatAvatar(photoStream, crop, photoData => Execute.ExecuteOnUIThread(() =>
       {
-        Stream stream = resized.Stream;
-        byte[] photoData = ImagePreprocessor.ReadFully(stream);
-        stream.Close();
-        BackendServices.MessagesService.UpdateChatPhoto(this.ChatId, photoData, ImagePreprocessor.GetThumbnailRect((double) resized.Width, (double) resized.Height, crop), (Action<BackendResult<ChatInfoWithMessageId, ResultCode>>) (result => Execute.ExecuteOnUIThread((Action) (() =>
+        if (photoData == null)
+        {
+          this.SetInProgress(false, ""); this.IsPhotoChanging = false;
+          GenericInfoUC.ShowBasedOnResult(ResultCode.UploadingFailed, "", null);
+          return;
+        }
+        BackendServices.MessagesService.UpdateChatPhoto(this.ChatId, photoData, new Rect(), (Action<BackendResult<ChatInfoWithMessageId, ResultCode>>) (result => Execute.ExecuteOnUIThread((Action) (() =>
         {
           if (result.ResultCode == ResultCode.Succeeded)
           {
-            this._chatInformation.chat.photo_200 = result.ResultData.chat.photo_200;
+            this._chatInformation.chat.photo_200 = result.ResultData != null && result.ResultData.chat != null
+              ? result.ResultData.chat.photo_200 : null;
+            this.PublishMetadata();
+            this.Reload(false);
             this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Photo));
             this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>) (() => this.PhotoPlaceholderVisibility));
             this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.IsPhotoMenuEnabled));
@@ -228,6 +291,7 @@ namespace VKMessenger.Library
 
     public void DeletePhoto()
     {
+      if (!this.CanManageChat || this.IsPhotoChanging) return;
       this.IsPhotoChanging = true;
       this.SetInProgress(true, "");
       BackendServices.MessagesService.DeleteChatPhoto(this.ChatId, (Action<BackendResult<ChatInfoWithMessageId, ResultCode>>) (result => Execute.ExecuteOnUIThread((Action) (() =>
@@ -235,6 +299,7 @@ namespace VKMessenger.Library
         if (result.ResultCode == ResultCode.Succeeded)
         {
           this._chatInformation.chat.photo_200 =  null;
+          this.PublishMetadata();
           this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.Photo));
           this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>) (() => this.PhotoPlaceholderVisibility));
           this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.IsPhotoMenuEnabled));
@@ -248,13 +313,20 @@ namespace VKMessenger.Library
 
     public void SwitchNotificationsSoundMode()
     {
+      if (this._chatInformation == null || this.IsNotificationsSoundModeSwitching) return;
+      bool disable = this.IsNotificationsSoundEnabled;
       this.IsNotificationsSoundModeSwitching = true;
       this.SetInProgress(true, "");
-      AccountService.Instance.SetSilenceMode(AppGlobalStateManager.Current.GlobalState.NotificationsUri, this.IsNotificationsSoundEnabled ? -1 : 0, (Action<BackendResult<object, ResultCode>>) (result => Execute.ExecuteOnUIThread((Action) (() =>
+      AccountService.Instance.SetSilenceMode(AppGlobalStateManager.Current.GlobalState.NotificationsUri, disable ? -1 : 0, (Action<BackendResult<object, ResultCode>>) (result => Execute.ExecuteOnUIThread((Action) (() =>
       {
         if (result.ResultCode == ResultCode.Succeeded)
         {
-          this._chatInformation.chat.push_settings.disabled_until = this.IsNotificationsSoundEnabled ? -1 : 0;
+          this._chatInformation.chat.push_settings.disabled_until = disable ? -1 : 0;
+          this._chatInformation.chat.push_settings.disabled_forever = disable;
+          this._chatInformation.chat.push_settings.sound = disable ? 0 : 1;
+          this._chatInformation.chat.push_settings.no_sound = disable;
+          EventAggregator.Current.Publish(new NotificationSettingsChangedEvent {
+            ChatId = this.ChatId, AreNotificationsDisabled = disable, PushSettings = this._chatInformation.chat.push_settings });
           this.NotifyPropertyChanged<bool>((Expression<Func<bool>>) (() => this.IsNotificationsSoundEnabled));
           this.NotifyPropertyChanged<string>((Expression<Func<string>>) (() => this.NotificationsSoundMode));
         }
@@ -267,6 +339,7 @@ namespace VKMessenger.Library
 
     public void AddMember(User user)
     {
+      if (!this.CanManageMembers || this.IsMemberAdding || user == null) return;
       this.IsMemberAdding = true;
       this.SetInProgress(true, "");
       IChatService chatService = BackendServices.ChatService;
@@ -290,6 +363,8 @@ namespace VKMessenger.Library
 
     public void ExcludeMember(ChatMember member)
     {
+      if (this._chatInformation == null || !this._chatInformation.chat.IsAdministrator(AppGlobalStateManager.Current.LoggedInUserId) ||
+          member == null || member.ExcludeButtonVisibility != Visibility.Visible) return;
       this.SetInProgress(true, "");
       member.ExcludeButtonVisibility = Visibility.Collapsed;
       IChatService chatService = BackendServices.ChatService;

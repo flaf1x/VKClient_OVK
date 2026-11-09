@@ -141,6 +141,7 @@ namespace VKClient.Library
         {
             if (string.IsNullOrWhiteSpace(uri))
                 return;
+            uri = uri.Trim();
             if (uri.StartsWith("tel:"))
             {
                 try
@@ -156,20 +157,38 @@ namespace VKClient.Library
             }
             else
             {
-                if (!uri.StartsWith("http://", (StringComparison)3) && !uri.StartsWith("https://", (StringComparison)3))
-                    uri = "http://" + uri;
+                if (uri.StartsWith("//")) uri = "https:" + uri;
+                else if (!uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    uri = "https://" + uri;
+                Uri parsed;
+                if (!Uri.TryCreate(uri, UriKind.Absolute, out parsed) ||
+                    (parsed.Scheme != "http" && parsed.Scheme != "https") || string.IsNullOrEmpty(parsed.Host))
+                {
+                    MessageBox.Show("Не удалось открыть ссылку");
+                    return;
+                }
                 uri = NavigatorImpl.NormalizeVkLinkToOpenVk(uri);
-                Logger.Instance.Info("Navigator.NavigateToWebUri, uri={0}, forceWebNavigation={1}", uri, forceWebNavigation);
+                Logger.Instance.Info("Navigator.NavigateToWebUri, host={0}, forceWebNavigation={1}", parsed.Host, forceWebNavigation);
                 bool flag = false;
                 if (!forceWebNavigation)
-                    flag = this.GetWithinAppNavigationUri(uri, fromPush, null);
+                {
+                    try { flag = this.GetWithinAppNavigationUri(uri, fromPush, null); }
+                    catch (Exception ex) { Logger.Instance.Info("Link route unavailable: {0}", ex.GetType().Name); }
+                }
                 if (flag)
                     return;
                 uri = this.PrepareWebUri(uri);
-                WebBrowserTask webBrowserTask = new WebBrowserTask();
-                Uri uri1 = new Uri(uri, UriKind.Absolute);
-                webBrowserTask.Uri = uri1;
-                webBrowserTask.Show();
+                try
+                {
+                    WebBrowserTask webBrowserTask = new WebBrowserTask();
+                    webBrowserTask.Uri = new Uri(uri, UriKind.Absolute);
+                    webBrowserTask.Show();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Instance.Info("Browser launch failed: {0}", ex.GetType().Name);
+                    MessageBox.Show("Не удалось открыть ссылку");
+                }
             }
         }
 

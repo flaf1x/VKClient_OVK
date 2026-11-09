@@ -5,7 +5,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Framework;
@@ -33,6 +36,91 @@ namespace VKMessenger.Library.VirtItems
     private MessageContentItem _messageContentItem;
     private SystemMessageItem _systemMessageItem;
     private bool _handledDelivered;
+    private readonly ReplySwipeGesture _replySwipe = new ReplySwipeGesture();
+    private TranslateTransform _replyTransform;
+    private TextBlock _replyHint;
+    private double _replyInputXX, _replyInputXY, _replyInputYX, _replyInputYY;
+    private double _replyParentXX, _replyParentXY, _replyParentYX, _replyParentYY;
+    private bool _replyCoordinatesReady;
+    private Storyboard _replyReturnX, _replyReturnY;
+
+    private static void GetReplyBasis(UIElement element, UIElement screen, out double xx, out double xy, out double yx, out double yy)
+    {
+      GeneralTransform transform = element.TransformToVisual(screen);
+      Point origin = transform.Transform(new Point());
+      Point x = transform.Transform(new Point(1, 0));
+      Point y = transform.Transform(new Point(0, 1));
+      xx = x.X - origin.X; xy = x.Y - origin.Y;
+      yx = y.X - origin.X; yy = y.Y - origin.Y;
+    }
+
+    private void StopReplyReturnAnimations()
+    {
+      if (this._replyReturnX != null) { this._replyReturnX.Stop(); this._replyReturnX = null; }
+      if (this._replyReturnY != null) { this._replyReturnY.Stop(); this._replyReturnY = null; }
+      if (this._replyTransform != null) { this._replyTransform.X = 0; this._replyTransform.Y = 0; }
+      if (this._replyHint != null) this._replyHint.Opacity = 0;
+    }
+
+    private bool CanSwipeReply
+    {
+      get { return !this._isTypingItem && !this.IsSystemMessage && !this._mvm.IsInSelectionMode && this._mvm.Message.id > 0 && this._mvm.Message.deleted == 0; }
+    }
+
+    private void ReplyGestureStarted(object sender, ManipulationStartedEventArgs e)
+    {
+      this._replySwipe.Reset();
+      this._replyCoordinatesReady = false;
+      this.StopReplyReturnAnimations();
+      if (!this.CanSwipeReply) return;
+      try
+      {
+        PhoneApplicationFrame frame = Application.Current.RootVisual as PhoneApplicationFrame;
+        UIElement screen = frame != null ? frame.Content as UIElement : Application.Current.RootVisual;
+        UIElement parent = this._view.Parent as UIElement;
+        if (screen == null || parent == null || e.ManipulationContainer == null) return;
+        // Gesture coordinates follow their container. RenderTransform translations
+        // follow the PARENT axes, which are reversed in the upside-down history.
+        GetReplyBasis(e.ManipulationContainer, screen, out this._replyInputXX, out this._replyInputXY, out this._replyInputYX, out this._replyInputYY);
+        GetReplyBasis(parent, screen, out this._replyParentXX, out this._replyParentXY, out this._replyParentYX, out this._replyParentYY);
+        this._replyCoordinatesReady = true;
+      }
+      catch (InvalidOperationException) { }
+      catch (ArgumentException) { }
+    }
+
+    private void ReplyGestureDelta(object sender, ManipulationDeltaEventArgs e)
+    {
+      if (!this.CanSwipeReply || !this._replyCoordinatesReady || e.IsInertial) return;
+      Point offset = e.CumulativeManipulation.Translation;
+      double screenX, screenY;
+      ReplySwipeGesture.MapVector(offset.X, offset.Y, this._replyInputXX, this._replyInputXY, this._replyInputYX, this._replyInputYY, out screenX, out screenY);
+      double x = this._replySwipe.Update(screenX, screenY);
+      if (!this._replySwipe.IsHorizontal) return;
+      double localX, localY;
+      if (!ReplySwipeGesture.UnmapVector(x, 0, this._replyParentXX, this._replyParentXY, this._replyParentYX, this._replyParentYY, out localX, out localY)) return;
+      e.Handled = true;
+      this._replyTransform.X = localX;
+      this._replyTransform.Y = localY;
+      this._replyHint.Opacity = Math.Min(1, Math.Abs(x) / 42);
+    }
+
+    private void ReplyGestureCompleted(object sender, ManipulationCompletedEventArgs e)
+    {
+      bool wasHorizontal = this._replySwipe.IsHorizontal;
+      bool reply = this._replySwipe.Complete() && this.CanSwipeReply;
+      if (wasHorizontal)
+      {
+        this._replyReturnX = this._replyTransform.Animate(this._replyTransform.X, 0, TranslateTransform.XProperty, 120, null, null, null);
+        if (this._replyTransform.Y != 0)
+          this._replyReturnY = this._replyTransform.Animate(this._replyTransform.Y, 0, TranslateTransform.YProperty, 120, null, null, null);
+      }
+      this._replyCoordinatesReady = false;
+      this._replyHint.Opacity = 0;
+      if (!reply) return;
+      e.Handled = true;
+      this.miQuote_Click(null, null);
+    }
 
     public MessageViewModel MVM
     {
@@ -500,6 +588,17 @@ namespace VKMessenger.Library.VirtItems
     {
       base.GenerateChildren();
       this.CreateMenu();
+      if (!this._isTypingItem && !this.IsSystemMessage)
+      {
+        this._replyTransform = new TranslateTransform();
+        this._view.RenderTransform = this._replyTransform;
+        this._replyHint = new TextBlock { Text = "↩", FontSize = 28, Opacity = 0, IsHitTestVisible = false,
+          Foreground = Application.Current.Resources["PhoneNameBlueBrush"] as Brush, Margin = new Thickness(this.Width + 6, 12, 0, 0) };
+        this.Children.Add(this._replyHint);
+        this._view.AddHandler(UIElement.ManipulationStartedEvent, new EventHandler<ManipulationStartedEventArgs>(this.ReplyGestureStarted), true);
+        this._view.AddHandler(UIElement.ManipulationDeltaEvent, new EventHandler<ManipulationDeltaEventArgs>(this.ReplyGestureDelta), true);
+        this._view.AddHandler(UIElement.ManipulationCompletedEvent, new EventHandler<ManipulationCompletedEventArgs>(this.ReplyGestureCompleted), true);
+      }
       this._mvm.PropertyChanged += new PropertyChangedEventHandler(this._mvm_PropertyChanged);
       if (this._calloutPath == null)
         return;
@@ -521,6 +620,15 @@ namespace VKMessenger.Library.VirtItems
 
     protected override void ReleaseResourcesOnUnload()
     {
+      this._view.RemoveHandler(UIElement.ManipulationStartedEvent, new EventHandler<ManipulationStartedEventArgs>(this.ReplyGestureStarted));
+      this._view.RemoveHandler(UIElement.ManipulationDeltaEvent, new EventHandler<ManipulationDeltaEventArgs>(this.ReplyGestureDelta));
+      this._view.RemoveHandler(UIElement.ManipulationCompletedEvent, new EventHandler<ManipulationCompletedEventArgs>(this.ReplyGestureCompleted));
+      this._replySwipe.Reset();
+      this._replyCoordinatesReady = false;
+      this.StopReplyReturnAnimations();
+      this._view.RenderTransform = null;
+      this._replyHint = null;
+      this._replyTransform = null;
       base.ReleaseResourcesOnUnload();
       this._mvm.PropertyChanged -= new PropertyChangedEventHandler(this._mvm_PropertyChanged);
     }
@@ -530,12 +638,12 @@ namespace VKMessenger.Library.VirtItems
         if (e.PropertyName == "UIStatusDelivered" && this._mvm.UIStatusDelivered == Visibility.Visible && !this._handledDelivered)
       {
         VirtualizableState currentState = this.CurrentState;
+        this._handledDelivered = true;
         if (currentState != VirtualizableState.Unloaded && this._mvm.StickerAttachment == null)
         {
           this.Unload();
           this.Load(currentState);
         }
-        this._handledDelivered = true;
       }
       if (e.PropertyName == "BGBrush")
         this.UpdateFill();

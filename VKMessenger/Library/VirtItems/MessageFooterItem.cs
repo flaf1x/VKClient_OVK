@@ -58,6 +58,7 @@ namespace VKMessenger.Library.VirtItems
     {
       get
       {
+          if (this._mvm == null || this._mvm.Attachments == null) return false;
           return Enumerable.Any<AttachmentViewModel>(this._mvm.Attachments, (Func<AttachmentViewModel, bool>)(a =>
         {
           if (a.AttachmentType == AttachmentType.Sticker)
@@ -165,7 +166,7 @@ namespace VKMessenger.Library.VirtItems
         ((FrameworkElement) this._stackPanelDateStatus).HorizontalAlignment = ((HorizontalAlignment) 2);
         Grid.SetColumn((FrameworkElement) this._stackPanelDateStatus, 1);
       }
-      ((PresentationFrameworkCollection<UIElement>) ((Panel) this._gridDateStatus).Children).Add((UIElement) this._stackPanelDateStatus);
+      this._gridDateStatus.Children.Add(this._stackPanelDateStatus);
       if (this._mvm.Message.@out == 1)
       {
         ProgressBar progressBar = new ProgressBar();
@@ -262,6 +263,12 @@ namespace VKMessenger.Library.VirtItems
         return;
       Border borderStatus = this._borderStatus;
       ImageBrush imageBrush = new ImageBrush();
+      if (string.IsNullOrEmpty(this._mvm.StatusImage))
+      {
+        borderStatus.OpacityMask = null;
+        borderStatus.Visibility = Visibility.Collapsed;
+        return;
+      }
       BitmapImage bitmapImage = new BitmapImage(new Uri(this._mvm.StatusImage, UriKind.Relative));
       int num = 18;
       bitmapImage.CreateOptions = ((BitmapCreateOptions) num);
@@ -279,11 +286,9 @@ namespace VKMessenger.Library.VirtItems
 
     private void _mvm_PropertyChanged(object sender, PropertyChangedEventArgs e)
     {
-      if (e.PropertyName == "UIStatusDelivered")
+      if (e.PropertyName == "UIStatusDelivered" || e.PropertyName == "StatusImage" || e.PropertyName == "UIStatusFailed")
       {
-        VirtualizableState currentState = this.CurrentState;
-        this.Unload();
-        this.Load(currentState);
+        this.UpdateState();
       }
       if (!(e.PropertyName == "UIDate"))
         return;

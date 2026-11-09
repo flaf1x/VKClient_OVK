@@ -74,7 +74,13 @@ namespace VKClient.Common.Emoji
       {
         if (this.StickerProduct == null)
           return "";
-        return string.Format("{0}thumb_102.png", this.StickerProduct.base_url);
+        string cover = this.StickerProduct.photo_140;
+        if (!string.IsNullOrEmpty(cover) && cover.IndexOf(".webp", StringComparison.OrdinalIgnoreCase) < 0)
+          return cover;
+        var stickers = this.StickerProduct.stickers;
+        if (stickers != null && stickers.sticker_ids != null && stickers.sticker_ids.Count > 0)
+          return OpenVKInstanceManager.ResolveWebUrl("/images/stickers/" + stickers.sticker_ids[0] + "/128b.png");
+        return "";
       }
     }
 

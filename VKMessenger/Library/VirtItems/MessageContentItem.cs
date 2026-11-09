@@ -1,4 +1,4 @@
-using System;
+п»їusing System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -35,6 +35,7 @@ namespace VKMessenger.Library.VirtItems
         private bool _handledDelivered;
         private int _lvl;
         private ForwardedHeaderItem _forwardedHeaderItem;
+        private ReplyPreviewItem _replyPreviewItem;
         private List<MessageContentItem> _forwardedList;
         private const bool _isFriendsOnly = false;
         private const bool _isCommentAttachments = false;
@@ -98,7 +99,7 @@ namespace VKMessenger.Library.VirtItems
             this._mvm.PropertyChanged += new PropertyChangedEventHandler(this._mvm_PropertyChanged);
             if (!this._mvm.IsForwarded)
                 return;
-            Rectangle rect = new Rectangle();//Та самая полоска слева от пересылаемого сообщения
+            Rectangle rect = new Rectangle();//РўР° СЃР°РјР°СЏ РїРѕР»РѕСЃРєР° СЃР»РµРІР° РѕС‚ РїРµСЂРµСЃС‹Р»Р°РµРјРѕРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ
             rect.Fill = Application.Current.Resources["PhoneNameBlueBrush"] as SolidColorBrush;
             rect.Opacity = 0.5;
             rect.Width = 3.0;
@@ -136,7 +137,7 @@ namespace VKMessenger.Library.VirtItems
         private void GenerateLayout()
         {
             double num1 = this._marginTop;
-            if (this._mvm.IsForwarded)//Идёт добавление шапки
+            if (this._mvm.IsForwarded)//РРґС‘С‚ РґРѕР±Р°РІР»РµРЅРёРµ С€Р°РїРєРё
             {
                 if (this._forwardedHeaderItem == null)
                 {
@@ -146,6 +147,17 @@ namespace VKMessenger.Library.VirtItems
                 num1 = num1 + this._forwardedHeaderItem.FixedHeight + (double)MessageContentItem.MARGIN_BETWEEN;
             }
             string body = this._mvm.Message.body;
+            if (this._mvm.Message.reply_message != null)
+            {
+                if (this._replyPreviewItem == null)
+                {
+                    this._replyPreviewItem = new ReplyPreviewItem(this.Width - this._marginLeft * 2, new Thickness(this._marginLeft, num1, 0, 0), this._mvm);
+                    this.VirtualizableChildren.Add(this._replyPreviewItem);
+                }
+                this._replyPreviewItem.Width = this.Width - this._marginLeft * 2;
+                this._replyPreviewItem.Margin = new Thickness(this._marginLeft, num1, 0, 0);
+                num1 += this._replyPreviewItem.FixedHeight + MessageContentItem.MARGIN_BETWEEN;
+            }
             bool flag1 = !string.IsNullOrWhiteSpace(body);
             bool flag2 = this._mvm.Attachments != null && Enumerable.Any<AttachmentViewModel>(this._mvm.Attachments, (Func<AttachmentViewModel, bool>)(a => a.AttachmentType == AttachmentType.Gift));
             bool isStickersGift = false;

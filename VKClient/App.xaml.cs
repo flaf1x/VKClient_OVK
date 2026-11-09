@@ -92,6 +92,7 @@ namespace VKClient
             AppendEarlyStartupMarker("07 language initialized");
             Logger.Instance.Info("App() check 6");
             this.InitializeServiceLocator();
+            VKClient.Common.ChatBackgroundPage.PreviewFactory = WallpaperConversationPreview.Create;
             AppendEarlyStartupMarker("08 service locator initialized");
             Logger.Instance.Info("App() check 7");
             IPageDataRequesteeInfo pageDataRequestee = PageBase.CurrentPageDataRequestee;
@@ -123,7 +124,7 @@ namespace VKClient
                     System.IO.FileAccess.Write,
                     store))
                 using (System.IO.StreamWriter writer = new System.IO.StreamWriter(stream))
-                    writer.Write("4.98-diagnostic");
+                    writer.Write("5.47-messaging");
             }
             catch
             {

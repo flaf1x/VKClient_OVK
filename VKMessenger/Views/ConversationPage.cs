@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Device.Location;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
@@ -17,7 +18,9 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
+using System.Windows.Threading;
 using VKClient.Audio.Base;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
@@ -47,6 +50,7 @@ namespace VKMessenger.Views
         private readonly ApplicationBar _appBarAttachments;
         private readonly ApplicationBar _appBarSelection;
         private readonly PhotoChooserTask _photoChooserTask;
+        private readonly DispatcherTimer _visibleReadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         private readonly ApplicationBarIconButton _appBarButtonSend;
         private readonly ApplicationBarIconButton _appBarButtonAttachImage;
         private readonly ApplicationBarIconButton _appBarButtonAddAttachment;
@@ -303,6 +307,7 @@ namespace VKMessenger.Views
             //  base.\u002Ector();
             ++ConversationPage.TotalCount;
             this.InitializeComponent();
+            this._visibleReadTimer.Tick += (sender, args) => { if (this._isCurrent && this.ConversationVM != null) this.ConversationVM.MarkVisibleMessagesAsRead(); };
             this.myScroll.BindViewportBoundsTo((FrameworkElement)this.myPanel);
             // ISSUE: method pointer
             base.Loaded += (new RoutedEventHandler((this.ConversationPage_Loaded)));
@@ -329,6 +334,10 @@ namespace VKMessenger.Views
             this.myPanel.InitializeWithScrollViewer((IScrollableArea)new ViewportScrollableAreaAdapter(this.myScroll), true);
             this.OrientationChanged += (new EventHandler<OrientationChangedEventArgs>(this.ConversationPage_OrientationChanged));
             this.myPanel.ScrollPositionChanged += new EventHandler<MyVirtualizingPanel2.ScrollPositionChangedEventAgrs>(this.myPanel_ScrollPositionChanged);
+            // ViewportControl can finish its manipulation before reporting the
+            // final offset. Observe the routed gesture too (even when handled).
+            this.myScroll.AddHandler(UIElement.ManipulationCompletedEvent,
+                new EventHandler<System.Windows.Input.ManipulationCompletedEventArgs>(this.HistoryGestureCompleted), true);
             this.myPanel.ManuallyLoadMore = true;
             this.myPanel.KeepScrollPositionWhenAddingItems = true;
             this.RegisterForCleanup((IMyVirtualizingPanel)this.myPanel);
@@ -339,9 +348,20 @@ namespace VKMessenger.Views
             // ISSUE: method pointer
             ((UIElement)this.ucNewPost.TextBoxPost).LostFocus += (new RoutedEventHandler((this.textBoxNewMessage_LostFocus)));
             this.ucNewPost.TextBlockWatermarkText.Text = CommonResources.Group_SendAMessage;
-            // Messages on OpenVK support text and emoji/stickers only in this client.
-            this.ucNewMessage.OnAddAttachTap = null;
-            this.ucNewMessage.SetAttachmentsAndVoiceAvailable(false);
+            this.ucNewMessage.OnAddAttachTap = new Action(this.AddAttachTap);
+            this.ucNewMessage.SetAttachmentsAndVoiceAvailable(true);
+            this.ucNewMessage.IsVoiceMessageButtonEnabled = false;
+            VKClient.Audio.Base.BackendServices.StoreService.Instance.GetStockItems(StoreProductType.stickers, callback: res =>
+            {
+                if (res.ResultCode != ResultCode.Succeeded || res.ResultData == null)
+                    return;
+                Execute.ExecuteOnUIThread(() =>
+                {
+                    var settings = VKClient.Common.Emoji.StickersSettings.Instance;
+                    settings.RecentStickers = settings.RecentStickers ?? new StoreStickers() { base_url = OpenVKInstanceManager.Current.WebOrigin + "/images/stickers/", sticker_ids = new List<int>() };
+                    settings.StickersList = (res.ResultData.items ?? new List<StockItem>()).Where(item => item.product != null && item.product.active == 1 && item.product.stickers != null).ToList();
+                });
+            });
             this.ucNewMessage.OnSendTap = new Action(this.SendTap);
             this.ucNewMessage.PanelControl.IsOpenedChanged += new EventHandler<bool>(this.PanelOpenClosed);
             Binding binding = new Binding("OutboundMessageVM.Attachments");
@@ -390,16 +410,39 @@ namespace VKMessenger.Views
 
         private void myPanel_ScrollPositionChanged(object sender, MyVirtualizingPanel2.ScrollPositionChangedEventAgrs e)
         {
-            if (e.ScrollHeight != 0.0 && e.ScrollHeight - e.CurrentPosition < VKConstants.LoadMoreNewsThreshold)
+            var vm = this.ConversationVM;
+            var panel = this.myPanel;
+            var scroll = panel == null ? null : panel.ScrollViewer;
+            // Layout changes and programmatic jumps must not recursively pull
+            // history. The news-feed threshold is 10,000 px: using it here
+            // silently downloaded hundreds of messages just to open a chat.
+            if (!this._isCurrent || vm == null || scroll == null || !panel.IsUserScrolling)
+                return;
+            if (MessagesService.ShouldLoadOlderHistory(e.CurrentPosition,
+                scroll.ExtentHeight, scroll.ViewportHeight, panel.IsUserScrolling))
             {
-                this.ConversationVM.LoadMoreConversations(null);
+                vm.LoadMoreConversations(null);
             }
             else
             {
                 if (e.ScrollHeight == 0.0 || e.CurrentPosition >= 100.0)
                     return;
-                this.ConversationVM.LoadNewerConversations(null);
+                vm.LoadNewerConversations(null);
             }
+        }
+
+        private void HistoryGestureCompleted(object sender, System.Windows.Input.ManipulationCompletedEventArgs e)
+        {
+            if (!this._isCurrent || this.myPanel == null) return;
+            var scroll = this.myPanel.ScrollViewer;
+            if (scroll == null || this.ConversationVM == null) return;
+            // The panel is rotated: increasing offset moves towards OLD history.
+            VKClient.Common.Utils.Logger.Instance.Info("History gesture: offset {0}, extent {1}, viewport {2}",
+                scroll.VerticalOffset, this.myPanel.Height, scroll.ViewportHeight);
+            if (this.myPanel.Height - scroll.ViewportHeight - scroll.VerticalOffset < 600.0)
+                this.ConversationVM.LoadMoreConversations(null);
+            else if (scroll.VerticalOffset < 100.0)
+                this.ConversationVM.LoadNewerConversations(null);
         }
 
         private void _appbarMenuItemPinToStart_Click(object sender, EventArgs e)
@@ -409,8 +452,7 @@ namespace VKMessenger.Views
 
         private void _appbarMenuItemShowMaterials_Click(object sender, EventArgs e)
         {
-            // Showing conversation attachments is not available in the OpenVK client.
-            return;
+            Navigator.Current.NavigateToConversationMaterials(MessagesService.Instance.GetPeerId(this.ConversationVM.UserOrCharId, this.ConversationVM.IsChat));
         }
 
         private void _appBarMenuItemDisableEnableNotifications_Click(object sender, EventArgs e)
@@ -459,10 +501,7 @@ namespace VKMessenger.Views
 
         private void _appBarButtonAddAttachment_Click(object sender, EventArgs e)
         {
-            List<NamedAttachmentType> attachmentTypes = AttachmentTypes.AttachmentTypesWithPhotoFromGalleryAndLocation
-                .Where(type => !IsDocumentAttachmentType(type.AttachmentType) &&
-                               type.AttachmentType != VKClient.Common.Library.Posts.AttachmentType.Location)
-                .ToList();
+            List<NamedAttachmentType> attachmentTypes = AttachmentTypes.AttachmentTypesWithPhotoFromGallery;
             this._pickerUC = PickerUC.PickAttachmentTypeAndNavigate(attachmentTypes, null, (() => Navigator.Current.NavigateToPhotoPickerPhotos(10, false, false)));
         }
 
@@ -476,8 +515,7 @@ namespace VKMessenger.Views
 
         private void _appBarMenuItemAddMember_Click(object sender, EventArgs e)
         {
-            // Creating group chats is not available in the OpenVK client.
-            return;
+            Navigator.Current.NavigateToPickUser(true, this.ConversationVM.UserOrCharId, false);
         }
 
         private void _appBarMenuItemRefresh_Click(object sender, EventArgs e)
@@ -487,8 +525,15 @@ namespace VKMessenger.Views
 
         private void _appBarMenuItemDeleteDialog_Click(object sender, EventArgs e)
         {
-            // Deleting a conversation is not available in the OpenVK client.
-            return;
+            if (MessageBox.Show(CommonResources.Conversation_AppBar_DeleteDialog, CommonResources.VK,
+                MessageBoxButton.OKCancel) == MessageBoxResult.OK)
+                this.ConversationVM.DeleteDialog(() =>
+                {
+                    var header = ConversationsViewModel.Instance.Conversations.FirstOrDefault(c => c.IsChat == this._isChat && c.UserOrChatId == this._userOrChatId);
+                    if (header != null)
+                        ConversationsViewModel.Instance.Conversations.Remove(header);
+                    Navigator.Current.GoBack();
+                });
         }
 
         private void _appBarMenuItemManageChat_Click(object sender, EventArgs e)
@@ -509,6 +554,57 @@ namespace VKMessenger.Views
             if (((TaskEventArgs)e).TaskResult != TaskResult.OK)
                 return;
             ParametersRepository.SetParameterForId("ChoosenPhoto", e.ChosenPhoto);
+        }
+
+        private string CurrentChatBackgroundKey()
+        {
+            return ChatWallpaperStore.Key(OpenVKInstanceManager.Current.ApiOrigin,
+                AppGlobalStateManager.Current.LoggedInUserId, _userOrChatId, _isChat);
+        }
+
+        private void ChooseChatBackgroundClick(object sender, RoutedEventArgs e)
+        {
+            Focus();
+            NavigationService.Navigate(new Uri("/VKClient.Common;component/chatbackgroundpage.xaml?peer=" + _userOrChatId + "&chat=" + _isChat, UriKind.Relative));
+        }
+
+        private void ClearChatBackground()
+        {
+            ((Image)FindName("ChatBackgroundImage")).Source = null;
+            ((Grid)FindName("ChatBackgroundLayer")).Visibility = Visibility.Collapsed;
+        }
+
+        private IEnumerable<Message> GetVisibleChatMessages()
+        {
+            var panel = this.myPanel;
+            var scroll = panel == null ? null : panel.ScrollViewer;
+            if (!this._isCurrent || this.IsMenuOpen || panel == null || scroll == null || scroll.IsManipulating || scroll.ViewportHeight <= 0 ||
+                (this.ImageViewerDecorator != null && this.ImageViewerDecorator.IsShown)) yield break;
+            double top = scroll.VerticalOffset, bottom = top + Math.Max(0, scroll.ViewportHeight - panel.ExtraOffsetY);
+            foreach (var item in panel.VirtualizableItems.OfType<MessageItem>())
+            {
+                if (item.CurrentState == VirtualizableState.Unloaded) continue;
+                double y = item.ViewMargin.Top + panel.OffsetY - panel.ExtraOffsetY;
+                if (Math.Min(bottom, y + item.FixedHeight) - Math.Max(top, y) >= Math.Min(24, item.FixedHeight / 4)) yield return item.MVM.Message;
+            }
+        }
+
+        private void LoadChatBackground()
+        {
+            ClearChatBackground();
+            try
+            {
+                var wallpaper = ChatWallpaperStore.LoadEffective(CurrentChatBackgroundKey());
+                if (wallpaper == null) return;
+                using (var stream = new MemoryStream(wallpaper.Photo))
+                {
+                    var image = new BitmapImage(); image.SetSource(stream);
+                    ((Image)FindName("ChatBackgroundImage")).Source = image;
+                }
+                ((System.Windows.Shapes.Rectangle)FindName("ChatBackgroundDim")).Opacity = wallpaper.Dim;
+                ((Grid)FindName("ChatBackgroundLayer")).Visibility = Visibility.Visible;
+            }
+            catch (Exception ex) { Logger.Instance.Info("Chat background load failed: {0}", ex.GetType().Name); }
         }
 
         private void UpdateAppBar()
@@ -638,6 +734,10 @@ namespace VKMessenger.Views
             this._appBarSelection.Buttons.Add(this._appBarButtonCancel);
             this._defaultAppBar.MenuItems.Add(this._appBarMenuItemRefresh);
             this._appBarAttachments.MenuItems.Add(this._appBarMenuItemRefresh);
+            this._defaultAppBar.MenuItems.Add(this._appbarMenuItemShowMaterials);
+            this._defaultAppBar.MenuItems.Add(this._appBarMenuItemDeleteDialog);
+            this._appBarAttachments.MenuItems.Add(this._appbarMenuItemShowMaterials);
+            this._appBarAttachments.MenuItems.Add(this._appBarMenuItemDeleteDialog);
             if (this._isChat)
             {
                 this._defaultAppBar.MenuItems.Add(this._appBarMenuItemManageChat);
@@ -647,6 +747,8 @@ namespace VKMessenger.Views
             }
             else
             {
+                if (this._userOrChatId > 0)
+                    this._defaultAppBar.MenuItems.Add(this._appBarMenuItemAddMember);
                 if (this._userOrChatId < 0L && this._userOrChatId > -2000000000L)
                     this._defaultAppBar.MenuItems.Add(this._appBarMenuItemAllowDenyMessagesFromGroup);
             }
@@ -764,40 +866,18 @@ namespace VKMessenger.Views
                 ConversationViewModelCache.Current.SetVM(this.ConversationVM, false);
             }
             this.ConversationVM.IsOnScreen = true;
+            this.ConversationVM.VisibleMessages = this.GetVisibleChatMessages;
+            this._visibleReadTimer.Start();
+            this.LoadChatBackground();
             this.ConversationVM.EnsureConversationIsUpToDate(e.NavigationMode == 0, this._startMessageId, null);
             this._startMessageId = -1L;
             this.ConversationVM.LoadHeaderInfoAsync();
-            // OpenVK messaging in this client deliberately supports text and
-            // emoji only. Discard files left by system picker continuations.
-            this.ConversationVM.OutboundMessageVM.Attachments.Clear();
+            this.ConversationVM.AddAttachmentsFromRepository();
             this.ConversationVM.Scroll = (IScroll)this;
             this.UpdateAppBar();
             if (ParametersRepository.Contains(NavigationParametersNames.NewMessageContents))
             {
                 string str = ParametersRepository.GetParameterForIdAndReset(NavigationParametersNames.NewMessageContents).ToString();
-                // OpenVK messaging in this client is text-only. Turn shared
-                // objects into OpenVK links instead of silently dropping them.
-                List<string> sharedContentLinks = new List<string>();
-                WallPost sharedWallPost = ParametersRepository.GetParameterForIdAndReset("WallPostAttachment") as WallPost;
-                if (sharedWallPost != null)
-                    sharedContentLinks.Add(string.Format("https://openvk.org/wall{0}_{1}", sharedWallPost.to_id, sharedWallPost.id));
-                Photo sharedPhoto = ParametersRepository.GetParameterForIdAndReset("PickedPhoto") as Photo;
-                if (sharedPhoto != null)
-                    sharedContentLinks.Add(string.Format("https://openvk.org/photo{0}_{1}", sharedPhoto.owner_id, sharedPhoto.pid));
-                VKClient.Common.Backend.DataObjects.Video sharedVideo = ParametersRepository.GetParameterForIdAndReset("PickedVideo") as VKClient.Common.Backend.DataObjects.Video;
-                if (sharedVideo != null)
-                    sharedContentLinks.Add(string.Format("https://openvk.org/video{0}_{1}", sharedVideo.owner_id, sharedVideo.vid));
-                Doc sharedDocument = ParametersRepository.GetParameterForIdAndReset("PickedDocument") as Doc;
-                if (sharedDocument != null)
-                    sharedContentLinks.Add(string.Format("https://openvk.org/doc{0}_{1}", sharedDocument.owner_id, sharedDocument.id));
-                Product sharedProduct = ParametersRepository.GetParameterForIdAndReset("ShareProduct") as Product;
-                if (sharedProduct != null)
-                    sharedContentLinks.Add(string.Format("https://openvk.org/market{0}?w=product{0}_{1}", sharedProduct.owner_id, sharedProduct.id));
-                if (sharedContentLinks.Count > 0)
-                {
-                    string links = string.Join("\n", sharedContentLinks);
-                    str = string.IsNullOrWhiteSpace(str) ? links : links + "\n" + str;
-                }
                 if (!string.IsNullOrWhiteSpace(str))
                 {
                     this.textBoxNewMessage.Text = str;
@@ -868,6 +948,9 @@ namespace VKMessenger.Views
         {
             base.HandleOnNavigatedFrom(e);
             this._isCurrent = false;
+            this._visibleReadTimer.Stop();
+            this.ConversationVM.VisibleMessages = null;
+            this.ClearChatBackground();
             EventAggregator.Current.Unsubscribe(this);
             MediaPlayerWrapper.Instance.Stop();
             VoiceMessagePlayer.ResetPlayerData();
@@ -1000,11 +1083,16 @@ namespace VKMessenger.Views
             switch (message.MessageActionType)
             {
                 case MessageActionType.Quote:
-                    this.ConversationVM.AddForwardedMessagesToOutboundMessage((IList<Message>)new List<Message>()
-          {
-            message.Message.Message
-          });
+                    this.ConversationVM.ReplyToMessage(message.Message.Message);
                     this.UpdateAppBar();
+                    break;
+                case MessageActionType.GoToReply:
+                    Message reply = message.Message.Message.reply_message;
+                    if (reply == null || reply.id <= 0) break;
+                    if (this.ConversationVM.Messages.Any(m => m.Message.id == reply.id))
+                        this.ScrollToMessageId(reply.id);
+                    else
+                        this.ConversationVM.LoadFromMessageId(reply.id, null, true);
                     break;
                 case MessageActionType.Forward:
                     ShareInternalContentDataProvider contentDataProvider = new ShareInternalContentDataProvider();
@@ -1127,12 +1215,8 @@ namespace VKMessenger.Views
             ConversationViewModel conversationVm = this.ConversationVM;
             ConversationInfo conversationInfo = new ConversationInfo(conversationVm.IsChat, conversationVm.UserOrCharId, conversationVm.User, conversationVm.Chat);
             AppGlobalStateData globalState = AppGlobalStateManager.Current.GlobalState;
-            List<NamedAttachmentType> attachmentTypes = AttachmentTypes.AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation
-                .Where(type => !IsDocumentAttachmentType(type.AttachmentType) &&
-                               type.AttachmentType != VKClient.Common.Library.Posts.AttachmentType.Location)
-                .ToList();
-            if (conversationVm.IsDialogWithOtherUser && globalState.CanSendMoneyTransfers || conversationVm.IsDialogWithCommunity && globalState.CanSendMoneyTransfersToGroups)
-                attachmentTypes.Insert(4, AttachmentTypes.MoneyAttachmentType);
+            List<NamedAttachmentType> attachmentTypes = new List<NamedAttachmentType>(AttachmentTypes.AttachmentTypesWithPhotoFromGalleryGraffitiAndLocation);
+            attachmentTypes.Add(AttachmentTypes.AttachmentTypesWithPhotoFromGallery.First(type => type.AttachmentType == VKClient.Common.Library.Posts.AttachmentType.Document));
             AttachmentPickerUC.Show(attachmentTypes, this.ConversationVM.OutboundMessageVM.NumberOfAttAllowedToAdd, (Action)(() =>
             {
                 this.ConversationVM.AddAttachmentsFromRepository();
@@ -1148,6 +1232,9 @@ namespace VKMessenger.Views
 
         private void PrepareMenu()
         {
+            ((MenuItem)FindName("menuItemChatBackground")).Header =
+                (ChatWallpaperStore.Exists(CurrentChatBackgroundKey()) || ChatWallpaperStore.Exists(ChatWallpaperStore.CurrentGlobalKey))
+                ? CommonResources.ChatBackgroundChange : CommonResources.ChatBackgroundSet;
             ((UIElement)this.menuItemAllowDenyMessagesFromGroup).Visibility = (this._defaultAppBar.MenuItems.Contains(this._appBarMenuItemAllowDenyMessagesFromGroup) ? Visibility.Visible : Visibility.Collapsed);
             this.menuItemAllowDenyMessagesFromGroup.Header = this._appBarMenuItemAllowDenyMessagesFromGroup.Text;
             ((UIElement)this.menuItemPinToStart).Visibility = (!this._defaultAppBar.MenuItems.Contains(this._appbarMenuItemPinToStart) || !this._appbarMenuItemPinToStart.IsEnabled ? Visibility.Collapsed : Visibility.Visible);
@@ -1168,9 +1255,7 @@ namespace VKMessenger.Views
 
         private void MenuShowMaterialsClick(object sender, RoutedEventArgs e)
         {
-            // Kept as a harmless compatibility handler for the legacy XAML
-            // menu entry; the entry itself is no longer added to the app bar.
-            return;
+            this._appbarMenuItemShowMaterials_Click(sender, e);
         }
 
         private void MenuDisableEnableNotificationsClick(object sender, RoutedEventArgs e)
@@ -1185,16 +1270,12 @@ namespace VKMessenger.Views
 
         private void MenuAddMemberClick(object sender, RoutedEventArgs e)
         {
-            // Kept as a harmless compatibility handler for the legacy XAML
-            // menu entry; the entry itself is no longer added to the app bar.
-            return;
+            this._appBarMenuItemAddMember_Click(sender, e);
         }
 
         private void MenuDeleteDialogClick(object sender, RoutedEventArgs e)
         {
-            // Kept as a harmless compatibility handler for the legacy XAML
-            // menu entry; the entry itself is no longer added to the app bar.
-            return;
+            this._appBarMenuItemDeleteDialog_Click(sender, e);
         }
 
         public void ScrollToOffset(double offset)
@@ -1221,9 +1302,9 @@ namespace VKMessenger.Views
                 return false;
             TextBox textBoxNewComment = this.ucNewMessage.TextBoxNewComment;
             string text = textBoxNewComment.Text;
-            if (text.Contains<char>('@') || text.Contains<char>('*'))
+            if (text.Contains<char>('@'))
             {
-                for (int index = text.Length - 1; index >= 0; --index)
+                for (int index = Math.Min(text.Length, textBoxNewComment.SelectionStart) - 1; index >= 0; --index)
                 {
                     char mentionStartSymbol = text[index];
                     char ch1 = index != 0 ? text[index - 1] : char.MinValue;
@@ -1243,12 +1324,10 @@ namespace VKMessenger.Views
             '<',
             '>'
           };
-                    if (((int)mentionStartSymbol == 64 || (int)mentionStartSymbol == 42) && ((int)ch1 == 0 || ((IEnumerable<char>)chArray).Contains<char>(ch1)))
+                    if (mentionStartSymbol == '@' && ((int)ch1 == 0 || char.IsWhiteSpace(ch1) || ((IEnumerable<char>)chArray).Contains<char>(ch1)))
                     {
-                        string source = text.Remove(0, index + 1);
-                        char ch2 = source.FirstOrDefault<char>((Func<char, bool>)(c => !ConversationPage.GetIsValidDomainSymbol(c)));
-                        if ((int)ch2 != 0)
-                            source = source.Remove(source.IndexOf(ch2));
+                        int mentionStart; string source;
+                        if (!OpenVKMentions.TryGetQuery(text, textBoxNewComment.SelectionStart, textBoxNewComment.SelectionLength, out mentionStart, out source) || mentionStart != index) return false;
                         int selectionStart = textBoxNewComment.SelectionStart;
                         if (textBoxNewComment.SelectionLength > 0 || selectionStart <= index || selectionStart > index + source.Length + 1)
                             return false;
@@ -1277,21 +1356,15 @@ namespace VKMessenger.Views
             return false;
         }
 
-        private static bool GetIsValidDomainSymbol(char c)
-        {
-            if (((int)c < 97 || (int)c > 122) && ((int)c < 65 || (int)c > 90) && (((int)c < 1072 || (int)c > 1103) && ((int)c < 1040 || (int)c > 1103)) && ((int)c < 48 || (int)c > 57))
-                return (int)c == 95;
-            return true;
-        }
-
         private static List<VKClient.Common.Library.FriendHeader> GetPickerItems(List<User> users, string q)
         {
             List<VKClient.Common.Library.FriendHeader> friendHeaderList = new List<VKClient.Common.Library.FriendHeader>();
-            q = q.ToLower();
+            q = (q ?? "").ToLowerInvariant();
+            users = (users ?? new List<User>()).Where(u => u != null).ToList();
             if (q == "")
             {
                 List<VKClient.Common.Library.FriendHeader> list = users.Select<User, VKClient.Common.Library.FriendHeader>((Func<User, VKClient.Common.Library.FriendHeader>)(u => new VKClient.Common.Library.FriendHeader(u, false))).ToList<VKClient.Common.Library.FriendHeader>();
-                list.Remove(list.First<VKClient.Common.Library.FriendHeader>((Func<VKClient.Common.Library.FriendHeader, bool>)(h => h.UserId == AppGlobalStateManager.Current.LoggedInUserId)));
+                list.RemoveAll(h => h.UserId == AppGlobalStateManager.Current.LoggedInUserId);
                 return list;
             }
             foreach (User user in users)
@@ -1299,16 +1372,16 @@ namespace VKMessenger.Views
                 if (user.id != AppGlobalStateManager.Current.LoggedInUserId)
                 {
                     bool flag = false;
-                    if (user.domain.ToLower().StartsWith(q))
+                    if ((user.domain ?? "").ToLowerInvariant().StartsWith(q) || ("id" + user.id).StartsWith(q, StringComparison.OrdinalIgnoreCase))
                         flag = true;
-                    else if (user.first_name.ToLower().StartsWith(q) || user.last_name.ToLower().StartsWith(q))
+                    else if ((user.first_name ?? "").ToLowerInvariant().StartsWith(q) || (user.last_name ?? "").ToLowerInvariant().StartsWith(q))
                     {
                         flag = true;
                     }
                     else
                     {
-                        MatchStrings matchStrings1 = TransliterationHelper.GetMatchStrings(user.first_name.ToLower());
-                        MatchStrings matchStrings2 = TransliterationHelper.GetMatchStrings(user.last_name.ToLower());
+                        MatchStrings matchStrings1 = TransliterationHelper.GetMatchStrings((user.first_name ?? "").ToLowerInvariant());
+                        MatchStrings matchStrings2 = TransliterationHelper.GetMatchStrings((user.last_name ?? "").ToLowerInvariant());
                         foreach (string latinString in matchStrings1.LatinStrings)
                         {
                             if (latinString.StartsWith(q))
@@ -1381,11 +1454,10 @@ namespace VKMessenger.Views
             await Task.Delay(1);
             TextBox textBoxNewComment = this.ucNewMessage.TextBoxNewComment;
             string text = textBoxNewComment.Text;
-            int startIndex = text.LastIndexOf(picker.SearchDomain);
-            string userMention = ConversationPage.GetUserMention(friend.UserId, friend.FullName, picker.MentionStartSymbol);
-            string str = text.Remove(startIndex, Math.Max(picker.SearchDomain.Length, 1)).Insert(startIndex, userMention);
+            string str; int nextCaret;
+            if (!OpenVKMentions.TryInsert(text, textBoxNewComment.SelectionStart, textBoxNewComment.SelectionLength, friend.UserId, friend.FullName, out str, out nextCaret)) { picker.IsVisible = false; return; }
             textBoxNewComment.Text = str;
-            int num = startIndex + userMention.Length;
+            int num = nextCaret;
             textBoxNewComment.SelectionStart = num;
             picker.IsVisible = false;
         }
@@ -1421,11 +1493,6 @@ namespace VKMessenger.Views
             return true;
         }
 
-        private static string GetUserMention(long id, string name, char mentionSymbol)
-        {
-            return string.Format("{0}id{1} ({2})", mentionSymbol, id, name);
-        }
-
         private static bool GetAreDifferentLists(List<VKClient.Common.Library.FriendHeader> firstList, List<VKClient.Common.Library.FriendHeader> secondList)
         {
             if (firstList.Count != secondList.Count)
@@ -1442,6 +1509,12 @@ namespace VKMessenger.Views
         {
             this.ConversationVM.OutboundMessageVM.AddVoiceMessageAttachment(message.File, message.Duration, message.Waveform);
             this.SendMessage();
+        }
+
+        private void CancelReplyTap(object sender, System.Windows.Input.GestureEventArgs e)
+        {
+            e.Handled = true;
+            this.ConversationVM.OutboundMessageVM.ReplyMessage = null;
         }
 
         [DebuggerNonUserCode]

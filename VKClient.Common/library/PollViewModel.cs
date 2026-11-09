@@ -158,31 +158,19 @@ namespace VKClient.Common.Library
 
     public void Handle(PollVotedUnvoted message)
     {
-      if (message.Poll.id != this.Poll.id || message.Poll.owner_id != this.Poll.owner_id)
+      if (message == null || message.Poll == null || message.Poll.id != this.Poll.id || message.Poll.owner_id != this.Poll.owner_id)
         return;
-      PollAnswerHeader pollAnswerHeader1 = (PollAnswerHeader)Enumerable.FirstOrDefault<PollAnswerHeader>(this.Answers, (Func<PollAnswerHeader, bool>)(a => a.Answer.id == message.AnswerHeader.Answer.id));
-      if (pollAnswerHeader1 == null)
-        return;
-      if (!this.Voted)
+      // Events contain the resulting state, not a command to toggle it. The
+      // poll control and its description often share the very same Poll DTO.
+      if (!object.ReferenceEquals(this.Poll, message.Poll))
       {
-        this.Poll.answer_id = pollAnswerHeader1.Answer.id;
-        ++this.Poll.votes;
-        ++pollAnswerHeader1.Answer.votes;
-      }
-      else if (this.Poll.answer_id == pollAnswerHeader1.Answer.id)
-      {
-        this.Poll.answer_id = 0L;
-        --this.Poll.votes;
-        --pollAnswerHeader1.Answer.votes;
-      }
-      else
-      {
-        long currentAnswer = this.Poll.answer_id;
-        this.Poll.answer_id = pollAnswerHeader1.Answer.id;
-        ++pollAnswerHeader1.Answer.votes;
-        PollAnswerHeader pollAnswerHeader2 = (PollAnswerHeader)Enumerable.FirstOrDefault<PollAnswerHeader>(this.Answers, (Func<PollAnswerHeader, bool>)(ah => ah.Answer.id == currentAnswer));
-        if (pollAnswerHeader2 != null)
-          --pollAnswerHeader2.Answer.votes;
+        this.Poll.answer_ids = new List<long>(message.Poll.answer_ids);
+        this.Poll.votes = message.Poll.votes;
+        foreach (PollAnswerHeader header in this.Answers)
+        {
+          Answer updated = (message.Poll.answers ?? new List<Answer>()).FirstOrDefault(answer => answer != null && answer.id == header.Answer.id);
+          if (updated != null) { header.Answer.votes = updated.votes; header.Answer.rate = updated.rate; }
+        }
       }
       this.NotifyUpdates();
     }

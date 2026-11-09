@@ -112,5 +112,6 @@ namespace VKMessenger.Library.VirtItems
         {
             return SystemMessageTextHelper.GenerateText(this._mvm.Message, this._mvm.AssociatedUser, this._mvm.AssociatedUser2, true);
         }
+
     }
 }

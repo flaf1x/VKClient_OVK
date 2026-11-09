@@ -1,0 +1,41 @@
+<framework:PageBase x:Class="VKClient.Common.ChatBackgroundPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:framework="clr-namespace:VKClient.Common.Framework" xmlns:uc="clr-namespace:VKClient.Common.UC"
+ xmlns:shell="clr-namespace:Microsoft.Phone.Shell;assembly=Microsoft.Phone" shell:SystemTray.IsVisible="True" shell:SystemTray.Opacity="0"
+ SupportedOrientations="Portrait" Orientation="Portrait" FontFamily="Segoe WP" FontSize="22"
+ Foreground="{StaticResource PhoneForegroundBrush}">
+ <Grid Background="{StaticResource PhoneBackgroundBrush}">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <uc:GenericHeaderUC Name="Header" Height="96"/>
+  <Grid Grid.Row="1" Grid.RowSpan="2" Name="PreviewViewport" Background="{StaticResource PhoneBackgroundBrush}"
+        SizeChanged="PreviewSizeChanged" ManipulationStarted="PreviewManipulationStarted"
+        ManipulationDelta="PreviewManipulationDelta" ManipulationCompleted="PreviewManipulationCompleted">
+   <!-- Canvas prevents an oversized photo from inflating the viewport. -->
+   <Canvas IsHitTestVisible="False"><Image Name="PreviewPhoto" Stretch="Fill"><Image.RenderTransform><TranslateTransform/></Image.RenderTransform></Image></Canvas>
+   <Rectangle Name="PreviewDim" Fill="{StaticResource PhoneBackgroundBrush}" Opacity="0.48" IsHitTestVisible="False"/>
+  </Grid>
+  <StackPanel Name="ConversationPreview" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+              Margin="16,13,16,8" IsHitTestVisible="False"/>
+  <Border Name="AdjustmentsPanel" Grid.Row="1" VerticalAlignment="Bottom" MaxHeight="320" Visibility="Collapsed"
+          Background="{StaticResource PhoneBackgroundBrush}" Padding="12,0,12,8">
+   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel>
+    <CheckBox Name="BlurCheck" FontSize="20" Content="{Binding LocalizedResources.ChatBackgroundBlur, Source={StaticResource LocalizedStrings}}" Checked="BlurChanged" Unchecked="BlurChanged"/>
+    <Grid>
+     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel><TextBlock FontSize="18" Text="{Binding LocalizedResources.ChatBackgroundZoom, Source={StaticResource LocalizedStrings}}"/><Slider Name="ZoomSlider" Minimum="1" Maximum="3" Value="1" ValueChanged="AppearanceChanged"/></StackPanel>
+     <StackPanel Grid.Column="1"><TextBlock FontSize="18" Text="{Binding LocalizedResources.ChatBackgroundDim, Source={StaticResource LocalizedStrings}}"/><Slider Name="DimSlider" Minimum="0" Maximum="0.85" Value="0.48" ValueChanged="AppearanceChanged"/></StackPanel>
+    </Grid>
+     <Button Name="ResetButton" FontSize="20" Click="ResetClick"/>
+    <Button Name="ChooseButton" FontSize="20" Content="{Binding LocalizedResources.ChatBackgroundChoose, Source={StaticResource LocalizedStrings}}" Click="ChoosePhotoClick"/>
+   </StackPanel>
+   </ScrollViewer>
+  </Border>
+  <Border Grid.Row="2" Height="72" Background="{StaticResource PhoneBackgroundBrush}" Padding="12,0,12,0">
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Button Name="AdjustButton" FontSize="18" Click="AdjustClick"/>
+    <Button Name="ApplyButton" Grid.Column="1" FontSize="18" Content="{Binding LocalizedResources.ChatBackgroundApply, Source={StaticResource LocalizedStrings}}" Click="ApplyClick"/>
+   </Grid>
+  </Border>
+ </Grid>
+</framework:PageBase>

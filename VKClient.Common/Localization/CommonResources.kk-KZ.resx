@@ -5716,4 +5716,23 @@
   <data name="comments_pivotItem" xml:space="preserve">
     <value>пікірлер</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>чат фонын орнату</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>чат фонын өзгерту</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>барлық чаттардың фоны</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>чат фоны</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>фотосуретті таңдау</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>фонды қолдану</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>фонды алып тастау</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>ортақ фонды пайдалану</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Өз фоны жоқ чаттарға арналған. Жеке орнатылған фондар өзгермейді.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Тек осы чатқа арналған. Артқа қайту өзгерістерден бас тартады, қолдану сақтайды.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>фонды бәсеңдету</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>бұлыңғырлау</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>масштаб</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Аймақты таңдау үшін фотоны саусағыңызбен жылжытыңыз.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>Хабарламалар осылай көрінеді.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Өз фоның — өз көңіл күйің.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>стандартты фон</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>баптау</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>алдын ала қарау</value></data>
 </root>

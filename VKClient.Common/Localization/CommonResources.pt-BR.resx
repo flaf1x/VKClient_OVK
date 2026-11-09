@@ -5697,4 +5697,23 @@ Verifique se o "Modo Avião" está desativado, a rede móvel está disponível o
   <data name="comments_pivotItem" xml:space="preserve">
     <value>comentários</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>definir papel de parede</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>alterar papel de parede</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>papel de parede de todas as conversas</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>papel de parede</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>escolher foto</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>aplicar papel de parede</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>remover papel de parede</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>usar papel de parede geral</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Usado nas conversas sem papel de parede próprio. Os individuais serão mantidos.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Somente nesta conversa. Voltar cancela as alterações; aplicar salva.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>atenuar papel de parede</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>desfoque</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>zoom</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Arraste a foto para ajustar a posição.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>Suas mensagens ficarão assim.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Seu papel de parede, seu estilo.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>papel de parede padrão</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>ajustar</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>pré-visualizar</value></data>
 </root>

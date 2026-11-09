@@ -74,6 +74,10 @@ namespace VKClient.Common.Framework
 
         public bool ManuallyLoadMore { get; set; }
 
+        // Includes inertia after the finger leaves the screen. Programmatic
+        // positioning and collection layout do not start a user scroll.
+        public bool IsUserScrolling { get; private set; }
+
         public int CountOfItemsBeforeLoadMore
         {
             get
@@ -317,7 +321,7 @@ namespace VKClient.Common.Framework
                         else if (e.OldStartingIndex >= 0 && e.OldStartingIndex < virtualizingPanel2.VirtualizableItems.Count)
                         {
                             IVirtualizable virtualizableItem = virtualizingPanel2.VirtualizableItems[e.OldStartingIndex];
-                            virtualizingPanel2.RemoveItem(virtualizableItem);
+                            virtualizableList1.Add(virtualizableItem);
                         }
                     }
                 }
@@ -336,6 +340,17 @@ namespace VKClient.Common.Framework
                     virtualizingPanel2.AddItems((IEnumerable<IVirtualizable>)itemsToInsert);
                 else
                     virtualizingPanel2.InsertRemoveItems(e.NewStartingIndex, itemsToInsert, virtualizingPanel2.KeepScrollPositionWhenAddingItems, null);
+            }
+            else if (e.Action == NotifyCollectionChangedAction.Replace)
+            {
+                for (int i = 0; i < itemsToInsert.Count; ++i)
+                {
+                    int index = e.NewStartingIndex + i;
+                    if (index < 0 || index >= virtualizingPanel2.VirtualizableItems.Count) continue;
+                    IVirtualizable oldItem = virtualizingPanel2.VirtualizableItems[index];
+                    virtualizingPanel2.InsertRemoveItems(index, new List<IVirtualizable> { itemsToInsert[i] },
+                        virtualizingPanel2.KeepScrollPositionWhenAddingItems, oldItem);
+                }
             }
             else if (e.Action == NotifyCollectionChangedAction.Reset)
             {
@@ -433,6 +448,7 @@ namespace VKClient.Common.Framework
             if (subscribe)
                 this.ScrollViewer.OnScrollStateChanged = (Action<bool, bool>)((isScrolling, isManipulating) =>
                 {
+                    this.IsUserScrolling = isScrolling;
                     this.group_CurrentStateChanging(isScrolling);
                     this._preventPullUntilNextManipulationStateChange = false;
                     if (isManipulating && this.ScrollViewer.VerticalOffset == 0.0)
@@ -526,6 +542,7 @@ namespace VKClient.Common.Framework
 
         private void OnListVerticalOffsetChanged()
         {
+            if (this.IsUserScrolling) VKClient.Common.Emoji.StickerImage.DeferAnimations();
             if (this._notReactToScroll || this._changingVerticalOffset)
                 return;
             if (!this._lastReportedVerticalOffset.HasValue)

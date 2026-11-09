@@ -17,6 +17,15 @@ namespace VKClient.Common.Library
     public static void BuyStickersPack(StockItemHeader stockItemHeader, string referrer = "", Action successCallback = null, Action errorCallback = null)
     {
       StoreBuyProductParams buyParams = new StoreBuyProductParams(StoreProductType.stickers, stockItemHeader.ProductId) { StickerReferrer = referrer };
+      int price = Math.Max(stockItemHeader.Price, stockItemHeader.Product.votes);
+      if (price > 0)
+      {
+        if (MessageBox.Show("Купить набор «" + stockItemHeader.Title + "» за " + price +
+            " монет OpenVK? Монеты будут списаны с аккаунта OpenVK, не через Windows Store.",
+            "Покупка стикеров", MessageBoxButton.OKCancel) != MessageBoxResult.OK)
+        { if (errorCallback != null) errorCallback(); return; }
+        buyParams.ConfirmedOpenVKPrice = price;
+      }
       FullscreenLoader loader = new FullscreenLoader();
       loader.Show( null, true);
       StoreService.Instance.BuyProduct(buyParams, (Action<BackendResult<StoreBuyProductResult, ResultCode>>) (result =>

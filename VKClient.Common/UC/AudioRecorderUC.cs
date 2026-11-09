@@ -372,9 +372,12 @@ namespace VKClient.Common.UC
 
         public async void StopRecordingAndShowPreview()
         {
+            var recording = this._viewModel;
+            if (recording == null) return;
             this.StopRecording();
             this.ResetValues();
-            StorageFile audioFileAsync = await this._viewModel.GetAudioFileAsync();
+            StorageFile audioFileAsync = await recording.GetAudioFileAsync();
+            if (!this._isOpened || this._viewModel != recording) return;
             if (audioFileAsync == null)
             {
                 this._disableHideAnimation = true;
@@ -382,8 +385,8 @@ namespace VKClient.Common.UC
             }
             else
             {
-                int recordDurationSeconds = this._viewModel.RecordDurationSeconds;
-                List<int> waveform = this._viewModel.Waveform;
+                int recordDurationSeconds = recording.RecordDurationSeconds;
+                List<int> waveform = recording.Waveform;
                 this._previewUC = new AudioRecorderPreviewUC();
                 ((PresentationFrameworkCollection<UIElement>)((Panel)this.gridRoot).Children).Add((UIElement)this._previewUC);
                 this._previewUC.CancelTap = (Action)(() =>

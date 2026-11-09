@@ -195,13 +195,115 @@ namespace VKClient.Common.Backend
           obj["is_closed"] = GetLong(closed) != 0L ? 1 : 0;
       }
 
-      if (!(obj["answer_ids"] is JArray))
-        obj["answer_ids"] = new JArray();
+      JArray selected = obj["answer_ids"] as JArray;
+      if (selected == null)
+      {
+        long legacyAnswer = GetLong(obj["answer_id"]);
+        selected = legacyAnswer > 0 ? new JArray(legacyAnswer) : new JArray();
+        obj["answer_ids"] = selected;
+      }
+      // Keep both model setters consistent regardless of JSON property order.
+      obj["answer_id"] = selected.Count > 0 ? GetLong(selected[0]) : 0L;
     }
 
     private static void NormalizeCommonAliases(JObject obj)
     {
+      JArray attachments = obj["attachments"] as JArray;
+      if (attachments != null)
+      {
+        foreach (JToken item in attachments.ToList())
+        {
+          JObject attachment = item as JObject;
+          if (attachment == null)
+          {
+            item.Replace(new JObject(new JProperty("type", "unavailable")));
+            continue;
+          }
+          string kind = GetString(attachment["type"]);
+          if (string.IsNullOrEmpty(kind))
+            attachment["type"] = "unavailable";
+          // PHP serializes a missing/deleted attachment as [] or false.
+          // Keep the attachment marker, but not an array in an object field.
+          foreach (string field in new[] { "photo", "video", "audio", "doc", "wall", "note", "poll", "sticker", "gift", "link", "wall_reply", "market", "market_album", "album", "money_transfer" })
+          {
+            JToken payload = attachment[field];
+            if (payload is JArray && !payload.HasValues ||
+                payload is JObject && !payload.HasValues ||
+                payload != null && payload.Type == JTokenType.Boolean && !payload.Value<bool>())
+              attachment[field] = JValue.CreateNull();
+          }
+        }
+      }
+      JObject pushSettings = obj["push_settings"] as JObject;
+      // account.getPushSettings returns this object directly, not nested.
+      if (obj["disabled_until"] != null && obj["sound"] != null && obj["sound"].Type == JTokenType.Boolean)
+        obj["sound"] = obj["sound"].Value<bool>() ? 1 : 0;
+      if (pushSettings != null && obj["HasPushSettings"] == null)
+        obj["HasPushSettings"] = true;
+      if (pushSettings != null && pushSettings["sound"] != null &&
+          pushSettings["sound"].Type == JTokenType.Boolean)
+        pushSettings["sound"] = pushSettings["sound"].Value<bool>() ? 1 : 0;
+      // Profile APIs may return null for an unspecified graduation year.
+      if (obj["graduation"] != null && obj["graduation"].Type == JTokenType.Null)
+        obj["graduation"] = 0;
       NormalizeAvatarUrls(obj);
+      if (GetString(obj["type"]) == "stickers" && obj["sticker_ids"] is JArray)
+      {
+        string stickerBase = OpenVKInstanceManager.ResolveWebUrl("/images/stickers/");
+        obj["base_url"] = stickerBase;
+        obj["votes"] = GetLong(obj["price"]);
+        obj["stickers"] = new JObject(new JProperty("base_url", stickerBase),
+          new JProperty("sticker_ids", obj["sticker_ids"].DeepClone()));
+        long firstSticker = GetLong(((JArray)obj["sticker_ids"]).FirstOrDefault());
+        if (firstSticker > 0)
+          foreach (string field in new[] { "photo_35", "photo_70", "photo_128", "photo_140", "photo_256", "photo_296", "photo_512", "photo_592" })
+          {
+            string url = GetString(obj[field]);
+            // WP 8.1 cannot decode the modern pack-cover WebP format.
+            if (string.IsNullOrEmpty(url) || url.IndexOf(".webp", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+              int pixels = field == "photo_592" || field == "photo_512" ? 512 :
+                (field == "photo_296" || field == "photo_256" ? 256 : 128);
+              obj[field] = GetLong(obj["is_animated"]) != 0 || GetString(obj["is_animated"]) == "True" || GetString(obj["is_animated"]) == "true"
+                ? OpenVKInstanceManager.ResolveWebUrl("/sticker/" + GetLong(obj["id"]) + "/" + firstSticker + "_512.json")
+                : stickerBase + firstSticker + "/" + pixels + "b.png";
+            }
+          }
+      }
+      JObject product = obj["product"] as JObject;
+      if (product != null && GetString(product["type"]) == "stickers")
+      {
+        foreach (string key in new[] { "photo_35", "photo_70", "photo_140", "photo_296", "photo_592" })
+          if (product[key] != null && (obj[key] == null || GetString(product[key]).EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
+            obj[key] = product[key].DeepClone();
+        if (!(obj["demo_photos_560"] is JArray) || ((JArray)obj["demo_photos_560"]).Count == 0)
+        {
+          JArray ids = product["sticker_ids"] as JArray;
+          if (ids != null) obj["demo_photos_560"] = new JArray(ids.Take(48).Select(id =>
+            GetString(product["photo_140"]).EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+              ? OpenVKInstanceManager.ResolveWebUrl("/sticker/" + GetLong(product["id"]) + "/" + GetLong(id) + "_512.json")
+              : OpenVKInstanceManager.ResolveWebUrl("/images/stickers/" + GetLong(id) + "/256b.png")));
+        }
+        // No VK gifting or Windows Store payment flow exists in OpenVK.
+        obj["can_purchase_for"] = 0;
+        if (GetLong(product["price"]) > 0)
+          obj["can_purchase"] = GetLong(product["purchased"]) == 0 ? 1 : 0;
+      }
+      if (obj["sticker_id"] != null && obj["images"] is JArray)
+      {
+        long stickerId = GetLong(obj["sticker_id"]);
+        obj["id"] = stickerId;
+        JObject size = ((JArray)obj["images"]).OfType<JObject>().FirstOrDefault();
+        Uri image;
+        string origin = size != null && Uri.TryCreate(GetString(size["url"]), UriKind.Absolute, out image) &&
+          !OpenVKInstanceManager.IsCurrentInstanceUrl(image.ToString())
+          ? image.Scheme + "://" + image.Authority : "";
+        foreach (int pixels in new[] { 64, 128, 256, 352, 512 })
+          obj["photo_" + pixels] = OpenVKInstanceManager.ResolveWebUrl(origin + "/images/stickers/" + stickerId + "/" + pixels + "b.png");
+        obj["width"] = obj["height"] = 256;
+        if (!IsEmptyString(obj["animation_url"]))
+          obj["photo_256"] = OpenVKInstanceManager.ResolveWebUrl(GetString(obj["animation_url"]));
+      }
 
       // VepurOVK returns city/country as plain strings while VK API 5.64
       // exposes { id, title } objects. The profile model cannot deserialize
@@ -292,23 +394,17 @@ namespace VKClient.Common.Backend
 
       // Message fields used by the old client. OpenVK already emits both for
       // v=5.64 in most handlers, but long poll/history payloads are not uniform.
-      if (obj["peer_id"] != null || obj["from_id"] != null)
+      if (obj["post_type"] == null && (obj["peer_id"] != null ||
+          (obj["from_id"] != null && (obj["text"] != null || obj["body"] != null))))
       {
         if (IsNullOrMissing(obj["body"]) && !IsNullOrMissing(obj["text"]))
           obj["body"] = obj["text"].DeepClone();
         if (IsNullOrMissing(obj["text"]) && !IsNullOrMissing(obj["body"]))
           obj["text"] = obj["body"].DeepClone();
         long peerId = GetLong(obj["peer_id"]);
-        long userId = GetLong(obj["user_id"]);
-        if (IsNullOrMissing(obj["user_id"]) || userId == 0L)
-        {
-          // OpenVK currently emits user_id=0 in message history and
-          // conversations. For direct dialogs the peer itself is the user.
-          if (peerId != 0L && (peerId < 2000000000L || peerId >= 3000000000L))
-            obj["user_id"] = peerId;
-          else if (!IsNullOrMissing(obj["from_id"]))
-            obj["user_id"] = obj["from_id"].DeepClone();
-        }
+        long legacyUserId = peerId != 0 && peerId < 2000000000L ? peerId : GetLong(obj["from_id"]);
+        if (legacyUserId != 0)
+          obj["uid"] = obj["user_id"] = legacyUserId;
         if (peerId >= 2000000000L && peerId < 3000000000L &&
             (IsNullOrMissing(obj["chat_id"]) || GetLong(obj["chat_id"]) == 0L))
           obj["chat_id"] = peerId - 2000000000L;
@@ -318,6 +414,31 @@ namespace VKClient.Common.Backend
           obj["fwd_messages"] = new JArray();
         if (IsNullOrMissing(obj["push_settings"]))
           obj["push_settings"] = new JObject(new JProperty("disabled_until", 0));
+        JObject action = obj["action"] as JObject;
+        if (action != null)
+        {
+          obj["action_mid"] = GetLong(action["member_id"]);
+          obj["action_text"] = GetString(action["text"]);
+          obj["action_email"] = GetString(action["email"]);
+          obj["action"] = GetString(action["type"]);
+        }
+        JObject reply = obj["reply_message"] as JObject;
+        if (reply != null && GetLong(reply["from_id"]) != 0)
+          reply["uid"] = reply["user_id"] = GetLong(reply["from_id"]);
+        foreach (JObject forwarded in ((JArray)obj["fwd_messages"]).OfType<JObject>())
+          if (GetLong(forwarded["from_id"]) != 0)
+            forwarded["uid"] = forwarded["user_id"] = GetLong(forwarded["from_id"]);
+      }
+
+      if (GetString(obj["type"]) == "audio_message" && obj["audio_message"] is JObject)
+      {
+        JObject voice = (JObject)obj["audio_message"];
+        obj["type"] = "doc";
+        obj["doc"] = new JObject(
+          new JProperty("id", GetLong(voice["id"])), new JProperty("owner_id", GetLong(voice["owner_id"])),
+          new JProperty("type", 5), new JProperty("title", "Voice message"),
+          new JProperty("ext", "ogg"), new JProperty("url", GetString(voice["link_ogg"])),
+          new JProperty("preview", new JObject(new JProperty("audio_msg", voice.DeepClone()))));
       }
 
       // The old model stores the inverse of OpenVK's is_processed flag.
@@ -419,7 +540,8 @@ namespace VKClient.Common.Backend
       Uri uri;
       if (!Uri.TryCreate(url, UriKind.Absolute, out uri))
         return false;
-      return uri.Host.StartsWith("media.", StringComparison.OrdinalIgnoreCase) ||
+      return uri.Host.Equals("cdn.openvk.org", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.StartsWith("media.", StringComparison.OrdinalIgnoreCase) ||
              uri.AbsolutePath.IndexOf("/content/", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
@@ -449,8 +571,15 @@ namespace VKClient.Common.Backend
 
       int jpegIndex = withoutQuery.LastIndexOf(".jpeg", StringComparison.OrdinalIgnoreCase);
       if (jpegIndex >= 0)
+      {
+        // /photos/thumbnails/{id}_{size}.jpeg is a lazy-resize endpoint,
+        // not the CDN's hash[_cropped] directory layout. Never invent a
+        // directory below it (e.g. {id}_original_cropped/miniscule.gif).
+        if (uri.AbsolutePath.StartsWith("/photos/thumbnails/", StringComparison.OrdinalIgnoreCase))
+          return url;
         return withoutQuery.Substring(0, jpegIndex) + "_cropped/" +
                sizeName + "." + extension + query;
+      }
 
       return null;
     }
@@ -485,6 +614,40 @@ namespace VKClient.Common.Backend
         return;
 
       string method = (methodName ?? "").ToLowerInvariant();
+      if (method == "store.getstickerskeywords")
+      {
+        // Modern OpenVK sends sticker objects where VK 5.64 expects IDs.
+        // Retain their actual assets/product IDs separately; animated packs
+        // do not have the fabricated PNGs used by the old client.
+        EnsureArray(response, "dictionary");
+        var assets = new Dictionary<long, JObject>();
+        foreach (JObject group in ((JArray)response["dictionary"]).OfType<JObject>())
+        {
+          EnsureArray(group, "words");
+          foreach (string field in new[] { "user_stickers", "promoted_stickers" })
+          {
+            var ids = new List<long>();
+            foreach (JToken entry in (group[field] as JArray ?? new JArray()))
+            {
+              JObject sticker = entry as JObject;
+              long id = sticker == null ? GetLong(entry) : GetLong(sticker["id"] ?? sticker["sticker_id"]);
+              JToken allowed = sticker == null ? null : sticker["is_allowed"];
+              if (id <= 0 || id > int.MaxValue || (field == "user_stickers" && allowed != null &&
+                  !(allowed.Type == JTokenType.Boolean ? allowed.Value<bool>() : GetLong(allowed) != 0))) continue;
+              if (!ids.Contains(id)) ids.Add(id);
+              if (sticker != null) { sticker["id"] = id; assets[id] = sticker; }
+            }
+            group[field] = new JArray(ids);
+          }
+        }
+        response["stickers"] = new JArray(assets.Values);
+        return;
+      }
+      if (method == "store.activateproduct" || method == "store.deactivateproduct")
+      {
+        root["response"] = GetLong(response["success"]) == 1 ? 1 : 0;
+        return;
+      }
       if (method == "execute.getuserinfo")
       {
         JObject newsfeed = response["newsfeed"] as JObject;
@@ -519,7 +682,8 @@ namespace VKClient.Common.Backend
           response["count"] = ((JArray)response["items"]).Count;
       }
       else if (method == "messages.gethistory" ||
-               method == "messages.getbyid")
+               method == "messages.getbyid" || method == "messages.search" ||
+               method == "messages.getbyconversationmessageid")
       {
         EnsureArray(response, "items");
         EnsureArray(response, "profiles");
@@ -532,6 +696,45 @@ namespace VKClient.Common.Backend
         EnsureArray(response, "items");
         EnsureArray(response, "profiles");
         EnsureArray(response, "groups");
+        foreach (JObject item in ((JArray)response["items"]).OfType<JObject>())
+        {
+          JObject conversation = item["conversation"] as JObject ?? (item["peer"] is JObject ? item : null);
+          JObject message = item["last_message"] as JObject;
+          if (conversation == null)
+            continue;
+          if (message == null)
+          {
+            message = new JObject(new JProperty("text", ""));
+            item["last_message"] = message;
+          }
+          if (message["peer_id"] == null && conversation["peer"] is JObject)
+            message["peer_id"] = conversation["peer"]["id"];
+          NormalizeCommonAliases(message);
+          JObject settings = conversation["chat_settings"] as JObject;
+          if (settings != null)
+          {
+            message["title"] = GetString(settings["title"]);
+            message["admin_id"] = GetLong(settings["owner_id"]);
+            message["users_count"] = GetLong(settings["members_count"]);
+            JArray members = settings["active_ids"] as JArray;
+            if (members != null)
+              message["chat_active"] = members.DeepClone();
+            JObject photo = settings["photo"] as JObject;
+            foreach (string key in new[] { "photo_50", "photo_100", "photo_200" })
+              if (photo != null && photo[key] != null || settings[key] != null)
+                message[key] = (photo != null && photo[key] != null ? photo[key] : settings[key]).DeepClone();
+          }
+          if (conversation["push_settings"] is JObject)
+          {
+            message["push_settings"] = conversation["push_settings"].DeepClone();
+            message["HasPushSettings"] = true;
+          }
+          string watermark = GetLong(message["out"]) == 1 ? "out_read" : "in_read";
+          if (conversation[watermark + "_cmid"] != null && GetLong(message["conversation_message_id"]) > 0)
+            message["read_state"] = GetLong(message["conversation_message_id"]) <= GetLong(conversation[watermark + "_cmid"]) ? 1 : 0;
+          else if (conversation[watermark] != null)
+            message["read_state"] = GetLong(message["id"]) <= GetLong(conversation[watermark]) ? 1 : 0;
+        }
       }
       else if (method == "notifications.get")
       {

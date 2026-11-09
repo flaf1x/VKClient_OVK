@@ -28,6 +28,7 @@ namespace VKClient.Common
     private DialogService _dialogService;
     private bool _groupViewOpened;
     private readonly ApplicationBarIconButton _appBarButtonSearch;
+    private readonly ApplicationBarIconButton _appBarButtonEnableSelection;
     private readonly ApplicationBarIconButton _appBarButtonCheck;
     private readonly ApplicationBarIconButton _appBarButtonCancel;
     private ApplicationBar _mainAppBar;
@@ -75,6 +76,7 @@ namespace VKClient.Common
       string pageAppBarSearch = CommonResources.FriendsPage_AppBar_Search;
       applicationBarIconButton1.Text = pageAppBarSearch;
       this._appBarButtonSearch = applicationBarIconButton1;
+      this._appBarButtonEnableSelection = new ApplicationBarIconButton(new Uri("/Resources/appbar.manage.rest.png", UriKind.Relative)) { Text = CommonResources.AppBar_SelectSeveral };
       ApplicationBarIconButton applicationBarIconButton2 = new ApplicationBarIconButton();
       Uri uri3 = new Uri("/Resources/check.png", UriKind.Relative);
       applicationBarIconButton2.IconUri = uri3;
@@ -102,6 +104,12 @@ namespace VKClient.Common
       this._mainAppBar = ApplicationBarBuilder.Build(new Color?(), new Color?(), 0.9);
       this._selectionAppBar = ApplicationBarBuilder.Build(new Color?(), new Color?(), 0.9);
       this._mainAppBar.Buttons.Add(this._appBarButtonSearch);
+      this._mainAppBar.Buttons.Add(this._appBarButtonEnableSelection);
+      this._appBarButtonEnableSelection.Click += (sender, e) =>
+      {
+        this.PickUserVM.IsInSelectionMode = true;
+        this.UpdateAppBar();
+      };
       this._selectionAppBar.Buttons.Add(this._appBarButtonCheck);
       this._selectionAppBar.Buttons.Add(this._appBarButtonCancel);
       this._appBarButtonSearch.Click+=(new EventHandler(this.AppBarButtonSearch_Click));
@@ -137,6 +145,8 @@ namespace VKClient.Common
         this.ApplicationBar = ((IApplicationBar) this._mainAppBar);
       if (this.PickUserVM.PickUserMode == PickUserMode.PickForPartner)
         this.ApplicationBar = ( null);
+      if (this.PickUserVM.PickUserMode != PickUserMode.PickForMessage)
+        this._mainAppBar.Buttons.Remove(this._appBarButtonEnableSelection);
       this._appBarButtonCheck.IsEnabled = (this.PickUserVM.SelectedCount > 0);
     }
 
@@ -183,8 +193,10 @@ namespace VKClient.Common
             goto label_8;
           }
         }
-        // OpenVK's messages.createChat is intentionally not exposed by this
-        // client. The picker remains available for a direct conversation.
+        if (queryString.ContainsKey("CreateChat"))
+          this._createChat = string.Equals(queryString["CreateChat"], "true", StringComparison.OrdinalIgnoreCase);
+        if (queryString.ContainsKey("InitialUserId"))
+          long.TryParse(queryString["InitialUserId"], out this._initialUserId);
 label_8:
         PickUserMode mode = PickUserMode.PickForMessage;
         if (queryString.ContainsKey("PickMode"))
@@ -214,6 +226,8 @@ label_8:
         if (mode == PickUserMode.PickForMessage || mode == PickUserMode.PickForPartner || (mode == PickUserMode.PickWithSearch || mode == PickUserMode.PickForStickerPackGift))
           ((PresentationFrameworkCollection<object>) ((ItemsControl) this.pivot).Items).Remove(this.pivotItemLists);
         base.DataContext = pickUserViewModel;
+        if (this._createChat)
+          pickUserViewModel.IsInSelectionMode = true;
         pickUserViewModel.PropertyChanged += new PropertyChangedEventHandler(this.OnPropertyChanged);
         pickUserViewModel.Friends.LoadData(false, false,  null, false);
         pickUserViewModel.Lists.LoadData(false, false,  null, false);
@@ -295,6 +309,8 @@ label_8:
           ParametersRepository.SetParameterForId("SelectedLists", lists);
         ((Page) this).NavigationService.GoBackSafe();
       }
+      else if (this._createChat || users.Count > 1)
+        this.CreateChatAndProceed(users.Select(user => user.uid).ToList());
       else
         Navigator.Current.NavigateToConversation(((User) Enumerable.First<User>(users)).uid, false, true, "", 0, false);
     }

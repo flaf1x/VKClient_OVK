@@ -319,6 +319,7 @@ namespace VKClient.Common.Backend.DataObjects
 
         public string faculty_name { get; set; }
 
+        [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int graduation { get; set; }
 
         public int online { get; set; }

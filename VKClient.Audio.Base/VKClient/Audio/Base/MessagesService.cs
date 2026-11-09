@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,8 +22,6 @@ namespace VKClient.Audio.Base
   public class MessagesService
   {
     private static MessagesService _instance;
-    private readonly object _localReadSync = new object();
-    private readonly Dictionary<long, long> _locallyReadThroughMessageId = new Dictionary<long, long>();
 
     public static MessagesService Instance
     {
@@ -37,7 +36,7 @@ namespace VKClient.Audio.Base
     public void CreateChat(List<long> userIds, Action<BackendResult<ResponseWithId, ResultCode>> callback)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["user_ids"] = userIds.GetCommaSeparated();
+      parameters["user_ids"] = userIds.Where(id => id > 0 && id != AppGlobalStateManager.Current.LoggedInUserId).Distinct().ToList().GetCommaSeparated();
       VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("messages.createChat", parameters, callback, new Func<string, ResponseWithId>(JsonConvert.DeserializeObject<ResponseWithId>), false, true, new CancellationToken?(),  null);
     }
 
@@ -49,52 +48,38 @@ namespace VKClient.Audio.Base
       parameters["fields"] = "photo_max,photo_100,photo_200";
       VKRequestsDispatcher.DispatchRequestToVK<List<object>>("messages.searchDialogs", parameters, callback, (Func<string, List<object>>) (jsonStr =>
       {
-        VKRequestsDispatcher.GenericRoot<IList<Dictionary<string, object>>> genericRoot = JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<IList<Dictionary<string, object>>>>(jsonStr);
+        JArray results = JObject.Parse(jsonStr)["response"] as JArray ?? new JArray();
         List<object> objectList = new List<object>();
-        foreach (Dictionary<string, object> dictionary in (IEnumerable<Dictionary<string, object>>) genericRoot.response)
+        foreach (JObject item in results.OfType<JObject>())
         {
-          if (dictionary.ContainsKey("type"))
+          string type = (string)item["type"];
+          if (type == "profile")
           {
-            if (dictionary["type"].ToString() == "profile")
-            {
-              User user1 = new User();
-              user1.uid = (long) int.Parse(dictionary["id"].ToString());
-              user1.last_name = dictionary["last_name"].ToString();
-              user1.first_name = dictionary["first_name"].ToString();
-              User user2 = user1;
-              object obj = dictionary["photo_max"];
-              string str = obj != null ? obj.ToString() :  null;
-              user2.photo_max = str;
-              objectList.Add(user1);
-            }
-            if (dictionary["type"].ToString() == "chat")
-            {
-              Chat chat = new Chat();
-              chat.chat_id = long.Parse(dictionary["id"].ToString());
-              chat.title = dictionary["title"].ToString();
-              if (dictionary.ContainsKey("photo_100"))
-                chat.photo_100 = dictionary["photo_100"].ToString();
-              if (dictionary.ContainsKey("photo_200"))
-                chat.photo_200 = dictionary["photo_200"].ToString();
-              string[] strArray = dictionary["users"].ToString().Split(',');
-              List<long> longList = new List<long>();
-              foreach (string input in strArray)
+            User user = item.ToObject<User>();
+            UsersService.Instance.SetCachedUser(user);
+            objectList.Add(user);
+          }
+          else if (type == "chat")
+          {
+            JToken users = item["users"];
+            item.Remove("users");
+            Chat chat = item.ToObject<Chat>();
+            chat.users = new List<long>();
+            if (users is JArray)
+              foreach (JToken user in (JArray)users)
+                chat.users.Add(user is JObject ? (long)(user["id"] ?? user["uid"] ?? 0) : (long)user);
+            else if (users != null)
+              foreach (string value in users.ToString().Split(','))
               {
-                string s = Regex.Match(input, "\\d+").Value;
-                longList.Add(long.Parse(s));
+                long id;
+                if (long.TryParse(value.Trim(), out id))
+                  chat.users.Add(id);
               }
-              chat.users = longList;
-              objectList.Add(chat);
-            }
-            if (dictionary["type"].ToString() == "group")
-              objectList.Add(new User()
-              {
-                id = -long.Parse(dictionary["id"].ToString()),
-                first_name = dictionary["name"].ToString(),
-                photo_max = dictionary["photo_200"].ToString()
-              });
-            if (dictionary["type"].ToString() == "email")
-              Debugger.Break();
+            objectList.Add(chat);
+          }
+          else if (type == "group")
+          {
+            objectList.Add(new User() { id = -(long)item["id"], first_name = (string)item["name"], photo_max = (string)item["photo_200"] });
           }
         }
         return objectList;
@@ -103,19 +88,71 @@ namespace VKClient.Audio.Base
 
     public void GetHistory(long userOrChatId, bool isChat, int offset, int count, int? startMessageId, Action<BackendResult<MessageListResponse, ResultCode>> callback)
     {
+      if (startMessageId.HasValue && startMessageId.Value == -1)
+      {
+        // Modern OpenVK does not interpret start_message_id=-1 as "unread".
+        // Find the window directly instead of walking backwards from latest.
+        VKRequestsDispatcher.DispatchRequestToVK<HistoryAnchor>("messages.getConversationsById",
+          new Dictionary<string, string>() { { "peer_ids", GetPeerId(userOrChatId, isChat).ToString() } },
+          result =>
+          {
+            HistoryAnchor anchor = result.ResultCode == ResultCode.Succeeded ? result.ResultData : null;
+            bool unread = anchor != null && anchor.UnreadCount > 0;
+            GetHistoryPage(userOrChatId, isChat, unread && anchor.ReadId > 0 ? -13 : 0, count,
+              unread && anchor.ReadId > 0 ? new int?(anchor.ReadId) : null,
+              page =>
+              {
+                if (page.ResultCode == ResultCode.Succeeded && anchor != null)
+                {
+                  page.ResultData.LatestMessageId = anchor.LastId;
+                  page.ResultData.Skipped = page.ResultData.Messages.Any(m => m.id >= anchor.LastId) ? 0 : 1;
+                }
+                callback(page);
+              }, unread && anchor.ReadId <= 0);
+          }, json =>
+          {
+            JObject response = JObject.Parse(json)["response"] as JObject;
+            JArray items = response == null ? null : response["items"] as JArray;
+            JObject item = items == null ? null : items.FirstOrDefault() as JObject;
+            JObject conversation = item == null ? null : (item["conversation"] as JObject ?? item);
+            return conversation == null ? new HistoryAnchor() : new HistoryAnchor {
+              UnreadCount = (int?)conversation["unread_count"] ?? 0,
+              ReadId = (int?)conversation["in_read"] ?? 0,
+              LastId = (int?)conversation["last_message_id"] ?? 0
+            };
+          }, false, true, new CancellationToken?(), null);
+        return;
+      }
+      GetHistoryPage(userOrChatId, isChat, offset, count, startMessageId, callback);
+    }
+
+    private class HistoryAnchor
+    {
+      public int UnreadCount;
+      public int ReadId;
+      public int LastId;
+    }
+
+    private void GetHistoryPage(long userOrChatId, bool isChat, int offset, int count, int? startMessageId, Action<BackendResult<MessageListResponse, ResultCode>> callback, bool oldestFirst = false)
+    {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["peer_id"] = this.GetPeerId(userOrChatId, isChat).ToString();
-      bool loadLatestMessages = startMessageId.HasValue && startMessageId.Value == -1;
       if (startMessageId.HasValue && startMessageId.Value > 0)
         parameters["start_message_id"] = startMessageId.Value.ToString();
-      parameters["offset"] = (loadLatestMessages ? 0 : offset).ToString();
+      parameters["offset"] = offset.ToString();
       parameters["count"] = count.ToString();
+      if (oldestFirst)
+        parameters["rev"] = "1";
       parameters["fields"] = "first_name_acc,last_name_acc,online,online_mobile,photo_max,sex,friend_status,photo_200,first_name_dat,is_messages_blocked";
       parameters["extended"] = "1";
       VKRequestsDispatcher.DispatchRequestToVK<MessageListResponse>("messages.getHistory", parameters, (Action<BackendResult<MessageListResponse, ResultCode>>) (res =>
       {
         if (res.ResultCode == ResultCode.Succeeded)
         {
+          // OpenVK omits the old "skipped" field. For offset-based windows
+          // the number of newer messages not loaded is precisely this offset.
+          if (!startMessageId.HasValue || startMessageId.Value <= 0)
+            res.ResultData.Skipped = Math.Max(0, offset);
           List<Message> messages = res.ResultData.Messages ?? new List<Message>();
           res.ResultData.Messages = messages;
           if (res.ResultData.Users == null)
@@ -147,9 +184,29 @@ namespace VKClient.Audio.Base
 
     public long GetPeerId(long userOrChatId, bool isChat)
     {
-      if (!isChat)
+      if (!isChat || userOrChatId >= 2000000000L)
         return userOrChatId;
       return userOrChatId + 2000000000L;
+    }
+
+    public static bool ShouldLoadOlderHistory(double position, double extent, double viewport, bool isUserScrolling)
+    {
+      return isUserScrolling && position > 150.0 && extent > 0.0 &&
+        extent - viewport - position < 600.0;
+    }
+
+    // ObservableCollectionExtensions.AddOrdered uses >= 0, unlike List.Sort.
+    // This comparator consequently stores real messages in ascending order.
+    public static int CompareConversationMessages(Message first, Message second)
+    {
+      return first.mid > 0 && second.mid > 0 ? second.mid.CompareTo(first.mid) : second.date.CompareTo(first.date);
+    }
+
+    public static int FindUnreadDividerIndex(IList<Message> messages)
+    {
+      for (int i = 0; i < messages.Count; ++i)
+        if (messages[i].mid > 0 && messages[i].@out == 0 && messages[i].read_state == 0) return i;
+      return -1;
     }
 
     public void GetChat(long chatId, Action<BackendResult<ChatExtended, ResultCode>> callback)
@@ -164,11 +221,20 @@ namespace VKClient.Audio.Base
           "fields",
           "photo_200,photo_max,domain"
         }
-      }, callback,  null, false, true, new CancellationToken?(),  null);
+      }, res => {
+        if (res.ResultCode != ResultCode.Succeeded || res.ResultData == null) { callback(res); return; }
+        AccountService.Instance.GetPeerPushSettings(chatId + 2000000000L, settings => {
+          if (settings.ResultCode == ResultCode.Succeeded && settings.ResultData != null)
+            res.ResultData.push_settings = settings.ResultData;
+          callback(res);
+        });
+      },  null, false, true, new CancellationToken?(),  null);
     }
 
     public void GetDialogs(GetDialogsRequest request, Action<BackendResult<MessageListResponse, ResultCode>> callback)
     {
+      var completed = callback;
+      callback = result => EnrichDialogChats(result, completed);
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["offset"] = request.Offset.ToString();
       parameters["count"] = request.Count.ToString();
@@ -196,7 +262,7 @@ namespace VKClient.Audio.Base
                 callback(res);
               }
               else
-                callback(new BackendResult<MessageListResponse, ResultCode>(resUsers.ResultCode));
+                callback(res);
             }));
           else
             callback(res);
@@ -236,19 +302,11 @@ namespace VKClient.Audio.Base
           if (lastMessage.chat_id == 0)
             lastMessage.chat_id = (int) (peerId - 2000000000L);
         }
-        else if (peerId > 0L && peerId <= int.MaxValue && lastMessage.user_id == 0)
+        else if (peerId != 0L && peerId <= int.MaxValue)
         {
           lastMessage.user_id = (int) peerId;
         }
         int unread = item.conversation != null ? item.conversation.unread_count : 0;
-        lock (this._localReadSync)
-        {
-          long readThrough;
-          if (peerId != 0L &&
-              this._locallyReadThroughMessageId.TryGetValue(peerId, out readThrough) &&
-              (long) lastMessage.id <= readThrough)
-            unread = 0;
-        }
         dialogs.Add(new DialogHeaderInfo()
         {
           unread = unread,
@@ -262,6 +320,31 @@ namespace VKClient.Audio.Base
         TotalCount = response.count,
         Users = profiles
       };
+    }
+
+    private void EnrichDialogChats(BackendResult<MessageListResponse, ResultCode> result,
+      Action<BackendResult<MessageListResponse, ResultCode>> callback)
+    {
+      if (result.ResultCode != ResultCode.Succeeded || result.ResultData == null) { callback(result); return; }
+      var messages = result.ResultData.DialogHeaders.Select(d => d.message).Where(m => m.chat_id != 0).ToList();
+      if (messages.Count == 0) { callback(result); return; }
+      // getConversations can omit the database-backed custom chat photo.
+      // One batch per page, not a request for each row.
+      VKRequestsDispatcher.DispatchRequestToVK<List<Chat>>("messages.getChat", new Dictionary<string, string> {
+        { "chat_ids", string.Join(",", messages.Select(m => m.chat_id).Distinct()) }
+      }, chats => {
+        if (chats.ResultCode == ResultCode.Succeeded && chats.ResultData != null)
+          foreach (var message in messages)
+          {
+            var chat = chats.ResultData.FirstOrDefault(c => c.id == message.chat_id);
+            if (chat == null) continue;
+            message.title = chat.title;
+            message.photo_200 = chat.photo_200;
+            message.chat_active = chat.users;
+            message.HasChatMetadata = true;
+          }
+        callback(result); // Optional enrichment must not hide the dialog list.
+      });
     }
 
     private sealed class ConversationsWrapper
@@ -326,7 +409,7 @@ namespace VKClient.Audio.Base
                   callback(res);
                 }
                 else
-                  callback(new BackendResult<MessageListResponse, ResultCode>(resUsers.ResultCode));
+                  callback(res);
               }));
             else
               callback(res);
@@ -400,13 +483,15 @@ namespace VKClient.Audio.Base
       string str1 = this.GetPeerId(request.UserOrCharId, request.IsChat).ToString();
       dictionary[index1] = str1;
       string index2 = "random_id";
-      string str2 = Convert.ToInt32((DateTime.Now.ToUniversalTime() - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds).ToString();
+      string str2 = (request.RandomId != 0 ? request.RandomId : NewRandomId()).ToString();
       dictionary[index2] = str2;
       string index3 = "message";
       string messageBody = request.MessageBody;
       dictionary[index3] = messageBody;
       Dictionary<string, string> parameters = dictionary;
-      this.ProcessCommands(request.MessageBody);
+      this.ProcessCommands(request.MessageBody ?? "");
+      if (request.ReplyTo > 0)
+        parameters["reply_to"] = request.ReplyTo.ToString(CultureInfo.InvariantCulture);
       if (request.AttachmentIds != null && request.AttachmentIds.Count > 0)
         parameters["attachment"] = request.AttachmentIds.GetCommaSeparated(",");
       if (request.ForwardedMessagesIds != null && request.ForwardedMessagesIds.Count > 0)
@@ -474,21 +559,37 @@ namespace VKClient.Audio.Base
 
     public void MarkAsRead(List<long> messageIds, long peerId, Action<BackendResult<ResponseWithId, ResultCode>> callback)
     {
-      if (!messageIds.IsNullOrEmpty() && peerId != 0L)
+      if (messageIds.IsNullOrEmpty() || peerId == 0L)
       {
-        long newestReadId = messageIds.Max();
-        lock (this._localReadSync)
-        {
-          long previousReadId;
-          if (!this._locallyReadThroughMessageId.TryGetValue(peerId, out previousReadId) ||
-              newestReadId > previousReadId)
-            this._locallyReadThroughMessageId[peerId] = newestReadId;
-        }
+        callback(new BackendResult<ResponseWithId, ResultCode>(ResultCode.Succeeded, new ResponseWithId() { response = 1 }));
+        return;
       }
-      // OpenVK master currently has no messages.markAsRead handler. Retain a
-      // per-peer read-through marker so refreshed conversation lists do not
-      // resurrect the same unread badge; a later message id becomes unread.
-      callback(new BackendResult<ResponseWithId, ResultCode>(ResultCode.Succeeded, new ResponseWithId() { response = 1 }));
+      long newestReadId = messageIds.Max();
+      var parameters = new Dictionary<string, string>();
+      parameters["peer_id"] = peerId.ToString();
+      parameters["start_message_id"] = newestReadId.ToString();
+      parameters["message_ids"] = messageIds.GetCommaSeparated();
+      VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("messages.markAsRead", parameters, callback,
+        JsonConvert.DeserializeObject<ResponseWithId>);
+    }
+
+    public void GetConversationUnreadCount(long peerId, Action<BackendResult<int, ResultCode>> callback)
+    {
+      VKRequestsDispatcher.DispatchRequestToVK<int>("messages.getConversationsById",
+        new Dictionary<string, string> { { "peer_ids", peerId.ToString() } }, callback, json => {
+          JObject response = JObject.Parse(json)["response"] as JObject;
+          JArray items = response == null ? null : response["items"] as JArray;
+          JObject item = items == null ? null : items.FirstOrDefault() as JObject;
+          JObject conversation = item == null ? null : item["conversation"] as JObject ?? item;
+          if (conversation == null || conversation["unread_count"] == null) throw new InvalidDataException("Missing unread count");
+          return Math.Max(0, (int)conversation["unread_count"]);
+        });
+    }
+
+    public static int NewRandomId()
+    {
+      int id = BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0) & int.MaxValue;
+      return id == 0 ? 1 : id;
     }
 
     public void SetUserIsTyping(long userOrChatId, bool isChatId, Action<BackendResult<ResponseWithId, ResultCode>> callback)
@@ -499,19 +600,30 @@ namespace VKClient.Audio.Base
       VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>("messages.setActivity", parameters, callback, new Func<string, ResponseWithId>(JsonConvert.DeserializeObject<ResponseWithId>), false, true, new CancellationToken?(),  null);
     }
 
-    public void DeleteMessages(List<int> messageIds, Action<BackendResult<ResponseWithId, ResultCode>> callback)
+    public void DeleteMessages(List<int> messageIds, Action<BackendResult<ResponseWithId, ResultCode>> callback, long peerId = 0)
     {
-      this.SetStatusByIds(messageIds, "messages.delete", callback);
+      this.SetStatusByIds(messageIds, "messages.delete", callback, peerId);
     }
 
-    private void SetStatusByIds(List<int> messageIds, string methodName, Action<BackendResult<ResponseWithId, ResultCode>> callback)
+    private void SetStatusByIds(List<int> messageIds, string methodName, Action<BackendResult<ResponseWithId, ResultCode>> callback, long peerId = 0)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters.Add("message_ids", messageIds.GetCommaSeparated());
+      if (peerId != 0)
+        parameters["peer_id"] = peerId.ToString();
       if (messageIds.Count == 0)
         callback(new BackendResult<ResponseWithId, ResultCode>(ResultCode.Succeeded, new ResponseWithId()));
       else
-        VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>(methodName, parameters, callback,  null, false, true, new CancellationToken?(),  null);
+        VKRequestsDispatcher.DispatchRequestToVK<ResponseWithId>(methodName, parameters, callback, json =>
+        {
+          JToken result = JObject.Parse(json)["response"];
+          bool succeeded = result != null && (result.Type == JTokenType.Object
+            ? messageIds.All(id => (int?)result[id.ToString()] == 1)
+            : (int?)result == 1);
+          if (!succeeded)
+            throw new InvalidOperationException("Messages were not deleted.");
+          return new ResponseWithId() { response = 1 };
+        }, false, true, new CancellationToken?(), null);
     }
 
     public void GetPhotoUploadServer(Action<BackendResult<UploadServerAddress, ResultCode>> callback)
@@ -541,15 +653,12 @@ namespace VKClient.Audio.Base
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["q"] = query;
       parameters["offset"] = offset.ToString();
-      parameters["preview_length"] = "1";
+      parameters["preview_length"] = "0";
       parameters["count"] = count.ToString();
-      VKRequestsDispatcher.DispatchRequestToVK<MessageListResponse>("messages.search", parameters, (Action<BackendResult<MessageListResponse, ResultCode>>) (res =>
-      {
-        if (res.ResultCode == ResultCode.Succeeded && res.ResultData.Messages.Count > 0)
-          this.GetMessages(res.ResultData.Messages.Select<Message, long>((Func<Message, long>) (m => (long) m.id)).ToList<long>(), callback);
-        else
-          callback(res);
-      }), new Func<string, MessageListResponse>(this.GetMessageDataForJson), false, true, new CancellationToken?(),  null);
+      parameters["extended"] = "1";
+      parameters["fields"] = "photo_200,photo_max,online,sex";
+      VKRequestsDispatcher.DispatchRequestToVK<MessageListResponse>("messages.search", parameters, callback,
+        this.GetMessageHistoryDataForJson, false, true, new CancellationToken?(), null);
     }
 
     public void UploadPhoto(byte[] photoData, Action<BackendResult<Photo, ResultCode>> callback, Action<double> progressCallback = null, Cancellation c = null)
@@ -575,15 +684,10 @@ namespace VKClient.Audio.Base
       parameters["videos"] = ownerId.ToString() + "_" + videoId.ToString();
       VKRequestsDispatcher.DispatchRequestToVK<VideoData>("video.get", parameters, callback, (Func<string, VideoData>) (jsonStr =>
       {
-        jsonStr = this.RemoveCountOfRecords(jsonStr);
-        try
-        {
-          return JsonConvert.DeserializeObject<VKRequestsDispatcher.GenericRoot<List<VideoData>>>(jsonStr).response.FirstOrDefault<VideoData>();
-        }
-        catch (Exception )
-        {
-          return new VideoData();
-        }
+        JToken response = JObject.Parse(jsonStr)["response"];
+        JArray items = response as JArray ?? (response as JObject)?["items"] as JArray;
+        JObject video = items == null ? null : items.OfType<JObject>().FirstOrDefault();
+        return video == null ? new VideoData() : video.ToObject<VideoData>();
       }), false, true, new CancellationToken?(),  null);
     }
 
@@ -624,10 +728,12 @@ namespace VKClient.Audio.Base
       VKRequestsDispatcher.DispatchRequestToVK<UploadServerAddress>("photos.getChatUploadServer", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
-    public void SetChatPhoto(UploadResponseData uploadData, Action<BackendResult<ChatInfoWithMessageId, ResultCode>> callback)
+    public void SetChatPhoto(long chatId, UploadResponseData uploadData, Action<BackendResult<ChatInfoWithMessageId, ResultCode>> callback)
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
-      parameters["file"] = uploadData.response;
+      parameters["chat_id"] = chatId.ToString();
+      parameters["file"] = uploadData.photo;
+      parameters["hash"] = uploadData.hash;
       VKRequestsDispatcher.DispatchRequestToVK<ChatInfoWithMessageId>("messages.setChatPhoto", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -642,22 +748,25 @@ namespace VKClient.Audio.Base
         else
         {
           string uploadUrl = getUplResp.ResultData.upload_url;
-          // ISSUE: explicit reference operation
-          if (((Rect) @thumbnailRect).Width != 0.0)
-          {
-            // ISSUE: explicit reference operation
-            // ISSUE: explicit reference operation
-            // ISSUE: explicit reference operation
-            string str = string.Format("&_square_crop={0},{1},{2}&_full={0},{1},{2},{2}", (int) ((Rect) @thumbnailRect).X, (int) ((Rect) @thumbnailRect).Y, (int) ((Rect) @thumbnailRect).Width);
-            uploadUrl += str;
-          }
+          // OpenVK consumes the already-cropped JPEG. Keep its signed URL
+          // intact instead of appending legacy VK crop query parameters.
           MemoryStream memoryStream = new MemoryStream(photoData);
-          JsonWebRequest.Upload(uploadUrl, (Stream) memoryStream, "photo", "image", (Action<JsonResponseData>) (jsonResult =>
+          JsonWebRequest.Upload(uploadUrl, (Stream) memoryStream, "photo", "image/jpeg", (Action<JsonResponseData>) (jsonResult =>
           {
+            memoryStream.Dispose();
             if (!jsonResult.IsSucceeded)
               callback(new BackendResult<ChatInfoWithMessageId, ResultCode>(ResultCode.UnknownError));
             else
-              this.SetChatPhoto(JsonConvert.DeserializeObject<UploadResponseData>(jsonResult.JsonString), callback);
+            {
+              try
+              {
+                var uploaded = JsonConvert.DeserializeObject<UploadResponseData>(jsonResult.JsonString);
+                if (uploaded == null || string.IsNullOrEmpty(uploaded.photo) || string.IsNullOrEmpty(uploaded.hash))
+                  callback(new BackendResult<ChatInfoWithMessageId, ResultCode>(ResultCode.UploadingFailed));
+                else this.SetChatPhoto(chatId, uploaded, callback);
+              }
+              catch (JsonException) { callback(new BackendResult<ChatInfoWithMessageId, ResultCode>(ResultCode.UploadingFailed)); }
+            }
           }), "MyImage.jpg",  null,  null);
         }
       }));

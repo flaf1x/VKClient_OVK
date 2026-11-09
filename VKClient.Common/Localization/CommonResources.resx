@@ -1767,7 +1767,7 @@ in the Friends section</value>
     <value>Version {0}</value>
   </data>
   <data name="About_PatchVersion" xml:space="preserve">
-    <value>Patch 1.1</value>
+    <value>Patch 1.2</value>
   </data>
   <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
     <value>About OpenVK</value>
@@ -5718,4 +5718,23 @@ Make sure flight mode is turned off and check your mobile data or Wi-Fi connecti
   <data name="comments_pivotItem" xml:space="preserve">
     <value>comments</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>set chat wallpaper</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>change chat wallpaper</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>wallpaper for all chats</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>chat wallpaper</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>choose photo</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>apply wallpaper</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>remove wallpaper</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>use common wallpaper</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Used in chats without their own wallpaper. Existing individual wallpapers stay unchanged.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Only for this chat. Back cancels changes; apply saves them.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>dim wallpaper</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>blur</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>zoom</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Drag the photo to adjust its position.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>This is how your messages will look.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Your wallpaper, your style.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>default wallpaper</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>adjust</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>preview</value></data>
 </root>

@@ -23,6 +23,7 @@ namespace ExifLib
         while (true)
         {
           marker = stream.ReadByte();
+          if (marker < 0) return; // Truncated photo: do not spin at EOF.
           if (marker == (int) byte.MaxValue || num1 != (int) byte.MaxValue)
           {
             num1 = marker;

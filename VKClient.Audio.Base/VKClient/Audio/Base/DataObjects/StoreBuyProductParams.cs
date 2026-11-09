@@ -10,6 +10,9 @@ namespace VKClient.Audio.Base.DataObjects
 
       public int ProductId { get; private set; }
 
+      // Set only after an explicit UI confirmation in OpenVK coins.
+      public int? ConfirmedOpenVKPrice { get; set; }
+
     public int RandomId
     {
       get

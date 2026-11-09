@@ -115,6 +115,12 @@ namespace VKClient.Common.Stickers.Views
       StickersPackView.Show(new StockItemHeader(dataContext.StockItem, false, 0, false), "store");
     }
 
+    private void Search_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+      if (this._viewModel != null)
+        this._viewModel.SearchQuery = ((System.Windows.Controls.TextBox)sender).Text;
+    }
+
     [DebuggerNonUserCode]
     public void InitializeComponent()
     {

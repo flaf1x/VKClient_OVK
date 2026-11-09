@@ -52,7 +52,7 @@ namespace VKClient.Common.Utils
       int num = (int) ((dt.Ticks - dateTime.Ticks) / 10000000L);
       if (includeTimeDiff)
       {
-        int minusLocalTimeDelta = AppGlobalStateManager.Current.GlobalState.ServerMinusLocalTimeDelta;
+        int minusLocalTimeDelta = BaseFormatterHelper.GetSafeStoredTimeDelta();
         num += minusLocalTimeDelta;
       }
       return num;

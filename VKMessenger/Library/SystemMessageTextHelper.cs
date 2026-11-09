@@ -20,6 +20,12 @@ namespace VKMessenger.Library
         str1 = "";
       string str3 = "";
       string action = message.action;
+      if (action == "chat_invite_user_by_link")
+        return (str1 + (user1.IsFemale ? " присоединилась к беседе по ссылке" : " присоединился к беседе по ссылке")).Trim();
+      if (action == "chat_pin_message") return (str1 + (user1.IsFemale ? " закрепила сообщение" : " закрепил сообщение")).Trim();
+      if (action == "chat_unpin_message") return (str1 + (user1.IsFemale ? " открепила сообщение" : " открепил сообщение")).Trim();
+      if (action == "chat_moderator_add") return (str1 + (user1.IsFemale ? " назначила администратором " : " назначил администратором ") + str2).Trim();
+      if (action == "chat_moderator_remove") return (str1 + (user1.IsFemale ? " сняла права администратора у " : " снял права администратора у ") + str2).Trim();
       if (!(action == "chat_photo_update"))
       {
         if (!(action == "chat_photo_remove"))
@@ -47,12 +53,15 @@ namespace VKMessenger.Library
       }
       else
         str3 = !user1.IsFemale ? string.Format(CommonResources.ChatPhotoUpdateMaleFrm, str1) : string.Format(CommonResources.ChatPhotoUpdateFemaleFrm, str1);
-      return str3.Trim();
+      // New server actions must not become empty, zero-height service rows.
+      return string.IsNullOrWhiteSpace(str3) ? (!string.IsNullOrWhiteSpace(message.body) ? message.body : "Событие беседы") : str3.Trim();
     }
 
     private static string CreateUserNameText(User user, bool isAcc, bool extendedText)
     {
       string str = isAcc ? user.NameAcc : user.Name;
+      if (string.IsNullOrWhiteSpace(str)) str = user.Name;
+      if (string.IsNullOrWhiteSpace(str)) return "Участник";
       if (!extendedText)
         return str;
       if (user.id > 0L)

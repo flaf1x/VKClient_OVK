@@ -64,6 +64,8 @@ namespace VKMessenger.Backend
 
     public int sex { get; set; }
 
+    public bool can_kick { get; set; }
+
     public ChatUser(User user, long invitedById)
     {
       this.type = "profile";

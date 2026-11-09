@@ -69,25 +69,25 @@ namespace VKMessenger.Views
       if (e.Key != Key.Enter)
         return;
       ((Control) this).Focus();
-      if (!(this.TitleBox.Text != this.ChatEditVM.Title))
-        return;
-      this.ChatEditVM.ChangeTitle(this.TitleBox.Text, (Action) (() => this.TitleBox.Text = this.ChatEditVM.Title));
+      // LostFocus is the single save path (Enter also triggers it).
     }
 
     private void Photo_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
     {
-      if (this.ChatEditVM.IsPhotoMenuEnabled || this.ChatEditVM.IsPhotoChanging)
+      if (!this.ChatEditVM.CanManageChat || this.ChatEditVM.IsPhotoMenuEnabled || this.ChatEditVM.IsPhotoChanging)
         return;
       Navigator.Current.NavigateToPhotoPickerPhotos(1, true, false);
     }
 
     private void ChangePhoto_OnClicked(object sender, RoutedEventArgs e)
     {
+      if (!this.ChatEditVM.CanManageChat || this.ChatEditVM.IsPhotoChanging) return;
       Navigator.Current.NavigateToPhotoPickerPhotos(1, true, false);
     }
 
     private void DeletePhoto_OnClicked(object sender, RoutedEventArgs e)
     {
+      if (!this.ChatEditVM.CanManageChat || this.ChatEditVM.IsPhotoChanging) return;
       if (MessageBox.Show(CommonResources.GenericConfirmation, CommonResources.DeleteOnePhoto, MessageBoxButton.OKCancel) != MessageBoxResult.OK)
         return;
       this.ChatEditVM.DeletePhoto();
@@ -107,7 +107,7 @@ namespace VKMessenger.Views
 
     private void AddMember_OnClicked(object sender, System.Windows.Input.GestureEventArgs e)
     {
-      if (this.ChatEditVM.IsMemberAdding)
+      if (!this.ChatEditVM.CanManageMembers || this.ChatEditVM.IsMemberAdding)
         return;
       Navigator.Current.NavigateToPickUser(false, 0, true, 0, PickUserMode.PickWithSearch, "", 0, true);
     }

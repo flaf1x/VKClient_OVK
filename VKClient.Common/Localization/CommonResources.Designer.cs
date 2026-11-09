@@ -24,6 +24,25 @@ namespace VKClient.Common.Localization {
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     public class CommonResources {
         
+        public static string ChatBackgroundSet { get { return ResourceManager.GetString("ChatBackgroundSet", resourceCulture); } }
+        public static string ChatBackgroundChange { get { return ResourceManager.GetString("ChatBackgroundChange", resourceCulture); } }
+        public static string ChatBackgroundAll { get { return ResourceManager.GetString("ChatBackgroundAll", resourceCulture); } }
+        public static string ChatBackgroundTitle { get { return ResourceManager.GetString("ChatBackgroundTitle", resourceCulture); } }
+        public static string ChatBackgroundChoose { get { return ResourceManager.GetString("ChatBackgroundChoose", resourceCulture); } }
+        public static string ChatBackgroundApply { get { return ResourceManager.GetString("ChatBackgroundApply", resourceCulture); } }
+        public static string ChatBackgroundAdjust { get { return ResourceManager.GetString("ChatBackgroundAdjust", resourceCulture); } }
+        public static string ChatBackgroundPreview { get { return ResourceManager.GetString("ChatBackgroundPreview", resourceCulture); } }
+        public static string ChatBackgroundRemove { get { return ResourceManager.GetString("ChatBackgroundRemove", resourceCulture); } }
+        public static string ChatBackgroundUseGlobal { get { return ResourceManager.GetString("ChatBackgroundUseGlobal", resourceCulture); } }
+        public static string ChatBackgroundAllHint { get { return ResourceManager.GetString("ChatBackgroundAllHint", resourceCulture); } }
+        public static string ChatBackgroundChatHint { get { return ResourceManager.GetString("ChatBackgroundChatHint", resourceCulture); } }
+        public static string ChatBackgroundDim { get { return ResourceManager.GetString("ChatBackgroundDim", resourceCulture); } }
+        public static string ChatBackgroundBlur { get { return ResourceManager.GetString("ChatBackgroundBlur", resourceCulture); } }
+        public static string ChatBackgroundZoom { get { return ResourceManager.GetString("ChatBackgroundZoom", resourceCulture); } }
+        public static string ChatBackgroundPanHint { get { return ResourceManager.GetString("ChatBackgroundPanHint", resourceCulture); } }
+        public static string ChatBackgroundPreviewIncoming { get { return ResourceManager.GetString("ChatBackgroundPreviewIncoming", resourceCulture); } }
+        public static string ChatBackgroundPreviewOutgoing { get { return ResourceManager.GetString("ChatBackgroundPreviewOutgoing", resourceCulture); } }
+        public static string ChatBackgroundDefault { get { return ResourceManager.GetString("ChatBackgroundDefault", resourceCulture); } }
         private static global::System.Resources.ResourceManager resourceMan;
         
         private static global::System.Globalization.CultureInfo resourceCulture;

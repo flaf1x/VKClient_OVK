@@ -131,8 +131,11 @@ namespace VKClient.Common.Emoji
           return;
         }
         if ((Visibility)Application.Current.Resources["PhoneLightThemeVisibility"] == Visibility.Visible &&
-            !context.IsRecentStickers && !string.IsNullOrWhiteSpace(context.StickerProduct.base_url))
+            !context.IsRecentStickers && !string.IsNullOrWhiteSpace(context.StickerProduct.base_url) &&
+            !context.StickerProduct.base_url.TrimEnd('/').EndsWith("/images/stickers", StringComparison.OrdinalIgnoreCase))
           ImageLoader.SetUriSource(this.ImageBackground, context.StickerProduct.base_url + "/background.png?" + VeryLowProfileImageLoader.REQUIRE_CACHING_KEY + "=True");
+        else
+          ImageLoader.SetUriSource(this.ImageBackground, null);
         List<IEnumerable<int>> list1 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(context.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountVerticalOrientation));
         List<IEnumerable<int>> list2 = (List<IEnumerable<int>>) Enumerable.ToList<IEnumerable<int>>(context.StickerProduct.stickers.sticker_ids.Partition<int>(StickersConstants.ColumnsCountHorizontalOrientation));
         List<IVirtualizable> virtualizableList = new List<IVirtualizable>();

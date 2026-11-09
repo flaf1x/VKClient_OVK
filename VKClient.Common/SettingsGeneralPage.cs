@@ -39,6 +39,11 @@ namespace VKClient.Common
             await Launcher.LaunchUriAsync(new Uri("ms-settings-lock:"));
         }
 
+        private void ChatBackgroundTap(object sender, GestureEventArgs e)
+        {
+            NavigationService.Navigate(new Uri("/VKClient.Common;component/chatbackgroundpage.xaml?all=1", UriKind.Relative));
+        }
+
         private void ClearMusicCacheTap(object sender, GestureEventArgs e)//mod
         {
             this.VM.ClearMusicCache();

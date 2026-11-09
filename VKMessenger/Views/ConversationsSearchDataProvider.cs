@@ -56,11 +56,20 @@ namespace VKMessenger.Views
 
     public void GetData(string searchString, Dictionary<string, string> parameters, int offset, int count, Action<BackendResult<VKList<User>, ResultCode>> callback)
     {
-      // OpenVK does not implement the legacy messages.searchDialogs method.
-      // The picker still needs a useful global search, so search people through
-      // the supported users.search endpoint; loaded conversations are searched
-      // locally by ConversationSearchViewModel.
-      UsersService.Instance.SearchUsers(searchString, offset, count, callback);
+      MessagesService.Instance.SearchDialogs(searchString, res =>
+      {
+        if (res.ResultCode != ResultCode.Succeeded)
+        {
+          callback(new BackendResult<VKList<User>, ResultCode>(res.ResultCode));
+          return;
+        }
+        List<User> users = new List<User>();
+        foreach (object item in res.ResultData)
+          if (item is User)
+            users.Add((User)item);
+        callback(new BackendResult<VKList<User>, ResultCode>(ResultCode.Succeeded,
+          new VKList<User>() { count = users.Count, items = users.GetRange(Math.Min(offset, users.Count), Math.Min(count, Math.Max(0, users.Count - offset))) }));
+      });
     }
   }
 }

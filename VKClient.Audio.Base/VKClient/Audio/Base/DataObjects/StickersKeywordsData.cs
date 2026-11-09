@@ -12,20 +12,24 @@ namespace VKClient.Audio.Base.DataObjects
 
     public List<StickerKeywordItem> dictionary { get; set; }
 
+    public List<Sticker> stickers { get; set; }
+
     public void Write(BinaryWriter writer)
     {
-      writer.Write(1);
+      writer.Write(2);
       writer.WriteString(this.base_url);
       writer.Write(this.count);
       writer.WriteList<StickerKeywordItem>((IList<StickerKeywordItem>) this.dictionary, 10000);
+      writer.WriteList<Sticker>(this.stickers, 10000);
     }
 
     public void Read(BinaryReader reader)
     {
-      reader.ReadInt32();
+      int version = reader.ReadInt32();
       this.base_url = reader.ReadString();
       this.count = reader.ReadInt32();
       this.dictionary = reader.ReadList<StickerKeywordItem>();
+      this.stickers = version >= 2 ? reader.ReadList<Sticker>() : new List<Sticker>();
     }
   }
 }

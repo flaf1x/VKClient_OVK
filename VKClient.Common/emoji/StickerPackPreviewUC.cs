@@ -14,7 +14,7 @@ namespace VKClient.Common.Emoji
 {
   public class StickerPackPreviewUC : UserControl, IHandle<DownloadSucceededEvent>, IHandle, IHandle<DownloadFailedEvent>, IHandle<DownloadProgressedEvent>
   {
-    internal Image previewImage;
+    internal StickerImage previewImage;
     internal TextBlock textBlockTitle;
     internal TextBlock textBlockAuthor;
     internal TextBlock textBlockDesc;
@@ -88,9 +88,7 @@ namespace VKClient.Common.Emoji
             ((UIElement) this.ButtonDownload).Opacity = 1.0;
             ((RangeBase) this.progressBar).Value = 0.0;
           }
-          Uri uriSource = VeryLowProfileImageLoader.GetUriSource(this.previewImage);
-          if (uriSource ==  null || uriSource.OriginalString != stickerProduct.photo_140)
-            VeryLowProfileImageLoader.SetUriSource(this.previewImage, stickerProduct.photo_140 == null ?  null : new Uri(stickerProduct.photo_140));
+          this.previewImage.SourceUri = stickerProduct.photo_140;
           this.textBlockAuthor.Text = (stickerProduct.author ?? "");
           this.textBlockTitle.Text = (stickerProduct.title ?? "");
           this.textBlockDesc.Text = (stickerProduct.description ?? "");
@@ -135,7 +133,7 @@ namespace VKClient.Common.Emoji
         return;
       this._contentLoaded = true;
       Application.LoadComponent(this, new Uri("/VKClient.Common;component/Emoji/StickerPackPreviewUC.xaml", UriKind.Relative));
-      this.previewImage = (Image) base.FindName("previewImage");
+      this.previewImage = (StickerImage) base.FindName("previewImage");
       this.textBlockTitle = (TextBlock) base.FindName("textBlockTitle");
       this.textBlockAuthor = (TextBlock) base.FindName("textBlockAuthor");
       this.textBlockDesc = (TextBlock) base.FindName("textBlockDesc");

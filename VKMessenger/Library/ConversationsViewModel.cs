@@ -29,6 +29,23 @@ namespace VKMessenger.Library
         private int _totalCount;
         private int _numberOfUnreadMessages;
         private static ConversationsViewModel _instance;
+        private readonly HashSet<long> _refreshingUnread = new HashSet<long>();
+        private readonly HashSet<long> _refreshUnreadAgain = new HashSet<long>();
+
+        public void RefreshUnreadCount(long id, bool chat)
+        {
+            long peer = chat ? id + 2000000000L : id;
+            if (!_refreshingUnread.Add(peer)) { _refreshUnreadAgain.Add(peer); return; }
+            long owner = AppGlobalStateManager.Current.LoggedInUserId;
+            string origin = VKClient.Common.OpenVKInstanceManager.Current.ApiOrigin;
+            VKMessenger.Backend.BackendServices.MessagesService.GetConversationUnreadCount(peer, result => Execute.ExecuteOnUIThread(() => {
+                _refreshingUnread.Remove(peer);
+                if (this != _instance || owner != AppGlobalStateManager.Current.LoggedInUserId || origin != VKClient.Common.OpenVKInstanceManager.Current.ApiOrigin) return;
+                var header = this.Conversations.FirstOrDefault(c => c.UserOrChatId == id && c.IsChat == chat);
+                if (result.ResultCode == ResultCode.Succeeded && header != null) header.Unread = result.ResultData;
+                if (_refreshUnreadAgain.Remove(peer)) RefreshUnreadCount(id, chat);
+            }));
+        }
 
         public ObservableCollection<ConversationHeader> Conversations
         {
@@ -212,6 +229,8 @@ namespace VKMessenger.Library
                 foreach (LongPollServerUpdateData update in updates)
                 {
                     LongPollServerUpdateData longPollServerUpdateData = update;
+                    if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.SynchronizationRequired)
+                        this.RefreshConversations(true);
                     if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.NewCounter)
                         CountersManager.Current.SetUnreadMessages(longPollServerUpdateData.Counter);
                     if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.UserIsTyping || longPollServerUpdateData.UpdateType == LongPollServerUpdateType.UserIsTypingInChat)
@@ -241,12 +260,27 @@ namespace VKMessenger.Library
                         dictionary1[longPollServerUpdateData.user_id] = false;
                     if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.MessageHasBeenRead)
                         dictionary3[longPollServerUpdateData.message_id] = true;
+                    if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.OutgoingMessagesRead)
+                    {
+                        foreach (ConversationHeader header in this.Conversations.Where(c => c.IsChat == longPollServerUpdateData.isChat &&
+                            c.UserOrChatId == (longPollServerUpdateData.isChat ? longPollServerUpdateData.chat_id : longPollServerUpdateData.user_id) &&
+                            c._message.@out == 1 && c._message.IsAtOrBeforeReadBoundary(longPollServerUpdateData.message_id)))
+                            header.IsRead = true;
+                    }
+                    if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.MessageHasBeenEdited && longPollServerUpdateData.message != null)
+                    {
+                        ConversationHeader header = this.Conversations.FirstOrDefault(c => c._message.id == longPollServerUpdateData.message_id);
+                        if (header != null)
+                        {
+                            header.SetMessageAndUsers(longPollServerUpdateData.message, header._associatedUsers);
+                        }
+                    }
                     if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.IncomingMessagesRead)
                     {
                         long id = longPollServerUpdateData.chat_id == 0L ? longPollServerUpdateData.user_id : longPollServerUpdateData.chat_id;
-                        ConversationHeader conversationHeader = this.Conversations.FirstOrDefault<ConversationHeader>((Func<ConversationHeader, bool>)(c => c.UserOrChatId == id));
+                        ConversationHeader conversationHeader = this.Conversations.FirstOrDefault<ConversationHeader>((Func<ConversationHeader, bool>)(c => c.UserOrChatId == id && c.IsChat == longPollServerUpdateData.isChat));
                         if (conversationHeader != null)
-                            conversationHeader.Unread = 0;
+                            this.RefreshUnreadCount(id, longPollServerUpdateData.isChat);
                     }
                     if (longPollServerUpdateData.UpdateType == LongPollServerUpdateType.MessageHasBeenAdded && longPollServerUpdateData.message != null)
                     {
@@ -326,6 +360,7 @@ namespace VKMessenger.Library
                                 if (conversationHeader == null)
                                     return;
                                 conversationHeader._message.title = chatInfo.chat.title;
+                                conversationHeader._message.photo_200 = chatInfo.chat.photo_200;
                                 conversationHeader._associatedUsers.Clear();
                                 foreach (ChatUser chatParticipant in chatInfo.chat_participants)
                                 {
@@ -437,6 +472,15 @@ namespace VKMessenger.Library
                         }
                     }
                 }
+                // A long-poll message replaces the entire header, not just its
+                // body. Carry the existing chat metadata into the new header.
+                foreach (DialogHeaderInfo info in dialogHeaderInfoList)
+                {
+                    ConversationHeader previous = source1.FirstOrDefault(h => h._message != null &&
+                        info.message.chat_id != 0 && h._message.chat_id == info.message.chat_id);
+                    if (previous == null) continue;
+                    info.message.PreserveConversationSettings(previous._message);
+                }
                 List<ConversationHeader> conversationHeaders = ConversationsViewModel.GetConversationHeaders(dialogHeaderInfoList, usersResult.ResultData);
                 Logger.Instance.Info("Applying new messages. Found {0} headers to remove, {1} to add.", (object)source1.Count, (object)conversationHeaders.Count);
                 foreach (ConversationHeader conversationHeader1 in source1)
@@ -516,8 +560,11 @@ namespace VKMessenger.Library
 
         internal void DeleteConversation(ConversationHeader conversation)
         {
-            this.ConversationsGenCol.Delete(conversation);
-            VKMessenger.Backend.BackendServices.MessagesService.DeleteDialog(conversation.UserOrChatId, conversation.IsChat, (Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>>)(res => { }));
+            VKMessenger.Backend.BackendServices.MessagesService.DeleteDialog(conversation.UserOrChatId, conversation.IsChat, res =>
+            {
+                if (res.ResultCode == ResultCode.Succeeded)
+                    Execute.ExecuteOnUIThread(() => this.ConversationsGenCol.Delete(conversation));
+            });
         }
 
         public static void Save()

@@ -7,6 +7,7 @@
              xmlns:framework="clr-namespace:VKClient.Common.Framework"
              xmlns:toolkit="clr-namespace:Microsoft.Phone.Controls;assembly=Microsoft.Phone.Controls.Toolkit"
              xmlns:views="clr-namespace:VKClient.Common.Stickers.Views"
+             xmlns:emoji="clr-namespace:VKClient.Common.Emoji"
              mc:Ignorable="d"
              FontFamily="{StaticResource PhoneFontFamilyNormal}"
              FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -176,7 +177,7 @@
                                                 Height="224"
                                                 VerticalAlignment="Center"
                                                 HorizontalAlignment="Center">
-                                            <Image framework:ImageLoader.UriSource="{Binding}"
+                                            <emoji:StickerImage SourceUri="{Binding}" Animate="True"
                                                    Stretch="Uniform" />
                                         </Border>
                                     </DataTemplate>

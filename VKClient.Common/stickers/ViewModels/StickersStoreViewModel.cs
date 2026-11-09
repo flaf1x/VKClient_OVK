@@ -27,6 +27,13 @@ namespace VKClient.Common.Stickers.ViewModels
 
     public List<StoreBannerHeader> Banners { get; set; }
 
+    private string _searchQuery = "";
+    public string SearchQuery
+    {
+      get { return this._searchQuery; }
+      set { this._searchQuery = value ?? ""; this.ReloadItems(); }
+    }
+
     public Visibility BannersVisibility
     {
       get
@@ -194,7 +201,12 @@ namespace VKClient.Common.Stickers.ViewModels
       int stickersListSource = (int) this._stickersListSource;
       if (stickersListSource < 0 || stickersListSource > this._stickersPacks.Count - 1)
         return;
-      this.StickersList = new ObservableCollection<IVirtualizable>(StickersStoreViewModel.CreateVirtualizableItems((IEnumerable<StockItemHeader>) this._stickersPacks[stickersListSource]));
+      string query = this._searchQuery.Trim();
+      this.StickersList = new ObservableCollection<IVirtualizable>(StickersStoreViewModel.CreateVirtualizableItems(
+        this._stickersPacks[stickersListSource].Where(item => query.Length == 0 ||
+          (item.Title ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
+          (item.Description ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
+          (item.Author ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)));
     }
 
     private static List<IVirtualizable> CreateVirtualizableItems(IEnumerable<StockItemHeader> stickers)

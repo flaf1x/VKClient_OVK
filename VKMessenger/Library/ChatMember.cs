@@ -48,6 +48,8 @@ namespace VKMessenger.Library
       {
         if (this._user.id == this._chatCreatorId)
           return CommonResources.ChatCreator.ToLower();
+        if (this._invitedByUser == null || string.IsNullOrWhiteSpace(this._invitedByUser.Name))
+          return "";
         return string.Format((this._invitedByUser.sex != 1 ? CommonResources.InvitedToChatBy_M : CommonResources.InvitedToChatBy_F).ToLower(), this._invitedByUser.Name);
       }
     }
@@ -71,7 +73,7 @@ namespace VKMessenger.Library
       this._invitedByUser = invitedByUser;
       this._chatCreatorId = chatCreatorId;
       long loggedInUserId = AppGlobalStateManager.Current.LoggedInUserId;
-      this.ExcludeButtonVisibility = this._chatCreatorId != loggedInUserId && this._invitedByUser.id != loggedInUserId || this._user.id == loggedInUserId ? Visibility.Collapsed : Visibility.Visible;
+      this.ExcludeButtonVisibility = user.can_kick && this._user.id != loggedInUserId ? Visibility.Visible : Visibility.Collapsed;
     }
   }
 }

@@ -184,14 +184,14 @@ namespace VKClient.Common.Emoji
       if (stickersData == null)
         return;
       StickersSettings.PreprocessStickersData(stickersData);
+      if (stickersData.StockItems != null && stickersData.StockItems.items != null)
+        stickersData.StockItems.items = StickerPackOrder.Apply(stickersData.StockItems.items);
       List<StockItem> stickersList = this.StickersList;
       VKList<StockItem> stockItems = stickersData.StockItems;
       List<StockItem> stockItemList = stockItems != null ? stockItems.items :  null;
-      int num = StickersSettings.GetStickersAreUpToDate((IReadOnlyList<StockItem>) stickersList, (IReadOnlyList<StockItem>) stockItemList) ? 1 : 0;
+      bool changed = stickersList == null || StickersSettings.GetStickersAreUpToDate((IReadOnlyList<StockItem>) stickersList, (IReadOnlyList<StockItem>) stockItemList);
       this.UpdateStickersData(stickersData);
-      if (num == 0)
-        return;
-      StickersAutoSuggestDictionary.Instance.EnsureDictIsLoadedAndUpToDate(true);
+      StickersAutoSuggestDictionary.Instance.EnsureDictIsLoadedAndUpToDate(changed);
     }
 
     private static void PreprocessStickersData(IAccountStickersData stickersData)

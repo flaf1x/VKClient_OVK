@@ -28,6 +28,8 @@ namespace VKMessenger.Backend
     public int Platform { get; set; }
 
     public int Counter { get; set; }
+    public int NotificationSound { get; set; }
+    public int NotificationsDisabledUntil { get; set; }
 
     public Chat chat { get; set; }
 

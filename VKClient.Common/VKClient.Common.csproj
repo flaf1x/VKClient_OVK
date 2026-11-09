@@ -175,6 +175,8 @@
     <Compile Include="emoji\SpriteListItemData.cs" />
     <Compile Include="emoji\SpritesPack.cs" />
     <Compile Include="emoji\StickerItemData.cs" />
+    <Compile Include="emoji\StickerImage.cs" />
+    <Compile Include="emoji\StickerPackOrder.cs" />
     <Compile Include="emoji\StickerPackPreviewUC.cs">
       <DependentUpon>stickerpackpreviewuc.xaml</DependentUpon>
     </Compile>
@@ -1065,6 +1067,9 @@
     <Compile Include="SettingsGeneralPage.cs">
       <DependentUpon>settingsgeneralpage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="library\ChatWallpaperStore.cs" />
+    <Compile Include="library\ChatWallpaperEditing.cs" />
+    <Compile Include="ChatBackgroundPage.cs"><DependentUpon>chatbackgroundpage.xaml</DependentUpon></Compile>
     <Compile Include="SettingsNotifications.cs">
       <DependentUpon>settingsnotifications.xaml</DependentUpon>
     </Compile>
@@ -1648,6 +1653,7 @@
     <Compile Include="Utils\Token.cs" />
     <Compile Include="Utils\Transliteration.cs" />
     <Compile Include="Utils\UIStringFormatterHelper.cs" />
+    <Compile Include="Utils\OpenVKMentions.cs" />
     <Compile Include="Utils\Utility.cs" />
     <Compile Include="Utils\WaveformUtils.cs" />
     <Compile Include="ValidatePage.cs">
@@ -2203,6 +2209,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Resource>
+    <Resource Include="chatbackgroundpage.xaml"><Generator>MSBuild:Compile</Generator><SubType>Designer</SubType></Resource>
     <Resource Include="settingsnotifications.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

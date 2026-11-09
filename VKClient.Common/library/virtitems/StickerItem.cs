@@ -43,7 +43,9 @@ namespace VKClient.Common.Library.VirtItems
           return;
         this._isHorizontal = value;
         this.Width = this._isHorizontal ? this._horizontalWidth : this._verticalWidth;
-        ((VirtualizableItemBase) Enumerable.First<IVirtualizable>(this.VirtualizableChildren)).Margin = this.StickerMargin;
+        if (this.VirtualizableChildren.Count > 0)
+          ((VirtualizableItemBase)this.VirtualizableChildren[0]).Margin = this.StickerMargin;
+        else foreach (FrameworkElement child in this.Children) child.Margin = this.StickerMargin;
       }
     }
 
@@ -68,6 +70,10 @@ namespace VKClient.Common.Library.VirtItems
 
     private void CreateLayout()
     {
+      if (!string.IsNullOrEmpty(this._sticker.photo_256) && this._sticker.photo_256.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+      {
+        return;
+      }
       double fixedHeight1 = this.FixedHeight;
       string str = this._sticker.photo_256;
       if (!((string) str).Contains("b.png"))
@@ -85,6 +91,13 @@ namespace VKClient.Common.Library.VirtItems
       int num4 = 0;
       int num5 = 0;
       base.VirtualizableChildren.Add((IVirtualizable) new VirtualizableImage(fixedHeight1, fixedHeight2, stickerMargin, uriStr, null, tag, num1 != 0, num2 != 0, (Stretch) num3, null, placeholderOpacity, num4 != 0, num5 != 0));
+    }
+
+    protected override void GenerateChildren()
+    {
+      if (!string.IsNullOrEmpty(this._sticker.photo_256) && this._sticker.photo_256.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        this.Children.Add(new VKClient.Common.Emoji.StickerImage { Width = this.FixedHeight, Height = this.FixedHeight,
+          Margin = this.StickerMargin, SourceUri = this._sticker.photo_256, Animate = true });
     }
   }
 }

@@ -583,7 +583,9 @@ namespace VKClient.Common.Library
 
     private void UpdateCommentsVisibility(UIElement imageComment, TextBlock textBlockCommentsCount, Canvas commentsCanvas)
     {
-      if (this.CanPost || this.CommentsCount > 0)
+      // Opening a post's discussion is independent of permission to add a
+      // comment. New OpenVK versions can close an otherwise readable thread.
+      if ((this._itemType == ItemType.Post && this._wallPost != null && this._wallPost.id > 0) || this.CanPost || this.CommentsCount > 0)
       {
         imageComment.Visibility = Visibility.Visible;
         ((UIElement) textBlockCommentsCount).Visibility = Visibility.Visible;

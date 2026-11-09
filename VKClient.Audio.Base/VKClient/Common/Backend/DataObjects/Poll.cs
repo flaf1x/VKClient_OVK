@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Newtonsoft.Json;
 using VKClient.Common.Framework;
 
 namespace VKClient.Common.Backend.DataObjects
@@ -8,6 +10,7 @@ namespace VKClient.Common.Backend.DataObjects
   {
     private string _question = "";
     private List<long> _answerIds = new List<long>();
+    private long _answerId;
 
     public long owner_id { get; set; }
 
@@ -43,8 +46,18 @@ namespace VKClient.Common.Backend.DataObjects
 
     public int votes { get; set; }
 
-    public long answer_id { get; set; }
+    public long answer_id
+    {
+      get { return this._answerId; }
+      set
+      {
+        this._answerId = value;
+        if (value <= 0) this._answerIds = new List<long>();
+        else if (this._answerIds.Count == 0 || this._answerIds[0] != value) this._answerIds = new List<long> { value };
+      }
+    }
 
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<long> answer_ids
     {
       get
@@ -53,8 +66,8 @@ namespace VKClient.Common.Backend.DataObjects
       }
       set
       {
-        this._answerIds = value ?? new List<long>();
-        this.answer_id = this._answerIds.Count > 0 ? this._answerIds[0] : 0L;
+        this._answerIds = (value ?? new List<long>()).Where(id => id > 0).Distinct().ToList();
+        this._answerId = this._answerIds.Count > 0 ? this._answerIds[0] : 0L;
       }
     }
 
@@ -69,7 +82,7 @@ namespace VKClient.Common.Backend.DataObjects
 
     public void Write(BinaryWriter writer)
     {
-      writer.Write(3);
+      writer.Write(4);
       writer.Write(this.owner_id);
       writer.Write(this.poll_id);
       writer.Write(this.created);
@@ -79,6 +92,7 @@ namespace VKClient.Common.Backend.DataObjects
       writer.Write(this.answer_id);
       writer.WriteList<Answer>((IList<Answer>) this.answers, 10000);
       writer.Write(this.anonymous);
+      writer.WriteList(this.answer_ids);
     }
 
     public void Read(BinaryReader reader)
@@ -100,6 +114,7 @@ namespace VKClient.Common.Backend.DataObjects
       if (num1 < num3)
         return;
       this.anonymous = reader.ReadInt32();
+      if (num1 >= 4) this.answer_ids = reader.ReadListLong();
     }
   }
 }

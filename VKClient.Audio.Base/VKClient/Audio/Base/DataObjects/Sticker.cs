@@ -26,13 +26,14 @@ namespace VKClient.Audio.Base.DataObjects
 
     private void SerializeForVersion1(BinaryWriter writer)
     {
-      writer.Write(2);
+      writer.Write(3);
       writer.WriteString(this.photo_64);
       writer.WriteString(this.photo_128);
       writer.WriteString(this.photo_256);
       writer.Write(this.width);
       writer.Write(this.height);
       writer.Write(this.product_id);
+      writer.Write(this.id);
     }
 
     public void Read(BinaryReader reader)
@@ -51,6 +52,7 @@ namespace VKClient.Audio.Base.DataObjects
       if (num1 < num3)
         return;
       this.product_id = reader.ReadInt32();
+      if (num1 >= 3) this.id = reader.ReadInt64();
     }
   }
 }

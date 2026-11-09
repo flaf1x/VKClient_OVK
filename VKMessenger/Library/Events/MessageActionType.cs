@@ -7,5 +7,6 @@ namespace VKMessenger.Library.Events
     Delete,
     SelectUnselect,
     EnterSelectMode,
+    GoToReply,
   }
 }

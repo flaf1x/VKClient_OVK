@@ -208,13 +208,22 @@ namespace VKClient.Common.Backend
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       string str = nrOfSeconds.ToString();
-      parameters.Add("device_id", device_id);
+      // Peer settings must be account-wide, not scoped to this push device.
+      if (chatId == 0 && uid == 0 && !string.IsNullOrEmpty(device_id))
+        parameters.Add("token", device_id);
       parameters.Add("time", str);
+      parameters.Add("sound", nrOfSeconds == 0 ? "1" : "0");
       if (chatId != 0L)
         parameters["peer_id"] = MessagesService.Instance.GetPeerId(chatId, true).ToString();
       if (uid != 0L)
         parameters["peer_id"] = MessagesService.Instance.GetPeerId(uid, false).ToString();
       VKRequestsDispatcher.DispatchRequestToVK<object>("account.setSilenceMode", parameters, callback,  null, false, true, new CancellationToken?(),  null);
+    }
+
+    public void GetPeerPushSettings(long peerId, Action<BackendResult<VKMessenger.Backend.PushSettings, ResultCode>> callback)
+    {
+      VKRequestsDispatcher.DispatchRequestToVK<VKMessenger.Backend.PushSettings>("account.getPushSettings",
+        new Dictionary<string, string> { { "peer_id", peerId.ToString() } }, callback);
     }
 
     public void GetCounters(Action<BackendResult<OwnCounters, ResultCode>> callback)

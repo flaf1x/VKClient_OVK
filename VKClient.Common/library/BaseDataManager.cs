@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VKClient.Audio.Base;
 using VKClient.Audio.Base.DataObjects;
+using VKClient.Audio.Base.Utils;
 using VKClient.Common.Backend;
 using VKClient.Common.Backend.DataObjects;
 using VKClient.Common.Emoji;
@@ -81,7 +82,9 @@ namespace VKClient.Common.Library
             }
             BaseDataManager.UpdateUserInfo();
             int unixTimestamp = Extensions.DateTimeToUnixTimestamp(DateTime.UtcNow, false);
-            globalState.ServerMinusLocalTimeDelta = resultData.time - unixTimestamp;
+            // OpenVK may return time=0 when this execute has no clock value.
+            // Treat it as missing, not as a server running in January 1970.
+            globalState.ServerMinusLocalTimeDelta = BaseFormatterHelper.GetServerTimeDelta(resultData.time, unixTimestamp);
             StickersSettings.Instance.UpdateStickersDataAndAutoSuggest((IAccountStickersData) resultData);
             globalState.GamesSectionEnabled = resultData.GamesSectionEnabled == 1;
             globalState.DebugDisabled = resultData.DebugDisabled == 1;

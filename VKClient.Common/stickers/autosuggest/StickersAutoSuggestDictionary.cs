@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using VKClient.Audio.Base.BackendServices;
 using VKClient.Audio.Base.DataObjects;
 using VKClient.Audio.Base.Events;
@@ -14,298 +15,167 @@ using VKClient.Common.Stickers.ViewModels;
 
 namespace VKClient.Common.Stickers.AutoSuggest
 {
-  public class StickersAutoSuggestDictionary : IBinarySerializable, IHandle<UserIsLoggedOutEvent>, IHandle, IHandle<StickersPackPurchasedEvent>, IHandle<StickersUpdatedEvent>, IHandle<StickersPackActivatedDeactivatedEvent>, IHandle<StickersPacksReorderedEvent>, IHandle<AutoSuggestEnabledChangedEvent>
+  public class StickersAutoSuggestDictionary : IBinarySerializable, IHandle<UserIsLoggedOutEvent>, IHandle,
+    IHandle<StickersPackPurchasedEvent>, IHandle<StickersUpdatedEvent>, IHandle<StickersPackActivatedDeactivatedEvent>,
+    IHandle<StickersPacksReorderedEvent>, IHandle<AutoSuggestEnabledChangedEvent>
   {
-    private static readonly int REFRESH_AFTER_HOURS = 12;
-    private static readonly string AUTO_SUGGEST_FILE_NAME = "StickersAutoSuggestData";
-    private static readonly int MAX_TEXT_LENGTH = 100;
-    private static readonly int MAX_SUGGEST_STICKERS_COUNT = 20;
-    private DateTime _lastLoadedDate = DateTime.MinValue;
-    private Dictionary<string, StickerKeywordItem> _lookupDictionary = new Dictionary<string, StickerKeywordItem>();
+    private const string CacheFile = "StickersAutoSuggestData";
     private static StickersAutoSuggestDictionary _instance;
+    private DateTime _lastLoadedDate = DateTime.MinValue, _retryAfter = DateTime.MinValue;
+    private readonly Dictionary<string, StickerKeywordItem> _lookupDictionary = new Dictionary<string, StickerKeywordItem>();
+    private readonly Dictionary<int, Sticker> _assets = new Dictionary<int, Sticker>();
     private StickersKeywordsData _keywordsData;
-    private bool _isLoading;
-    private bool _isLoaded;
-    private bool _isRestoringState;
+    private bool _isLoading, _isLoaded, _isRestoringState;
+    private long _owner;
+    private string _origin;
 
     public static StickersAutoSuggestDictionary Instance
     {
-      get
-      {
-        if (StickersAutoSuggestDictionary._instance == null)
-          StickersAutoSuggestDictionary._instance = new StickersAutoSuggestDictionary();
-        return StickersAutoSuggestDictionary._instance;
-      }
+      get { return _instance ?? (_instance = new StickersAutoSuggestDictionary()); }
     }
+    public StickersAutoSuggestDictionary() { EventAggregator.Current.Subscribe(this); }
 
-    public StickersAutoSuggestDictionary()
+    public string PrepareTextForLookup(string text)
     {
-      EventAggregator.Current.Subscribe(this);
+      if (string.IsNullOrWhiteSpace(text) || text.Length > 100) return "";
+      text = text.ToLowerInvariant().Replace('ё', 'е').Replace("\ufe0f", "").Replace("\ufe0e", "");
+      for (int modifier = 0x1f3fb; modifier <= 0x1f3ff; modifier++)
+        text = text.Replace(char.ConvertFromUtf32(modifier), "");
+      return Regex.Replace(text.Trim().TrimEnd('.', ',', '!', '?', ':', ';'), @"\s+", " ").Trim();
     }
 
     public IEnumerable<StickersAutoSuggestItem> GetAutoSuggestItemsFor(string text)
     {
-      if (!AppGlobalStateManager.Current.GlobalState.StickersAutoSuggestEnabled || string.IsNullOrWhiteSpace(text) || (text.Length > StickersAutoSuggestDictionary.MAX_TEXT_LENGTH || this._isRestoringState) || !this._isLoaded)
-        return (IEnumerable<StickersAutoSuggestItem>) Enumerable.Empty<StickersAutoSuggestItem>();
-      List<StickersAutoSuggestItem> stickersAutoSuggestItemList = new List<StickersAutoSuggestItem>();
-      StickerKeywordItem stickerKeywordItem;
-      if (this._lookupDictionary.TryGetValue(text, out stickerKeywordItem))
+      var result = new List<StickersAutoSuggestItem>();
+      if (!AppGlobalStateManager.Current.GlobalState.StickersAutoSuggestEnabled || !_isLoaded || _isRestoringState || !IsCurrentAccount()) return result;
+      text = PrepareTextForLookup(text);
+      StickerKeywordItem group;
+      if (!_lookupDictionary.TryGetValue(text, out group))
       {
-        List<int>.Enumerator enumerator1 = this.SortBasedOnRecents(stickerKeywordItem.user_stickers).GetEnumerator();
-        try
-        {
-          while (enumerator1.MoveNext())
-          {
-            int current = enumerator1.Current;
-            StickerItemData stickerItemData = new StickerItemData();
-            stickerItemData.StickerId = current;
-            string pathForStickerId128 = StickersDownloader.Instance.GetLocalPathForStickerId128(this._keywordsData.base_url, current);
-            stickerItemData.LocalPath = pathForStickerId128;
-            string pathForStickerId256 = StickersDownloader.Instance.GetLocalPathForStickerId256(this._keywordsData.base_url, current);
-            stickerItemData.LocalPathBig = pathForStickerId256;
-            string pathForStickerId512 = StickersDownloader.Instance.GetLocalPathForStickerId512(this._keywordsData.base_url, current);
-            stickerItemData.LocalPathExtraBig = pathForStickerId512;
-            StickerItemData stickerData = stickerItemData;
-            stickersAutoSuggestItemList.Add(new StickersAutoSuggestItem(stickerData, false));
-          }
-        }
-        finally
-        {
-          enumerator1.Dispose();
-        }
-        List<int>.Enumerator enumerator2 = stickerKeywordItem.promoted_stickers.GetEnumerator();
-        try
-        {
-          while (enumerator2.MoveNext())
-          {
-            int current = enumerator2.Current;
-            StickerItemData stickerItemData = new StickerItemData();
-            stickerItemData.StickerId = current;
-            string pathForStickerId128 = StickersDownloader.Instance.GetLocalPathForStickerId128(this._keywordsData.base_url, current);
-            stickerItemData.LocalPath = pathForStickerId128;
-            string pathForStickerId256 = StickersDownloader.Instance.GetLocalPathForStickerId256(this._keywordsData.base_url, current);
-            stickerItemData.LocalPathBig = pathForStickerId256;
-            string pathForStickerId512 = StickersDownloader.Instance.GetLocalPathForStickerId512(this._keywordsData.base_url, current);
-            stickerItemData.LocalPathExtraBig = pathForStickerId512;
-            StickerItemData stickerData = stickerItemData;
-            stickersAutoSuggestItemList.Add(new StickersAutoSuggestItem(stickerData, true));
-          }
-        }
-        finally
-        {
-          enumerator2.Dispose();
-        }
+        int space = text.LastIndexOf(' ');
+        if (space < 0 || !_lookupDictionary.TryGetValue(text.Substring(space + 1), out group)) return result;
       }
-      return (IEnumerable<StickersAutoSuggestItem>) Enumerable.Take<StickersAutoSuggestItem>(stickersAutoSuggestItemList, StickersAutoSuggestDictionary.MAX_SUGGEST_STICKERS_COUNT);
+      foreach (int id in SortBasedOnRecents(group.user_stickers))
+      {
+        StickerItemData data = CreateItem(id);
+        if (data != null) result.Add(new StickersAutoSuggestItem(data, false));
+        if (result.Count == 20) break;
+      }
+      return result;
     }
 
-    private List<int> SortBasedOnRecents(List<int> user_stickers)
+    private StickerItemData CreateItem(int id)
     {
-      List<int> intList1 = new List<int>();
-      if (user_stickers == null)
-        return intList1;
-      StickersSettings instance = StickersSettings.Instance;
-      List<int> intList2;
-      if (instance == null)
+      Sticker sticker;
+      if (_assets.TryGetValue(id, out sticker))
       {
-        intList2 =  null;
+        bool animated = (sticker.photo_256 ?? "").EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+        string small = animated ? sticker.photo_256 : sticker.photo_128 ?? sticker.photo_256;
+        if (string.IsNullOrEmpty(small)) return null;
+        return new StickerItemData { StickerId = id, StickerSetId = sticker.product_id, CanSendSticker = true,
+          LocalPath = small, LocalPathBig = sticker.photo_256 ?? small, LocalPathExtraBig = sticker.photo_256 ?? small };
       }
-      else
-      {
-        StoreStickers recentStickers = instance.RecentStickers;
-        intList2 = recentStickers != null ? recentStickers.sticker_ids :  null;
-      }
-      List<int> intList3 = intList2;
-      if (intList3 == null)
-        return user_stickers;
-      List<int>.Enumerator enumerator1 = intList3.GetEnumerator();
-      try
-      {
-        while (enumerator1.MoveNext())
-        {
-          int current = enumerator1.Current;
-          if (user_stickers.Contains(current))
-            intList1.Add(current);
-        }
-      }
-      finally
-      {
-        enumerator1.Dispose();
-      }
-      List<int>.Enumerator enumerator2 = user_stickers.GetEnumerator();
-      try
-      {
-        while (enumerator2.MoveNext())
-        {
-          int current = enumerator2.Current;
-          if (!intList1.Contains(current))
-            intList1.Add(current);
-        }
-      }
-      finally
-      {
-        enumerator2.Dispose();
-      }
-      return intList1;
+      // Old instances may return numeric IDs. Use an owned keyboard pack,
+      // never a fabricated URL or a sticker that requires purchase.
+      var stocks = StickersSettings.Instance.StickersList;
+      var product = stocks == null ? null : stocks.Where(s => s != null && s.product != null && s.product.purchased != 0)
+        .Select(s => s.product).FirstOrDefault(p => p.stickers != null && p.stickers.sticker_ids != null && p.stickers.sticker_ids.Contains(id));
+      if (product == null) return null;
+      return new StickerItemData { StickerId = id, StickerSetId = product.id, CanSendSticker = true,
+        LocalPath = StickersDownloader.Instance.GetLocalPathForStickerId128(product, id),
+        LocalPathBig = StickersDownloader.Instance.GetLocalPathForStickerId256(product, id),
+        LocalPathExtraBig = StickersDownloader.Instance.GetLocalPathForStickerId512(product, id) };
     }
 
-    public string PrepareTextForLookup(string text)
+    private IEnumerable<int> SortBasedOnRecents(List<int> ids)
     {
-      if (text.EndsWith("  "))
-        return "";
-      text = text.ToLowerInvariant();
-      text = text.Replace('ё', 'е');
-      text = text.Replace(" ", "");
-      return text;
+      ids = ids ?? new List<int>();
+      var recent = StickersSettings.Instance.RecentStickers;
+      return (recent == null || recent.sticker_ids == null ? Enumerable.Empty<int>() : recent.sticker_ids.Where(ids.Contains))
+        .Concat(ids).Where(id => id > 0).Distinct();
     }
 
+    private bool IsCurrentAccount()
+    {
+      return _owner != 0 && _owner == AppGlobalStateManager.Current.LoggedInUserId && _origin == OpenVKInstanceManager.Current.ApiOrigin;
+    }
     public void EnsureDictIsLoadedAndUpToDate(bool forceReload = false)
     {
-      // OpenVK chat UI is emoji-only; do not call the unsupported VK sticker
-      // keyword store endpoint on each page activation.
-      return;
-#pragma warning disable 0162
-      if ((AppGlobalStateManager.Current.LoggedInUserId == 0L || this._isLoading ? 0 : (forceReload ? 1 : ((DateTime.UtcNow- this._lastLoadedDate).TotalHours >= (double) StickersAutoSuggestDictionary.REFRESH_AFTER_HOURS ? 1 : 0))) == 0)
-        return;
-      this._isLoading = true;
-      StoreService.Instance.GetStickersKeywords((Action<BackendResult<StickersKeywordsData, ResultCode>>) (res =>
-      {
-        this._isLoading = false;
-        if (res.ResultCode == ResultCode.Succeeded)
+      if (_isLoading || _isRestoringState || AppGlobalStateManager.Current.LoggedInUserId == 0 ||
+          !AppGlobalStateManager.Current.GlobalState.StickersAutoSuggestEnabled || DateTime.UtcNow < _retryAfter) return;
+      if (!forceReload && IsCurrentAccount() && _isLoaded && (DateTime.UtcNow - _lastLoadedDate).TotalHours < 12) return;
+      long owner = AppGlobalStateManager.Current.LoggedInUserId;
+      string origin = OpenVKInstanceManager.Current.ApiOrigin;
+      _isLoading = true;
+      StoreService.Instance.GetStickersKeywords(res => Execute.ExecuteOnUIThread(() => {
+        _isLoading = false;
+        if (_instance != this || owner != AppGlobalStateManager.Current.LoggedInUserId || origin != OpenVKInstanceManager.Current.ApiOrigin) return;
+        if (res.ResultCode == ResultCode.Succeeded && res.ResultData != null && res.ResultData.dictionary != null)
         {
-          this.SetKeywordsData(res.ResultData);
-          this._lastLoadedDate = DateTime.UtcNow;
-          this._isLoaded = true;
-          EventAggregator.Current.Publish(new StickersAutoSuggestDictionary.AutoSuggestDictionaryUpdatedEvent());
+          _owner = owner; _origin = origin; SetKeywordsData(res.ResultData);
+          _lastLoadedDate = DateTime.UtcNow; _isLoaded = true;
+          SaveState(); PublishUpdated();
         }
-        else
-        {
-          if (!forceReload)
-            return;
-          this._lastLoadedDate = DateTime.MinValue;
-        }
+        else _retryAfter = DateTime.UtcNow.AddMinutes(1);
       }));
-#pragma warning restore 0162
     }
 
-    private void SetKeywordsData(StickersKeywordsData keywordsData)
+    private void SetKeywordsData(StickersKeywordsData data)
     {
-      this._keywordsData = keywordsData;
-      this.BuildDictionary();
-    }
-
-    private void BuildDictionary()
-    {
-      if (this._keywordsData == null)
-        return;
-      this._lookupDictionary.Clear();
-      List<StickerKeywordItem>.Enumerator enumerator1 = this._keywordsData.dictionary.GetEnumerator();
-      try
+      _keywordsData = data; _lookupDictionary.Clear(); _assets.Clear();
+      if (data == null) return;
+      foreach (var sticker in data.stickers ?? new List<Sticker>())
+        if (sticker != null && sticker.id > 0 && sticker.id <= int.MaxValue) _assets[(int)sticker.id] = sticker;
+      foreach (var item in data.dictionary ?? new List<StickerKeywordItem>())
       {
-        while (enumerator1.MoveNext())
+        if (item == null) continue;
+        foreach (string word in item.words ?? new List<string>())
         {
-          StickerKeywordItem current = enumerator1.Current;
-          List<string>.Enumerator enumerator2 = current.words.GetEnumerator();
-          try
-          {
-            while (enumerator2.MoveNext())
-            {
-              string key = this.PrepareTextForLookup(enumerator2.Current);
-              if (!this._lookupDictionary.ContainsKey(key))
-                this._lookupDictionary.Add(key, current);
-            }
-          }
-          finally
-          {
-            enumerator2.Dispose();
-          }
+          string key = PrepareTextForLookup(word);
+          if (key.Length == 0) continue;
+          StickerKeywordItem group;
+          if (!_lookupDictionary.TryGetValue(key, out group)) _lookupDictionary[key] = group = new StickerKeywordItem();
+          group.user_stickers = group.user_stickers.Concat(item.user_stickers ?? new List<int>()).Distinct().ToList();
         }
       }
-      finally
-      {
-        enumerator1.Dispose();
-      }
     }
 
-    public void SaveState()
-    {
-      CacheManager.TrySerialize((IBinarySerializable) this, StickersAutoSuggestDictionary.AUTO_SUGGEST_FILE_NAME, false, CacheManager.DataType.CachedData);
-    }
-
+    private void PublishUpdated() { EventAggregator.Current.Publish(new AutoSuggestDictionaryUpdatedEvent()); }
+    public void SaveState() { if (_isLoaded && IsCurrentAccount()) CacheManager.TrySerialize(this, CacheFile, false, CacheManager.DataType.CachedData); }
     public async void RestoreStateAsync()
     {
-      this._isRestoringState = true;
-      await CacheManager.TryDeserializeAsync((IBinarySerializable) this, StickersAutoSuggestDictionary.AUTO_SUGGEST_FILE_NAME, CacheManager.DataType.CachedData);
-      this._isRestoringState = false;
+      _isRestoringState = true;
+      try { await CacheManager.TryDeserializeAsync(this, CacheFile, CacheManager.DataType.CachedData); }
+      finally { _isRestoringState = false; }
+      if (_instance != this) return;
+      if (IsCurrentAccount()) PublishUpdated();
+      EnsureDictIsLoadedAndUpToDate();
     }
-
     public void Write(BinaryWriter writer)
     {
-      writer.Write(1);
-      writer.Write(this._isLoaded);
-      BinarySerializerExtensions.Write(writer, this._lastLoadedDate);
-      writer.Write<StickersKeywordsData>(this._keywordsData, false);
+      writer.Write(2); writer.Write(_isLoaded); BinarySerializerExtensions.Write(writer, _lastLoadedDate);
+      writer.Write<StickersKeywordsData>(_keywordsData, false); writer.Write(_owner); writer.WriteString(_origin);
     }
-
     public void Read(BinaryReader reader)
     {
-      reader.ReadInt32();
-      this._isLoaded = reader.ReadBoolean();
-      this._lastLoadedDate = BinarySerializerExtensions.ReadDateTime(reader);
-      this.SetKeywordsData(reader.ReadGeneric<StickersKeywordsData>());
+      int version = reader.ReadInt32(); _isLoaded = reader.ReadBoolean();
+      _lastLoadedDate = BinarySerializerExtensions.ReadDateTime(reader);
+      SetKeywordsData(reader.ReadGeneric<StickersKeywordsData>());
+      _owner = version >= 2 ? reader.ReadInt64() : 0; _origin = version >= 2 ? reader.ReadString() : "";
+      if (!IsCurrentAccount()) { _isLoaded = false; _lastLoadedDate = DateTime.MinValue; }
     }
-
     public void Handle(UserIsLoggedOutEvent message)
     {
-      this.ResetInstance();
+      if (_instance != this) return;
+      EventAggregator.Current.Unsubscribe(this); _instance = null;
+      _isLoaded = false; SetKeywordsData(null); PublishUpdated();
     }
-
-    private void ResetInstance()
-    {
-      StickersAutoSuggestDictionary._instance = new StickersAutoSuggestDictionary();
-    }
-
-    public void Handle(StickersPackPurchasedEvent message)
-    {
-      this.RefreshDictIfNeeded();
-    }
-
-    public void Handle(StickersUpdatedEvent message)
-    {
-      this.RefreshDictIfNeeded();
-    }
-
-    public void Handle(StickersPackActivatedDeactivatedEvent message)
-    {
-      this.RequestDeferredUpdate();
-    }
-
-    public void Handle(StickersPacksReorderedEvent message)
-    {
-      this.RequestDeferredUpdate();
-    }
-
-    public void Handle(AutoSuggestEnabledChangedEvent message)
-    {
-      this.RequestDeferredUpdate();
-    }
-
-    private void RefreshDictIfNeeded()
-    {
-      if (StickersAutoSuggestDictionary._instance != this)
-        return;
-      this.EnsureDictIsLoadedAndUpToDate(true);
-    }
-
-    private void RequestDeferredUpdate()
-    {
-      if (StickersAutoSuggestDictionary._instance != this)
-        return;
-      this._lastLoadedDate = DateTime.MinValue;
-    }
-
-    public class AutoSuggestDictionaryUpdatedEvent
-    {
-    }
+    public void Handle(StickersPackPurchasedEvent message) { Refresh(); }
+    public void Handle(StickersUpdatedEvent message) { Refresh(); }
+    public void Handle(StickersPackActivatedDeactivatedEvent message) { Refresh(); }
+    public void Handle(StickersPacksReorderedEvent message) { PublishUpdated(); }
+    public void Handle(AutoSuggestEnabledChangedEvent message) { Refresh(); PublishUpdated(); }
+    private void Refresh() { if (_instance == this) { _lastLoadedDate = DateTime.MinValue; EnsureDictIsLoadedAndUpToDate(true); } }
+    public class AutoSuggestDictionaryUpdatedEvent { }
   }
 }

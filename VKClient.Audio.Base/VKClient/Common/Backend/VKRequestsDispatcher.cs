@@ -219,6 +219,11 @@ namespace VKClient.Common.Backend
                             LogoutRequestHandler.InvokeLogoutRequest();
                         }
                     }
+                    // OpenVK also uses code 14 for "Chat not found". It is
+                    // not a captcha challenge without a SID and an image.
+                    if (backendResult.ResultCode == ResultCode.CaptchaRequired &&
+                        (string.IsNullOrEmpty(resultFromJson.captcha_sid) || string.IsNullOrEmpty(resultFromJson.captcha_img)))
+                        backendResult.ResultCode = ResultCode.AccessDenied;
                     if (backendResult.ResultCode == ResultCode.CaptchaRequired)
                         CaptchaUserRequestHandler.InvokeCaptchaRequest(new CaptchaUserRequest()
                         {
@@ -303,7 +308,8 @@ namespace VKClient.Common.Backend
                     {
                         try
                         {
-                            List<ExecuteError> executeErrorList = null;
+                            List<ExecuteError> executeErrorList = responseObject["execute_errors"] is JArray
+                                ? responseObject["execute_errors"].ToObject<List<ExecuteError>>() : null;
                             R r;
                             if (customDeserializationFunc != null)
                                 r = customDeserializationFunc(responseJson);

@@ -8,6 +8,34 @@ namespace VKClient.Common.Backend.DataObjects
   {
     public string type { get; set; }
 
+    [Newtonsoft.Json.JsonIgnore]
+    public bool IsUnavailable
+    {
+      get
+      {
+        switch (this.type)
+        {
+          case "photo": return this.photo == null;
+          case "video": return this.video == null;
+          case "audio": return this.audio == null;
+          case "doc": return this.doc == null;
+          case "wall": return this.wall == null;
+          case "note": return this.note == null;
+          case "poll": return this.poll == null;
+          case "sticker": return this.sticker == null;
+          case "gift": return this.gift == null;
+          case "link": return this.link == null;
+          case "wall_reply": return this.wall_reply == null;
+          case "market": return this.market == null;
+          case "market_album": return this.market_album == null;
+          case "album": return this.album == null;
+          case "page": return this.Page == null;
+          case "money_transfer": return this.money_transfer == null;
+          default: return true;
+        }
+      }
+    }
+
     public AudioObj audio { get; set; }
 
     public Video video { get; set; }

@@ -6,6 +6,7 @@
                                     xmlns:framework="clr-namespace:VKClient.Common.Framework"
                                     xmlns:virtItems="clr-namespace:VKClient.Common.Library.VirtItems"
                                     xmlns:views="clr-namespace:VKClient.Common.Stickers.Views"
+                                    xmlns:emoji="clr-namespace:VKClient.Common.Emoji"
                                     mc:Ignorable="d"
                                     FontFamily="{StaticResource PhoneFontFamilyNormal}"
                                     FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -23,11 +24,11 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Image Width="88"
+            <emoji:StickerImage Width="88"
                    Height="88"
                    VerticalAlignment="Top"
                    Margin="0 6 0 0"
-                   framework:ImageLoader.UriSource="{Binding ImageUrl}" />
+                   SourceUri="{Binding ImageUrl}" />
 
             <views:StickersPackInfoUC Grid.Column="1"
                                      VerticalAlignment="Center"

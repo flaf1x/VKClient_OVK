@@ -5,6 +5,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:framework="clr-namespace:VKClient.Common.Framework;assembly=VKClient.Common"
     xmlns:local="clr-namespace:VKClient.Common.Stickers.AutoSuggest"
+    xmlns:emoji="clr-namespace:VKClient.Common.Emoji"
     mc:Ignorable="d"
     FontFamily="{StaticResource PhoneFontFamilyNormal}"
     FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -41,10 +42,10 @@
                           Height="88"
                           Background="Transparent" 
                               Tap="Grid_Tap">
-                            <Image Height="88"
+                            <emoji:StickerImage Height="88"
                                    Opacity="{Binding Opacity}"
                                    Width="88"
-                                   framework:ImageLoader.UriSource="{Binding PreviewUri, FallbackValue='https://new.vk.com/images/stickers/910/128.png'}" />
+                                   Animate="False" SourceUri="{Binding PreviewUri}" />
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

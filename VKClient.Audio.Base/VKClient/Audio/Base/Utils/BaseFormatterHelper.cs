@@ -8,6 +8,21 @@ namespace VKClient.Audio.Base.Utils
 {
   public class BaseFormatterHelper
   {
+    public static int GetServerTimeDelta(int serverTime, int localTime)
+    {
+      if (serverTime <= 0)
+        return 0;
+      long delta = (long)serverTime - localTime;
+      return Math.Abs(delta) <= 86400L ? (int)delta : 0;
+    }
+
+    public static int GetSafeStoredTimeDelta()
+    {
+      int delta = AppGlobalStateManager.Current.GlobalState.ServerMinusLocalTimeDelta;
+      // Also ignore corrupt values already persisted by previous versions,
+      // before the first successful account refresh on startup.
+      return Math.Abs((long)delta) <= 86400L ? delta : 0;
+    }
     public static DateTimeDiff GetDateTimeDiff(double unixTimeStamp)
     {
       return BaseFormatterHelper.GetDateTimeDiff(BaseFormatterHelper.UnixTimeStampToDateTime(unixTimeStamp, true));
@@ -89,7 +104,7 @@ namespace VKClient.Audio.Base.Utils
       DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0);
       if (includeTimeDiff)
       {
-        int minusLocalTimeDelta = AppGlobalStateManager.Current.GlobalState.ServerMinusLocalTimeDelta;
+        int minusLocalTimeDelta = GetSafeStoredTimeDelta();
         unixTimeStamp -= (double) minusLocalTimeDelta;
       }
       dateTime = dateTime.AddSeconds(unixTimeStamp).ToLocalTime();
@@ -100,7 +115,7 @@ namespace VKClient.Audio.Base.Utils
     {
       if (includeTimeDiff)
       {
-        int minusLocalTimeDelta = AppGlobalStateManager.Current.GlobalState.ServerMinusLocalTimeDelta;
+        int minusLocalTimeDelta = GetSafeStoredTimeDelta();
         unixTimeStamp -= (long) minusLocalTimeDelta;
       }
       return unixTimeStamp - (unixTimeStamp + 14400L) % 86400L;

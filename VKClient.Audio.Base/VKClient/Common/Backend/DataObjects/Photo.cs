@@ -9,6 +9,12 @@ namespace VKClient.Common.Backend.DataObjects
 {
   public class Photo : IBinarySerializable
   {
+    public static string ComposeAttachmentId(long ownerId, long photoId, string accessKey)
+    {
+      return string.Format("photo{0}_{1}", ownerId, photoId) +
+        (string.IsNullOrEmpty(accessKey) ? "" : "_" + accessKey);
+    }
+
     private string _text = "";
     private string _photo75;
     private string _photo130;

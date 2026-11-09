@@ -1762,7 +1762,7 @@
     <value>Версия {0}</value>
   </data>
   <data name="About_PatchVersion" xml:space="preserve">
-    <value>Патч 1.1</value>
+    <value>Патч 1.2</value>
   </data>
   <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
     <value>Об OpenVK</value>
@@ -5716,4 +5716,23 @@
   <data name="comments_pivotItem" xml:space="preserve">
     <value>комментарии</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>установить фон чата</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>изменить фон чата</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>фон всех чатов</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>фон чата</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>выбрать фотографию</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>применить фон</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>убрать фон</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>использовать общий фон</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Для чатов без своего фона. Уже установленные индивидуальные фоны не изменятся.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Только для этого чата. Кнопка «назад» отменяет изменения, «применить» сохраняет.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>приглушение фона</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>размытие</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>масштаб</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Перемещайте фото пальцем, чтобы выбрать область.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>Так будут выглядеть сообщения.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Твой фон — твоё настроение.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>стандартный фон</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>настроить</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>предпросмотр</value></data>
 </root>

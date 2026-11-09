@@ -84,9 +84,11 @@ namespace VKClient.Audio.Base.DataObjects
 
     public int votes { get; set; }
 
+    public bool is_animated { get; set; }
+
     public void Write(BinaryWriter writer)
     {
-      writer.Write(4);
+      writer.Write(5);
       writer.Write(this.id);
       writer.WriteString(this.type);
       writer.Write(this.purchased);
@@ -100,6 +102,7 @@ namespace VKClient.Audio.Base.DataObjects
       writer.WriteString(this.photo_140);
       writer.Write(this.votes);
       writer.Write(this.promoted);
+      writer.Write(this.is_animated);
     }
 
     public void Read(BinaryReader reader)
@@ -131,6 +134,7 @@ namespace VKClient.Audio.Base.DataObjects
       if (num1 < num5)
         return;
       this.promoted = reader.ReadInt32();
+      if (num1 >= 5) this.is_animated = reader.ReadBoolean();
     }
   }
 }

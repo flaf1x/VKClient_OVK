@@ -127,12 +127,10 @@ namespace VKClient.Common.Stickers.ViewModels
 
     public StickersManageViewModel()
     {
+      this.ActiveStickers = new ObservableCollection<StockItemHeader>();
+      this.HiddenStickers = new ObservableCollection<StockItemHeader>();
       this.ActiveStickers.CollectionChanged += new NotifyCollectionChangedEventHandler(this.ActiveStickers_OnCollectionChanged);
       EventAggregator.Current.Subscribe(this);
-
-        this.ActiveStickers = new ObservableCollection<StockItemHeader>();
-
-    this.HiddenStickers = new ObservableCollection<StockItemHeader>();
     }
 
     private SolidColorBrush GetForeground(StickersManageViewModel.CurrentSource currentSource)
@@ -163,23 +161,9 @@ namespace VKClient.Common.Stickers.ViewModels
     {
       if (this._updatingCollection || e.Action != NotifyCollectionChangedAction.Add)
         return;
-      int num1 = 0;
-      int num2 = 0;
       int index = e.NewStartingIndex;
-      int id = ((Collection<StockItemHeader>) this.ActiveStickers)[index].Product.id;
-      if (index > 0)
-        num2 = ((Collection<StockItemHeader>) this.ActiveStickers)[index - 1].Product.id;
-      if (index < ((Collection<StockItemHeader>) this.ActiveStickers).Count - 1)
-        num1 = ((Collection<StockItemHeader>) this.ActiveStickers)[index + 1].Product.id;
-      this.SetProgress(true);
-      StoreService.Instance.ReorderProducts(id, num2, num1, (Action<BackendResult<bool, ResultCode>>) (result =>
-      {
-        this.SetProgress(false);
-        if (result.ResultCode != ResultCode.Succeeded)
-          GenericInfoUC.ShowBasedOnResult((int) result.ResultCode, "", (VKRequestsDispatcher.Error) null);
-        else
-          EventAggregator.Current.Publish(new StickersPacksReorderedEvent(((Collection<StockItemHeader>) this.ActiveStickers)[index].StockItem, index));
-      }));
+      VKClient.Common.Emoji.StickerPackOrder.Save(this.ActiveStickers.Select(item => item.ProductId));
+      EventAggregator.Current.Publish(new StickersPacksReorderedEvent(this.ActiveStickers[index].StockItem, index));
     }
 
     private void AddActiveStickers(StockItemHeader stockItemHeader)
@@ -200,7 +184,7 @@ namespace VKClient.Common.Stickers.ViewModels
             if (resultCode == ResultCode.Succeeded)
                 Execute.ExecuteOnUIThread((Action)(() =>
                 {
-                    List<StockItem> resultData = result.ResultData;
+                    List<StockItem> resultData = VKClient.Common.Emoji.StickerPackOrder.Apply(result.ResultData ?? new List<StockItem>());
                     this.ClearItems();
                     foreach (StockItem stockItem in resultData.Where<StockItem>((Func<StockItem, bool>)(product => product != null)))
                     {

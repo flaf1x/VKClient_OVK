@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:framework="clr-namespace:VKClient.Common.Framework"
+             xmlns:emoji="clr-namespace:VKClient.Common.Emoji"
              mc:Ignorable="d"
              FontFamily="{StaticResource PhoneFontFamilyNormal}"
              FontSize="{StaticResource PhoneFontSizeNormal}"
@@ -100,7 +101,7 @@
                                 <Grid Background="Transparent"
                                       framework:MetroInMotion.Tilt="1.5"
                                       Tap="Grid_Tap">
-                                    <Image framework:ImageLoader.UriSource="{Binding TabThumbSticker}"
+                                    <emoji:StickerImage SourceUri="{Binding TabThumbSticker}"
                                            Width="{Binding ImageDim}"
                                            MaxHeight="{Binding ImageDim}"
                                            Visibility="{Binding TabImageVisibility}"

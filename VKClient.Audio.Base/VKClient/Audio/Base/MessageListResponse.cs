@@ -12,6 +12,9 @@ namespace VKClient.Audio.Base
 
     public int Skipped { get; set; }
 
+    // Runtime-only history navigation metadata; not part of the binary cache.
+    public int LatestMessageId { get; set; }
+
     public List<Message> Messages { get; set; }
 
     public List<DialogHeaderInfo> DialogHeaders { get; set; }

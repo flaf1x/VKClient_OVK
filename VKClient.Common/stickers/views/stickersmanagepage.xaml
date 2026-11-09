@@ -7,6 +7,7 @@
                     xmlns:uc="clr-namespace:VKClient.Common.UC"
                     xmlns:framework="clr-namespace:VKClient.Common.Framework"
                     xmlns:views="clr-namespace:VKClient.Common.Stickers.Views"
+                    xmlns:emoji="clr-namespace:VKClient.Common.Emoji"
                     FontFamily="{StaticResource PhoneFontFamilyNormal}"
                     FontSize="{StaticResource PhoneFontSizeNormal}"
                     Foreground="{StaticResource PhoneForegroundBrush}"
@@ -65,9 +66,9 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <Image Width="64"
+                                <emoji:StickerImage Width="64"
                                        Height="64"
-                                       framework:ImageLoader.UriSource="{Binding ImageUrl}" />
+                                       SourceUri="{Binding ImageUrl}" />
 
                                 <TextBlock Grid.Column="1"
                                            VerticalAlignment="Top"
@@ -118,10 +119,10 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <Image Width="64"
+                                <emoji:StickerImage Width="64"
                                        Height="64"
                                        Margin="16 0 0 0"
-                                       framework:ImageLoader.UriSource="{Binding ImageUrl}" />
+                                       SourceUri="{Binding ImageUrl}" />
 
                                 <TextBlock Grid.Column="1"
                                            VerticalAlignment="Top"

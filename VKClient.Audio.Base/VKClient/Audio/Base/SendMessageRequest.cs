@@ -4,6 +4,8 @@ namespace VKClient.Audio.Base
 {
   public class SendMessageRequest
   {
+    public int RandomId { get; set; }
+    public int ReplyTo { get; set; }
     public string MessageBody { get; set; }
 
     public long UserOrCharId { get; set; }

@@ -5694,4 +5694,23 @@
   <data name="comments_pivotItem" xml:space="preserve">
     <value>каментарыі</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>усталяваць фон чата</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>змяніць фон чата</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>фон усіх чатаў</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>фон чата</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>выбраць фатаграфію</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>ужыць фон</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>прыбраць фон</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>выкарыстоўваць агульны фон</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Для чатаў без свайго фону. Усталяваныя індывідуальныя фоны не зменяцца.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Толькі для гэтага чата. Кнопка «назад» скасоўвае змены, «ужыць» захоўвае.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>прыглушэнне фону</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>размыццё</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>маштаб</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Перамяшчайце фота пальцам, каб выбраць вобласць.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>Так будуць выглядаць паведамленні.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Твой фон — твой настрой.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>стандартны фон</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>наладзіць</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>перадпрагляд</value></data>
 </root>

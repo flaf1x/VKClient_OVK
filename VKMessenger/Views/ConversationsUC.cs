@@ -108,7 +108,7 @@ namespace VKMessenger.Views
             if (dataContext == null)
                 return;
             long userOrChatId = dataContext.UserOrChatId;
-            if (userOrChatId <= 0L)
+            if (userOrChatId == 0L)
                 return;
             args.Handled = true;
             Navigator.Current.NavigateToConversation(userOrChatId, dataContext.IsChat, this.IsLookup, "", 0, false);
@@ -120,7 +120,7 @@ namespace VKMessenger.Views
             if (dataContext == null)
                 return;
             long userOrChatId = dataContext.UserOrChatId;
-            if (userOrChatId <= 0L)
+            if (userOrChatId == 0L)
                 return;
             Navigator.Current.NavigateToConversation(userOrChatId, dataContext.IsChat, this.IsLookup, "", 0, false);
         }

@@ -143,6 +143,10 @@
     <Compile Include="Library\VirtItems\ForwardedHeaderItem.cs" />
     <Compile Include="Library\VirtItems\MessageContentItem.cs" />
     <Compile Include="Library\VirtItems\MessageFooterItem.cs" />
+    <Compile Include="Library\ReplyPresentation.cs" />
+    <Compile Include="Library\ReplySwipeGesture.cs" />
+    <Compile Include="Library\WallpaperConversationPreview.cs" />
+    <Compile Include="Library\VirtItems\ReplyPreviewItem.cs" />
     <Compile Include="Library\VirtItems\MessageItem.cs" />
     <Compile Include="Library\VirtItems\SystemMessageItem.cs" />
     <Compile Include="Library\VirtItems\TapHandlerItem.cs" />

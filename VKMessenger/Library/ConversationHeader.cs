@@ -407,9 +407,12 @@ namespace VKMessenger.Library
             set
             {
                 int num = value ? -1 : 0;
-                if (this._message.push_settings.disabled_until == num)
+                if (this.AreNotificationsDisabled == value)
                     return;
                 this._message.push_settings.disabled_until = num;
+                this._message.push_settings.disabled_forever = value;
+                this._message.push_settings.sound = value ? 0 : 1;
+                this._message.push_settings.no_sound = value;
                 this.RespondToSettingsChange();
             }
         }
@@ -520,6 +523,9 @@ namespace VKMessenger.Library
 
         public void SetMessageAndUsers(Message message, List<User> associatedUsers)
         {
+            // Long-poll/history messages have no conversation settings. Do not
+            // erase the chat's custom avatar/title when its last message changes.
+            if (message != null) message.PreserveConversationSettings(this._message);
             this._message = message;
             this._associatedUsers = associatedUsers;
             if (this._message == null || this._associatedUsers == null)
@@ -574,6 +580,8 @@ namespace VKMessenger.Library
             if (message.attachments != null && message.attachments.Count > 0)
             {
                 Attachment firstAttachment = message.attachments.First<Attachment>();
+                if (firstAttachment == null || firstAttachment.IsUnavailable)
+                    return CommonResources.Unavailable;
                 int num = message.attachments.Count<Attachment>((Func<Attachment, bool>)(a => a.type == firstAttachment.type));
                 string lowerInvariant = firstAttachment.type.ToLowerInvariant();
 
@@ -714,14 +722,15 @@ namespace VKMessenger.Library
             if (this._changingNotifications)
                 return;
             this._changingNotifications = true;
+            bool disable = !this.AreNotificationsDisabled;
             string notificationsUri = AppGlobalStateManager.Current.GlobalState.NotificationsUri;
-            if (!string.IsNullOrEmpty(notificationsUri))
+            if (this.UserOrChatId != 0)
             {
-                AccountService.Instance.SetSilenceMode(notificationsUri, this.AreNotificationsDisabled ? 0 : -1, (Action<BackendResult<object, ResultCode>>)(res => Execute.ExecuteOnUIThread((Action)(() =>
+                AccountService.Instance.SetSilenceMode(notificationsUri, disable ? -1 : 0, (Action<BackendResult<object, ResultCode>>)(res => Execute.ExecuteOnUIThread((Action)(() =>
                 {
                     this._changingNotifications = false;
                     if (res.ResultCode == ResultCode.Succeeded)
-                        this.AreNotificationsDisabled = !this.AreNotificationsDisabled;
+                        this.AreNotificationsDisabled = disable;
                     resultCallback(res.ResultCode == ResultCode.Succeeded);
                 }))), this.IsChat ? this.UserOrChatId : 0, !this.IsChat ? this.UserOrChatId : 0L);
             }
@@ -762,19 +771,21 @@ namespace VKMessenger.Library
             this.UsersTypingHelper.SetUserIsTypingWithDelayedReset(userId);
         }
 
-        internal void RespondToSettingsChange()
+        internal void RespondToSettingsChange(bool publishChanges = true)
         {
             this.NotifyPropertyChanged<ObservableCollection<MenuItemData>>((Expression<Func<ObservableCollection<MenuItemData>>>)(() => this.MenuItems));
             this.NotifyPropertyChanged<Visibility>((Expression<Func<Visibility>>)(() => this.NotificationsDisabledVisibility));
             this.NotifyPropertyChanged<SolidColorBrush>((Expression<Func<SolidColorBrush>>)(() => this.HaveUnreadMessagesBackground));
             this.NotifyPropertyChanged<Thickness>((Expression<Func<Thickness>>)(() => this.IsOnlineOrOnlineMobileMargin));
             this.NotifyPropertyChanged<Thickness>((Expression<Func<Thickness>>)(() => this.TitleMargin));
+            if (!publishChanges) return;
             EventAggregator current = EventAggregator.Current;
             NotificationSettingsChangedEvent settingsChangedEvent = new NotificationSettingsChangedEvent();
             int num = this.AreNotificationsDisabled ? 1 : 0;
             settingsChangedEvent.AreNotificationsDisabled = num != 0;
             long userOrChatId = this.UserOrChatId;
             settingsChangedEvent.ChatId = userOrChatId;
+            settingsChangedEvent.PushSettings = this._message.push_settings;
             current.Publish(settingsChangedEvent);
         }
 
@@ -782,6 +793,19 @@ namespace VKMessenger.Library
         {
             if (message.ChatId != this.UserOrChatId || !this.IsChat)
                 return;
+            if (message.IsChatMetadataChange)
+            {
+                this._message.title = message.Title;
+                this._message.photo_200 = message.Photo;
+                this.RefreshUIProperties();
+                return;
+            }
+            if (message.PushSettings != null)
+            {
+                this._message.push_settings = message.PushSettings;
+                this.RespondToSettingsChange(false);
+                return;
+            }
             this.AreNotificationsDisabled = message.AreNotificationsDisabled;
         }
 

@@ -1765,7 +1765,7 @@
     <value>Версія {0}</value>
   </data>
   <data name="About_PatchVersion" xml:space="preserve">
-    <value>Патч 1.1</value>
+    <value>Патч 1.2</value>
   </data>
   <data name="OpenVK_DisclaimerTitle" xml:space="preserve">
     <value>Про OpenVK</value>
@@ -5722,4 +5722,23 @@
   <data name="comments_pivotItem" xml:space="preserve">
     <value>коментарі</value>
   </data>
+  <data name="ChatBackgroundSet" xml:space="preserve"><value>встановити тло чату</value></data>
+  <data name="ChatBackgroundChange" xml:space="preserve"><value>змінити тло чату</value></data>
+  <data name="ChatBackgroundAll" xml:space="preserve"><value>тло всіх чатів</value></data>
+  <data name="ChatBackgroundTitle" xml:space="preserve"><value>тло чату</value></data>
+  <data name="ChatBackgroundChoose" xml:space="preserve"><value>вибрати фотографію</value></data>
+  <data name="ChatBackgroundApply" xml:space="preserve"><value>застосувати тло</value></data>
+  <data name="ChatBackgroundRemove" xml:space="preserve"><value>прибрати тло</value></data>
+  <data name="ChatBackgroundUseGlobal" xml:space="preserve"><value>використовувати спільне тло</value></data>
+  <data name="ChatBackgroundAllHint" xml:space="preserve"><value>Для чатів без власного тла. Встановлені індивідуальні фони не зміняться.</value></data>
+  <data name="ChatBackgroundChatHint" xml:space="preserve"><value>Лише для цього чату. Кнопка «назад» скасовує зміни, «застосувати» зберігає.</value></data>
+  <data name="ChatBackgroundDim" xml:space="preserve"><value>приглушення тла</value></data>
+  <data name="ChatBackgroundBlur" xml:space="preserve"><value>розмиття</value></data>
+  <data name="ChatBackgroundZoom" xml:space="preserve"><value>масштаб</value></data>
+  <data name="ChatBackgroundPanHint" xml:space="preserve"><value>Пересувайте фото пальцем, щоб вибрати область.</value></data>
+  <data name="ChatBackgroundPreviewIncoming" xml:space="preserve"><value>Так виглядатимуть повідомлення.</value></data>
+  <data name="ChatBackgroundPreviewOutgoing" xml:space="preserve"><value>Твоє тло — твій настрій.</value></data>
+  <data name="ChatBackgroundDefault" xml:space="preserve"><value>стандартне тло</value></data>
+  <data name="ChatBackgroundAdjust" xml:space="preserve"><value>налаштувати</value></data>
+  <data name="ChatBackgroundPreview" xml:space="preserve"><value>перегляд</value></data>
 </root>

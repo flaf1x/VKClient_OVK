@@ -56,8 +56,11 @@ namespace VKMessenger.Library.VirtItems
             this._messagesList.CollectionChanged += new NotifyCollectionChangedEventHandler(this.Messages_CollectionChanged);
             this._messages.Clear();
             foreach (MessageViewModel mvm in this._messagesList.Reverse<MessageViewModel>())
+            {
                 this._messages.Add((IVirtualizable)new MessageItem(mvm, this._cvm.Scroll != null && this._cvm.Scroll.IsHorizontalOrientation));
+            }
         }
+
 
         private void Messages_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
@@ -81,6 +84,15 @@ namespace VKMessenger.Library.VirtItems
                 foreach (IVirtualizable virtualizable in virtualizableList)
                     this._messages.Insert(index, virtualizable);
             }
+            else if (e.Action == NotifyCollectionChangedAction.Replace)
+            {
+                for (int i = 0; i < virtualizableList.Count; ++i)
+                {
+                    int index = this._messages.Count - e.NewStartingIndex - i - 1;
+                    if (index >= 0 && index < this._messages.Count)
+                        this._messages[index] = virtualizableList[i];
+                }
+            }
             else if (e.Action == NotifyCollectionChangedAction.Reset)
             {
                 this._messages.Clear();
@@ -99,6 +111,10 @@ namespace VKMessenger.Library.VirtItems
         internal void Cleanup()
         {
             this._cvm.PropertyChanged -= new PropertyChangedEventHandler(this._cvm_PropertyChanged);
+            if (this._messagesList != null)
+                this._messagesList.CollectionChanged -= new NotifyCollectionChangedEventHandler(this.Messages_CollectionChanged);
+            EventAggregator.Current.Unsubscribe(this);
+            this._messages.Clear();
         }
 
         public void Handle(VoiceMessagePlayEndedEvent message)

@@ -33,6 +33,36 @@ namespace VKMessenger.Backend
         }
 
         public int id { get; set; }
+        public long peer_id { get; set; }
+        public int conversation_message_id { get; set; }
+        public long random_id { get; set; }
+        public Message reply_message { get; set; }
+
+        public bool IsAtOrBeforeReadBoundary(long boundary)
+        {
+            // OpenVK long-poll 6/7 carries a peer-local CMID, not a global ID.
+            return boundary > 0 && conversation_message_id > 0 && conversation_message_id <= boundary;
+        }
+
+        public void MergeReadState(Message latest)
+        {
+            if (latest == null) return;
+            if (latest.conversation_message_id > 0) this.conversation_message_id = latest.conversation_message_id;
+            this.read_state = Math.Max(this.read_state, latest.read_state);
+        }
+
+        public Message CreateReplySnapshot()
+        {
+            // A quote is a bounded preview, not a recursive copy of the chat.
+            return new Message {
+                id = this.id, conversation_message_id = this.conversation_message_id,
+                peer_id = this.peer_id, from_id = this.from_id, uid = this.uid,
+                chat_id = this.chat_id, date = this.date, body = this.body,
+                @out = this.@out, read_state = this.read_state, deleted = this.deleted,
+                attachments = this.attachments, sticker_id = this.sticker_id, geo = this.geo,
+                fwd_messages = this.fwd_messages == null ? null : this.fwd_messages.Where(m => m != null).Take(1).Select(m => new Message { id = m.id, body = m.body }).ToList()
+            };
+        }
 
         public int date { get; set; }
 
@@ -113,6 +143,23 @@ namespace VKMessenger.Backend
 
         public PushSettings push_settings { get; set; }
 
+        // Runtime provenance: a history/long-poll message has no chat settings.
+        public bool HasChatMetadata { get; set; }
+        public bool HasPushSettings { get; set; }
+
+        public void PreserveConversationSettings(Message previous)
+        {
+            if (previous == null || chat_id == 0 || chat_id != previous.chat_id) return;
+            if (!HasChatMetadata)
+            {
+                if (string.IsNullOrEmpty(photo_200)) photo_200 = previous.photo_200;
+                if (string.IsNullOrEmpty(title)) title = previous.title;
+                if (string.IsNullOrEmpty(chat_active_str)) chat_active_str = previous.chat_active_str;
+                if (action == "chat_photo_remove") photo_200 = "";
+            }
+            if (!HasPushSettings) push_settings = previous.push_settings;
+        }
+
         public string photo_100
         {
             get
@@ -188,7 +235,7 @@ namespace VKMessenger.Backend
 
         public void Write(BinaryWriter writer)
         {
-            writer.Write(3);
+            writer.Write(6);
             writer.Write(this.mid);
             writer.Write(this.date);
             writer.Write(this.@out);
@@ -214,6 +261,10 @@ namespace VKMessenger.Backend
             writer.Write(this.sticker_id);
             writer.WriteString(this.photo_200);
             writer.Write(this.from_id);
+            writer.Write(this.peer_id);
+            writer.Write(this.conversation_message_id);
+            writer.Write(this.random_id);
+            writer.Write<Message>(this.reply_message == null ? null : this.reply_message.CreateReplySnapshot(), false);
         }
 
         public void Read(BinaryReader reader)
@@ -249,6 +300,14 @@ namespace VKMessenger.Backend
             if (num1 < num3)
                 return;
             this.from_id = reader.ReadInt64();
+            if (num1 >= 4)
+            {
+                this.peer_id = reader.ReadInt64();
+                this.conversation_message_id = reader.ReadInt32();
+                this.random_id = num1 >= 5 ? reader.ReadInt64() : reader.ReadInt32();
+            }
+            if (num1 >= 6)
+                this.reply_message = reader.ReadGeneric<Message>();
         }
 
         public static List<long> GetAssociatedUserIds(List<Message> messages, bool includeForwarded = true)
@@ -263,6 +322,8 @@ namespace VKMessenger.Backend
         {
             List<long> source = new List<long>();
             source.Add((long)this.uid);
+            if (this.from_id != 0)
+                source.Add(this.from_id);
             if (this.action_mid > 0L)
                 source.Add((long)(int)this.action_mid);
             if (!string.IsNullOrWhiteSpace(this.chat_active_str))
@@ -272,6 +333,8 @@ namespace VKMessenger.Backend
                 foreach (Message fwdMessage in this.fwd_messages)
                     source.AddRange((IEnumerable<long>)fwdMessage.GetAssociatedUserIds(true));
             }
+            if (this.reply_message != null && includeForwarded)
+                source.AddRange(this.reply_message.GetAssociatedUserIds(false));
             return source.Distinct<long>().ToList<long>();
         }
     }

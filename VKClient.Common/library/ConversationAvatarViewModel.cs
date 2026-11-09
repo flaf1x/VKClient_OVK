@@ -205,6 +205,9 @@ namespace VKClient.Common.Library
             //      cDisplayClass450.chatParticipantsIds = chatParticipantsIds;
             defaultAvatar = AvatarHelper.Prepare(defaultAvatar);
             this._defaultAvatar = defaultAvatar;
+            // The single-avatar control is also visible for chats with their
+            // own photo. Previously this URL was only assigned for users.
+            this.UIImageUrl = defaultAvatar;
             this.IsChat = isChat;
             // ISSUE: method reference
             this.NotifyPropertyChanged<Visibility>(() => this.IsChatVisibility);
@@ -232,6 +235,7 @@ namespace VKClient.Common.Library
                 }
                 if (!string.IsNullOrWhiteSpace(defaultAvatar))
                 {
+                    this.UIImageUrl = defaultAvatar;
                     this.UIChatImage1Url = this.UIChatImage2Url = this.UIChatImage3Url = this.UIChatImage4Url = "";
                     this.ChatLeftImageVisibility = this.ChatRightImageVisibility = Visibility.Collapsed;
                     this.ChatRightImageUrl = string.Empty;

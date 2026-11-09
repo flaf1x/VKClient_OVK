@@ -31,11 +31,12 @@ namespace VKMessenger.Library
 
     public LinkHeader(Link link, long messageId = 0)
     {
+      link = link ?? new Link();
       this.Link = link;
       this.MessageId = messageId;
       this.Title = Extensions.ForUI(link.title);
       this.Description = Extensions.ForUI(link.description);
-      this.Domain = Extensions.ForUI(link.url);
+      this.Domain = Extensions.ForUI(link.url) ?? "";
       this.Url = link.url;
       if (this.Title.Length > 55)
       {
@@ -50,7 +51,7 @@ namespace VKMessenger.Library
           this.Description = "...";
       }
       this.Thumbnail = link.image_src;
-      if (this.Thumbnail != null)
+      if (!string.IsNullOrEmpty(this.Thumbnail))
       {
         this.ThumbnailBackground = (SolidColorBrush) Application.Current.Resources["PhoneChromeBrush"];
         this.ThumbnailPlaceholderLetter = "";
@@ -58,7 +59,7 @@ namespace VKMessenger.Library
       else
       {
         this.ThumbnailBackground = (SolidColorBrush) Application.Current.Resources["PhonePollSliderBackgroundBrush"];
-        this.ThumbnailPlaceholderLetter = this.Domain[0].ToString().ToUpper();
+        this.ThumbnailPlaceholderLetter = string.IsNullOrEmpty(this.Domain) ? "?" : this.Domain[0].ToString().ToUpper();
       }
     }
   }

@@ -33,9 +33,7 @@ namespace VKMessenger.Library
     {
         public static Func<MessageViewModel, MessageViewModel, int> _comparisonFunc = (Func<MessageViewModel, MessageViewModel, int>)((m1, m2) =>
         {
-            if (m2.Message.mid > 0 && m1.Message.mid > 0)
-                return m2.Message.mid - m1.Message.mid;
-            return m2.Message.date - m1.Message.date;
+            return MessagesService.CompareConversationMessages(m1.Message, m2.Message);
         });
         public static readonly string UNREAD_ITEM_ACTION = "UNREAD_MESSAGES";
         private readonly int _numberOfMessagesToStore = 10;
@@ -60,6 +58,13 @@ namespace VKMessenger.Library
         private string _chatTypeStatusText;
         private bool _isInSelectionMode;
         private bool _isBusyLoadingMessages;
+        private bool _hasMoreOlderMessages = true;
+        private int _latestKnownMessageId;
+        private long _incomingReadCmid;
+        private long _outgoingReadCmid;
+        private bool _markingVisibleRead;
+        private DateTime _nextVisibleReadAttempt;
+        public Func<IEnumerable<Message>> VisibleMessages { get; set; }
         private bool _isBusyLoadingHeaderInfo;
         private UsersTypingHelper _usersTypingHelper;
         private bool _changingNotifications;
@@ -117,15 +122,20 @@ namespace VKMessenger.Library
             set
             {
                 int num1 = value ? -1 : 0;
+                if (this._chat == null) return;
                 if (this.AreNotificationsDisabled == value)
                     return;
                 this._chat.push_settings.disabled_until = num1;
+                this._chat.push_settings.disabled_forever = value;
+                this._chat.push_settings.sound = value ? 0 : 1;
+                this._chat.push_settings.no_sound = value;
                 EventAggregator current = EventAggregator.Current;
                 NotificationSettingsChangedEvent settingsChangedEvent = new NotificationSettingsChangedEvent();
                 int num2 = this.AreNotificationsDisabled ? 1 : 0;
                 settingsChangedEvent.AreNotificationsDisabled = num2 != 0;
                 long userOrCharId = this.UserOrCharId;
                 settingsChangedEvent.ChatId = userOrCharId;
+                settingsChangedEvent.PushSettings = this._chat.push_settings;
                 current.Publish((object)settingsChangedEvent);
             }
         }
@@ -449,14 +459,20 @@ namespace VKMessenger.Library
 
         public void LoadMoreConversations(Action<bool> callback = null)
         {
-            this.LoadMessagesAsyncWithParams(this._messages.Where<MessageViewModel>((Func<MessageViewModel, bool>)(mvm => mvm.Message.mid > 0)).Count<MessageViewModel>() + this._skipped, 16, false, false, callback, new int?(), false);
+            if (!this._hasMoreOlderMessages || this._isBusyLoadingMessages)
+                return;
+            MessageViewModel oldest = this._messages.FirstOrDefault(m => m.Message.mid > 0);
+            if (oldest != null)
+                this.LoadMessagesAsyncWithParams(1, 16, false, false, callback, oldest.Message.id, false, true);
         }
 
         public void LoadNewerConversations(Action<bool> callback = null)
         {
             if (this._skipped <= 0 || this._messages.Count <= 0)
                 return;
-            this.LoadMessagesAsyncWithParams(-15, 15, false, true, callback, new int?(this._messages.Last<MessageViewModel>().Message.id), false);
+            MessageViewModel newest = this._messages.LastOrDefault(m => m.Message.mid > 0);
+            if (newest != null)
+                this.LoadMessagesAsyncWithParams(-15, 15, false, false, callback, newest.Message.id, false, true);
         }
 
         public void RefreshConversations()
@@ -482,7 +498,7 @@ namespace VKMessenger.Library
                 }
                 else
                     GenericInfoUC.ShowBasedOnResult((int)result.ResultCode, "", null);
-            }))));
+            }))), BackendServices.MessagesService.GetPeerId(this._userOrChatId, this._isChat));
         }
 
         public void SendMessage(string messageText = "")
@@ -505,6 +521,8 @@ namespace VKMessenger.Library
             string str = messageText.Replace("\r\n", "\r").Replace("\r", "\r\n").Trim();
             this.RemoveUnreadMessagesItem();
             OutboundMessageViewModel outboundMessage = new OutboundMessageViewModel(this._isChat, this._userOrChatId);
+            outboundMessage.ReplyMessage = this._outboundMessage.ReplyMessage;
+            this._outboundMessage.ReplyMessage = null;
             if (stickerData != null)
             {
                 outboundMessage.StickerItem = stickerData;
@@ -534,6 +552,7 @@ namespace VKMessenger.Library
                 if (messageViewModel.OutboundMessageVM.OutboundMessageStatus != OutboundMessageStatus.Delivered)
                     return;
                 this.IsMessagesFromGroupDenied = false;
+                Execute.ExecuteOnUIThread(this.ApplyReadBoundaries);
             });
             messageViewModel.Send();
             if (this._skipped > 0)
@@ -544,8 +563,28 @@ namespace VKMessenger.Library
 
         public void AddForwardedMessagesToOutboundMessage(IList<Message> forwardedMessages)
         {
+            this.OutboundMessageVM.ReplyMessage = null;
             this.OutboundMessageVM.RemoveForwardedMessages();
             this.OutboundMessageVM.Attachments.Add((IOutboundAttachment)new OutboundForwardedMessages(forwardedMessages.ToList<Message>()));
+        }
+
+        public void ReplyToMessage(Message message)
+        {
+            if (message == null || message.id <= 0 || message.deleted != 0 || !string.IsNullOrEmpty(message.action)) return;
+            this.OutboundMessageVM.RemoveForwardedMessages();
+            this.OutboundMessageVM.ReplyMessage = message;
+        }
+
+        private void ApplyReadBoundaries()
+        {
+            foreach (MessageViewModel vm in this._messages)
+            {
+                if (vm.Message.read_state == 0 && vm.Message.IsAtOrBeforeReadBoundary(vm.Message.@out == 1 ? this._outgoingReadCmid : this._incomingReadCmid))
+                {
+                    vm.Message.read_state = 1;
+                    vm.RefreshUIProperties();
+                }
+            }
         }
 
         private void EnsureUserAndChatIdSet(Message message)
@@ -574,7 +613,18 @@ namespace VKMessenger.Library
                 BackendServices.MessagesService.GetChat(this._userOrChatId, (Action<BackendResult<ChatExtended, ResultCode>>)(res =>
                 {
                     if (res.ResultCode == ResultCode.Succeeded)
+                    {
                         this._chat = res.ResultData;
+                        Execute.ExecuteOnUIThread(() => {
+                          if (this._chat == null) return;
+                          EventAggregator.Current.Publish(new NotificationSettingsChangedEvent {
+                            ChatId = this._userOrChatId, IsChatMetadataChange = true,
+                            Title = this._chat.title, Photo = this._chat.photo_200 });
+                          EventAggregator.Current.Publish(new NotificationSettingsChangedEvent {
+                            ChatId = this._userOrChatId, AreNotificationsDisabled = this._chat.push_settings.AreDisabledNow,
+                            PushSettings = this._chat.push_settings });
+                        });
+                    }
                     this.RefreshUIPropertiesSafe();
                     this._isBusyLoadingHeaderInfo = false;
                 }));
@@ -646,7 +696,7 @@ namespace VKMessenger.Library
                 }));
         }
 
-        private void LoadMessagesAsyncWithParams(int offset, int count, bool resetCollection, bool showProgress = true, Action<bool> callback = null, int? startMessageId = null, bool scrollToMessageId = false)
+        private void LoadMessagesAsyncWithParams(int offset, int count, bool resetCollection, bool showProgress = true, Action<bool> callback = null, int? startMessageId = null, bool scrollToMessageId = false, bool keepExistingWindow = false)
         {
             if (this._isBusyLoadingMessages)
                 return;
@@ -682,10 +732,18 @@ namespace VKMessenger.Library
                         // made otherwise valid OpenVK dialogs appear completely empty.
                         if (r.ResultCode == ResultCode.Succeeded || messages != null)
                         {
-                            if (startMessageId.HasValue)
+                            if (result.ResultData.LatestMessageId > 0)
+                                this._latestKnownMessageId = result.ResultData.LatestMessageId;
+                            if (keepExistingWindow && offset < 0)
+                                this.Skipped = messages.Count == 0 || messages.Any(m => m.id >= this._latestKnownMessageId) ? 0 : 1;
+                            else if (startMessageId.HasValue && !keepExistingWindow)
                                 this.Skipped = result.ResultData.Skipped;
                             else if (offset == 0)
                                 this.Skipped = 0;
+                            if (keepExistingWindow && offset > 0)
+                                this._hasMoreOlderMessages = messages.Count >= count;
+                            else if (startMessageId == -1)
+                                this._hasMoreOlderMessages = result.ResultData.TotalCount > messages.Count + this._skipped;
                             List<User> resultData = r.ResultData;
                             List<MessageViewModel> messagesViewModels = new List<MessageViewModel>(messages.Count);
                             messages.ForEach((Action<Message>)(m =>
@@ -696,6 +754,8 @@ namespace VKMessenger.Library
                             ((DependencyObject)Deployment.Current).Dispatcher.BeginInvoke((Action)(() =>
                             {
                                 int? nullable;
+                                if (keepExistingWindow)
+                                    goto label_6;
                                 if (offset != 0)
                                 {
                                     nullable = startMessageId;
@@ -739,9 +799,9 @@ namespace VKMessenger.Library
                                                     return m.Message.mid == mvm.Message.mid;
                                                 return false;
                                             }));
-                                            if (messageViewModel != null && messageViewModel.Message.read_state != mvm.Message.read_state)
+                                            if (messageViewModel != null)
                                             {
-                                                mvm.Message.read_state = messageViewModel.Message.read_state;
+                                                mvm.Message.MergeReadState(messageViewModel.Message);
                                                 mvm.RefreshUIProperties();
                                             }
                                         }
@@ -754,6 +814,7 @@ namespace VKMessenger.Library
                                         return;
                                     this._messages.AddOrdered<MessageViewModel>(messageVM, ConversationViewModel._comparisonFunc, false);
                                 }));
+                                this.ApplyReadBoundaries();
                                 this.NotifyPropertyChanged<bool>((Expression<Func<bool>>)(() => this.NoMessages));
                                 nullable = startMessageId;
                                 int num3 = -1;
@@ -781,6 +842,7 @@ namespace VKMessenger.Library
                                         this._scroll.ScrollToMessageId((long)startMessageId.Value);
                                 }
                             label_34:
+                                Logger.Instance.Info("Conversation history window: {0} loaded, {1} newer skipped, memory {2} MB", this._messages.Count, this._skipped, Microsoft.Phone.Info.DeviceStatus.ApplicationCurrentMemoryUsage / 1048576L);
                                 this.SetReadStatusIfNeeded();
                                 this._isBusyLoadingMessages = false;
                             }));
@@ -797,18 +859,18 @@ namespace VKMessenger.Library
         private void EnsureUnreadItem()
         {
             this.RemoveUnreadMessagesItem();
-            int num = 0;
-            for (int index = this._messages.Count - 1; index >= 0 && (this._messages[index].Message.@out == 0 && this._messages[index].Message.read_state == 0); --index)
-                ++num;
-            if (num <= 0)
+            // AddOrdered stores oldest-first (its comparator contract is the
+            // reverse of List.Sort). ConversationItems reverses this for the
+            // rotated panel. Insert BEFORE the first incoming unread message.
+            int unreadIndex = MessagesService.FindUnreadDividerIndex(this._messages.Select(m => m.Message).ToList());
+            if (unreadIndex < 0)
                 return;
             MessageViewModel messageViewModel = new MessageViewModel(new Message()
             {
+                date = this._messages[unreadIndex].Message.date,
                 action = ConversationViewModel.UNREAD_ITEM_ACTION
             });
-            if (this._messages.Count < num)
-                return;
-            this._messages.Insert(this._messages.Count - num, messageViewModel);
+            this._messages.Insert(unreadIndex, messageViewModel);
         }
 
         public void RemoveUnreadMessagesItem()
@@ -819,23 +881,34 @@ namespace VKMessenger.Library
             this._messages.Remove(messageViewModel);
         }
 
+        public void MarkVisibleMessagesAsRead() { this.SetReadStatusIfNeeded(); }
+
         private void SetReadStatusIfNeeded()
         {
-            List<Message> listToBeMarkedAsRead = new List<Message>();
-            foreach (MessageViewModel message1 in (Collection<MessageViewModel>)this.Messages)
-            {
-                Message message2 = message1.Message;
-                if (message2 != null && message2.read_state == 0 && (message2.@out == 0 || (long)message2.user_id == AppGlobalStateManager.Current.LoggedInUserId))
-                    listToBeMarkedAsRead.Add(message2);
-            }
+            if (!this.IsOnScreen || this.VisibleMessages == null || this._markingVisibleRead || this._isBusyLoadingMessages || DateTime.UtcNow < this._nextVisibleReadAttempt) return;
+            List<Message> listToBeMarkedAsRead = this.VisibleMessages().Where(m => m != null && m.mid > 0 && m.read_state == 0 && m.@out == 0).Distinct().ToList();
             if (listToBeMarkedAsRead.Count <= 0)
                 return;
-            BackendServices.MessagesService.MarkAsRead(listToBeMarkedAsRead.Select<Message, long>((Func<Message, long>)(m => (long)m.mid)).ToList<long>(), this.IsChat ? this.UserOrCharId + 2000000000L : this.UserOrCharId, (Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>>)(res =>
+            this._markingVisibleRead = true;
+            long owner = AppGlobalStateManager.Current.LoggedInUserId;
+            string origin = VKClient.Common.OpenVKInstanceManager.Current.ApiOrigin;
+            BackendServices.MessagesService.MarkAsRead(listToBeMarkedAsRead.Select<Message, long>((Func<Message, long>)(m => (long)m.mid)).ToList<long>(), this.IsChat ? this.UserOrCharId + 2000000000L : this.UserOrCharId, (Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>>)(res => Execute.ExecuteOnUIThread(() =>
             {
+                this._markingVisibleRead = false;
+                if (owner != AppGlobalStateManager.Current.LoggedInUserId || origin != VKClient.Common.OpenVKInstanceManager.Current.ApiOrigin) return;
                 if (res.ResultCode != ResultCode.Succeeded)
+                {
+                    this._nextVisibleReadAttempt = DateTime.UtcNow.AddSeconds(5);
                     return;
-                Execute.ExecuteOnUIThread((Action)(() => listToBeMarkedAsRead.ForEach((Action<Message>)(m => m.read_state = 1))));
-            }));
+                }
+                long lastId = listToBeMarkedAsRead.Max(m => (long)m.mid);
+                foreach (var item in this.Messages.Where(m => m.Message.@out == 0 && m.Message.read_state == 0 && m.Message.mid > 0 && m.Message.mid <= lastId))
+                {
+                    item.Message.read_state = 1;
+                    item.RefreshUIProperties();
+                }
+                ConversationsViewModel.Instance.RefreshUnreadCount(this.UserOrCharId, this.IsChat);
+            })));
         }
 
         public void Write(BinaryWriter writer)
@@ -915,6 +988,8 @@ namespace VKMessenger.Library
             List<MessageViewModel> newOrRestoredMessages = new List<MessageViewModel>();
             List<long> readMessages = new List<long>();
             List<long> deletedMessagesIds = new List<long>();
+            List<LongPollServerUpdateData> readRanges = new List<LongPollServerUpdateData>();
+            List<Message> editedMessages = new List<Message>();
             bool atLeastOneNewMessage = false;
             bool flag = false;
             foreach (LongPollServerUpdateData update1 in updates)
@@ -922,6 +997,10 @@ namespace VKMessenger.Library
                 LongPollServerUpdateData update = update1;
                 if (this._userOrChatId == (update.isChat ? update.chat_id : update.user_id) && update.isChat == this.IsChat)
                 {
+                    if (update.UpdateType == LongPollServerUpdateType.IncomingMessagesRead || update.UpdateType == LongPollServerUpdateType.OutgoingMessagesRead)
+                        readRanges.Add(update);
+                    if (update.UpdateType == LongPollServerUpdateType.MessageHasBeenEdited && update.message != null)
+                        editedMessages.Add(update.message);
                     if ((update.UpdateType == LongPollServerUpdateType.MessageHasBeenAdded || update.UpdateType == LongPollServerUpdateType.MessageHasBeenRestored) && (update.user != null && update.message != null))
                     {
                         this.EnsureUserAndChatIdSet(update.message);
@@ -929,7 +1008,7 @@ namespace VKMessenger.Library
                         if (update.UpdateType == LongPollServerUpdateType.MessageHasBeenAdded)
                         {
                             atLeastOneNewMessage = true;
-                            flag = this.IsChat && (this.IsKickedFromChat || update.message.action == "chat_photo_update" || update.message.action == "chat_photo_remove");
+                            flag = flag || this.IsChat && (this.IsKickedFromChat || update.message.action == "chat_photo_update" || update.message.action == "chat_photo_remove" || update.message.action == "chat_title_update");
                         }
                     }
                     if (update.UpdateType == LongPollServerUpdateType.MessageHasBeenRead)
@@ -960,7 +1039,7 @@ namespace VKMessenger.Library
                     }
                 }
             }
-            if (newOrRestoredMessages.Count <= 0 && readMessages.Count <= 0 && deletedMessagesIds.Count <= 0)
+            if (newOrRestoredMessages.Count <= 0 && readMessages.Count <= 0 && deletedMessagesIds.Count <= 0 && readRanges.Count == 0 && editedMessages.Count == 0)
                 return;
             int delayInMilliseconds = 0;
             List<MessageViewModel> source = newOrRestoredMessages;
@@ -971,17 +1050,40 @@ namespace VKMessenger.Library
             {
                 double num1 = this._scroll == null ? 0.0 : this._scroll.VerticalOffset;
                 Logger.Instance.Info("Applying new messages");
+                foreach (LongPollServerUpdateData range in readRanges)
+                    if (range.UpdateType == LongPollServerUpdateType.OutgoingMessagesRead)
+                        this._outgoingReadCmid = Math.Max(this._outgoingReadCmid, range.message_id);
+                    else
+                        this._incomingReadCmid = Math.Max(this._incomingReadCmid, range.message_id);
+                foreach (Message edited in editedMessages)
+                {
+                    MessageViewModel old = this._messages.FirstOrDefault(m => m.Message.id == edited.id);
+                    if (old != null)
+                    {
+                        int index = this._messages.IndexOf(old);
+                        this.EnsureUserAndChatIdSet(edited);
+                        edited.MergeReadState(old.Message);
+                        this._messages[index] = new MessageViewModel(edited) { IsInSelectionMode = this.IsInSelectionMode, IsSelected = old.IsSelected };
+                    }
+                }
                 if (this._skipped == 0)
                 {
                     foreach (MessageViewModel messageViewModel in newOrRestoredMessages)
                     {
                         MessageViewModel newMessage = messageViewModel;
+                        MessageViewModel pending = this._messages.FirstOrDefault(m => m.Message.id == newMessage.Message.id ||
+                            (m.OutboundMessageVM != null && newMessage.Message.random_id != 0 && m.OutboundMessageVM.RandomId == newMessage.Message.random_id));
+                        if (pending != null)
+                        {
+                            pending.Message.MergeReadState(newMessage.Message);
+                            pending.RefreshUIProperties();
+                        }
                         if (!this._messages.Any<MessageViewModel>((Func<MessageViewModel, bool>)(mes =>
                         {
                             if (mes.Message.mid == newMessage.Message.mid || mes.OutboundMessageVM != null && mes.OutboundMessageVM.DeliveredMessageId == (long)newMessage.Message.mid)
                                 return true;
-                            if (mes.SendStatus == OutboundMessageStatus.SendingNow)
-                                return mes.Message.body == newMessage.Message.body;
+                            if (mes.SendStatus == OutboundMessageStatus.SendingNow && mes.OutboundMessageVM != null && newMessage.Message.random_id != 0)
+                                return mes.OutboundMessageVM.RandomId == newMessage.Message.random_id;
                             return false;
                         })))
                         {
@@ -999,12 +1101,12 @@ namespace VKMessenger.Library
                     }
                     if (newOrRestoredMessages.Count > 0 && this.IsOnScreen)
                     {
-                        this.RemoveUnreadMessagesItem();
                         this.SetReadStatusIfNeeded();
                     }
                     if (!this.IsOnScreen)
                         this.EnsureUnreadItem();
                 }
+                this.ApplyReadBoundaries();
                 foreach (long num2 in readMessages)
                 {
                     long readMessageId = num2;
@@ -1031,10 +1133,19 @@ namespace VKMessenger.Library
             this.LoadHeaderInfoAsync();
         }
 
-        internal void DeleteDialog()
+        internal void DeleteDialog(Action callback = null)
         {
-            BackendServices.MessagesService.DeleteDialog(this._userOrChatId, this._isChat, (Action<BackendResult<VKClient.Audio.Base.ResponseWithId, ResultCode>>)(res => { }));
-            this.Messages.Clear();
+            BackendServices.MessagesService.DeleteDialog(this._userOrChatId, this._isChat, res => Execute.ExecuteOnUIThread(() =>
+            {
+                if (res.ResultCode != ResultCode.Succeeded)
+                {
+                    GenericInfoUC.ShowBasedOnResult((int)res.ResultCode, "", null);
+                    return;
+                }
+                this.Messages.Clear();
+                if (callback != null)
+                    callback();
+            }));
         }
 
         internal void EnsureConversationIsUpToDate(bool force, long startMessageId = 0, Action<bool> callback = null)
@@ -1058,18 +1169,19 @@ namespace VKMessenger.Library
             if (this._changingNotifications)
                 return;
             this._changingNotifications = true;
+            bool disable = !this.AreNotificationsDisabled;
             string notificationsUri = AppGlobalStateManager.Current.GlobalState.NotificationsUri;
-            if (!string.IsNullOrEmpty(notificationsUri))
+            if (this._userOrChatId != 0)
             {
                 this.SetInProgress(true, "");
-                AccountService.Instance.SetSilenceMode(notificationsUri, this.AreNotificationsDisabled ? 0 : -1, (Action<BackendResult<object, ResultCode>>)(res =>
+                AccountService.Instance.SetSilenceMode(notificationsUri, disable ? -1 : 0, (Action<BackendResult<object, ResultCode>>)(res => Execute.ExecuteOnUIThread(() =>
                 {
                     this._changingNotifications = false;
                     this.SetInProgress(false, "");
                     if (res.ResultCode == ResultCode.Succeeded)
-                        this.AreNotificationsDisabled = !this.AreNotificationsDisabled;
+                        this.AreNotificationsDisabled = disable;
                     resultCallback(res.ResultCode == ResultCode.Succeeded);
-                }), this._isChat ? this._userOrChatId : 0, !this._isChat ? this._userOrChatId : 0L);
+                })), this._isChat ? this._userOrChatId : 0, !this._isChat ? this._userOrChatId : 0L);
             }
             else
             {
@@ -1163,7 +1275,14 @@ namespace VKMessenger.Library
         {
             if (message.ChatId != this.UserOrCharId || !this.IsChat)
                 return;
-            this.AreNotificationsDisabled = message.AreNotificationsDisabled;
+            if (this._chat == null) return;
+            if (message.IsChatMetadataChange)
+            {
+                this._chat.title = message.Title;
+                this._chat.photo_200 = message.Photo;
+            }
+            else if (message.PushSettings != null) this._chat.push_settings = message.PushSettings;
+            else this.AreNotificationsDisabled = message.AreNotificationsDisabled;
             this.RefreshUIPropertiesSafe();
         }
 

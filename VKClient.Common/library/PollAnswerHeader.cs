@@ -58,7 +58,7 @@ namespace VKClient.Common.Library
     {
       get
       {
-        if (!this._pollVM.Voted || this._pollVM.AnswerId != this.Answer.id)
+        if (!this._pollVM.Voted || !this._pollVM.Poll.answer_ids.Contains(this.Answer.id))
           return Visibility.Collapsed;
         return Visibility.Visible;
       }

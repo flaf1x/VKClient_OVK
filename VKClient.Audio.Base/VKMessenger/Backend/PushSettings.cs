@@ -5,19 +5,23 @@ namespace VKMessenger.Backend
 {
   public class PushSettings
   {
+    public PushSettings() { sound = 1; }
     public int disabled_until { get; set; }
 
     public int sound { get; set; }
+
+    public bool disabled_forever { get; set; }
+    public bool no_sound { get; set; }
 
     public bool AreDisabledNow
     {
       get
       {
-        if (this.disabled_until == -1)
+        if (this.disabled_forever || this.disabled_until == -1)
           return true;
         if (this.disabled_until > 0)
           return ExtensionsBase.DateTimeToUnixTimestamp(DateTime.UtcNow, true) < this.disabled_until;
-        return false;
+        return this.no_sound || this.sound == 0;
       }
     }
   }

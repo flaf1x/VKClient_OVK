@@ -230,10 +230,7 @@ namespace VKClient.Common.Library.Posts
 
     private static string ComposeAttachmentId(long ownerId, long id, string accessKey)
     {
-      string str0 = string.Format("photo{0}_{1}", ownerId, id);
-      if (ownerId != AppGlobalStateManager.Current.LoggedInUserId && !string.IsNullOrEmpty(accessKey))
-        str0 = string.Concat(str0, string.Format("_{0}", accessKey));
-      return str0;
+      return Photo.ComposeAttachmentId(ownerId, id, accessKey);
     }
 
     public override void Upload(Action completionCallback, Action<double> progressCallback = null)

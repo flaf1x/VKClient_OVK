@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using System;
+using VKClient.Common;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -30,7 +31,33 @@ namespace VKClient.Audio.Base.BackendServices
     {
       if (buyParams == null || buyParams.ProductType != StoreProductType.stickers)
         return;
-      this.FulfillPurchases( null, (Action) (() => this.DoBuyProduct(buyParams, successCallback, errorCallback)), errorCallback);
+      // Re-read the server price; never buy a paid pack without a matching
+      // explicit OpenVK coin confirmation, including after a price change.
+      VKRequestsDispatcher.DispatchRequestToVK<VKList<StoreProduct>>("store.getProducts",
+        new Dictionary<string, string>() { { "type", "stickers" }, { "product_ids", buyParams.ProductId.ToString() } },
+        products =>
+        {
+          StoreProduct product = products.ResultCode == ResultCode.Succeeded && products.ResultData != null && products.ResultData.items != null
+            ? products.ResultData.items.FirstOrDefault(p => p.id == buyParams.ProductId) : null;
+          if (!CanBuyOpenVKProduct(product, buyParams.ConfirmedOpenVKPrice))
+          {
+            if (errorCallback != null)
+              errorCallback(new BackendResult<StorePurchaseResult, ResultCode>(ResultCode.UnknownError, StorePurchaseResult.GetForFailedPurchaseState()));
+            return;
+          }
+          VKRequestsDispatcher.DispatchRequestToVK<StoreBuyProductResult>("store.buy",
+            new Dictionary<string, string>() { { "product_id", buyParams.ProductId.ToString() } }, result =>
+            {
+              if (result.ResultCode == ResultCode.Succeeded && result.ResultData != null && result.ResultData.success == 1)
+              {
+                product.purchased = product.active = 1;
+                result.ResultData.product = product;
+                if (successCallback != null) successCallback(result);
+              }
+              else if (errorCallback != null)
+                errorCallback(new BackendResult<StorePurchaseResult, ResultCode>(result.ResultCode == ResultCode.Succeeded ? ResultCode.UnknownError : result.ResultCode, StorePurchaseResult.GetForFailedPurchaseState()));
+            });
+        });
     }
 
     private void DoBuyProduct(StoreBuyProductParams buyParams, Action<BackendResult<StoreBuyProductResult, ResultCode>> successCallback, Action<BackendResult<StorePurchaseResult, ResultCode>> errorCallback)
@@ -264,16 +291,47 @@ namespace VKClient.Audio.Base.BackendServices
 
     public void GetStickersStoreCatalog(long purchaseFor, Action<BackendResult<StoreCatalog, ResultCode>> callback)
     {
-      Dictionary<string, string> parameters = new Dictionary<string, string>()
+      VKRequestsDispatcher.Execute<StoreCatalog>(
+        "var all = API.store.getStockItems({\"type\":\"stickers\",\"section\":\"all\",\"count\":200,\"extended\":1});" +
+        "var popular = API.store.getStockItems({\"type\":\"stickers\",\"section\":\"popular\",\"count\":200,\"extended\":1});" +
+        "var free = API.store.getStockItems({\"type\":\"stickers\",\"section\":\"free\",\"count\":200,\"extended\":1});" +
+        "var products = API.store.getProducts({\"type\":\"stickers\",\"filters\":\"active\",\"count\":200,\"extended\":1});" +
+        "return {\"banners\":[],\"sections\":[{\"name\":\"new\",\"title\":\"Каталог\",\"stickers\":all},{\"name\":\"popular\",\"title\":\"Популярные\",\"stickers\":popular},{\"name\":\"free\",\"title\":\"Бесплатные\",\"stickers\":free}],\"Products\":products,\"StockItems\":all};",
+        callback, json => MergeOwnedProducts(Newtonsoft.Json.Linq.JObject.Parse(json)["response"].ToObject<StoreCatalog>()));
+    }
+
+    public static bool CanBuyOpenVKProduct(StoreProduct product, int? confirmedPrice)
+    {
+      return product != null && product.votes >= 0 && (product.votes == 0 || confirmedPrice == product.votes);
+    }
+
+    public static StockItem StockItemForProduct(StoreProduct product)
+    {
+      return new StockItem { product = product, can_purchase = product.purchased == 0 ? 1 : 0, free = product.votes == 0 ? 1 : 0,
+        author = product.author, description = product.description, price = product.votes,
+        price_str = product.votes == 0 ? "Бесплатно" : product.votes + " монет OpenVK",
+        photo_35 = product.photo_140, photo_70 = product.photo_140, photo_140 = product.photo_140,
+        photo_296 = product.photo_140, photo_592 = product.photo_140,
+        demo_photos_560 = product.stickers == null || product.stickers.sticker_ids == null ? new List<string>() :
+          product.stickers.sticker_ids.Take(48).Select(id => product.is_animated
+            ? new Uri(new Uri(product.base_url), "/sticker/" + product.id + "/" + id + "_512.json").AbsoluteUri
+            : product.stickers.base_url + id + "/256b.png").ToList() };
+    }
+
+    public static StoreCatalog MergeOwnedProducts(StoreCatalog catalog)
+    {
+      if (catalog == null) return null;
+      if (catalog.StockItems == null) catalog.StockItems = new VKList<StockItem>();
+      if (catalog.StockItems.items == null) catalog.StockItems.items = new List<StockItem>();
+      foreach (StoreProduct product in catalog.Products == null || catalog.Products.items == null
+        ? new List<StoreProduct>() : catalog.Products.items)
       {
-        {
-          "func_v",
-          "3"
-        }
-      };
-      if (purchaseFor > 0L)
-        parameters["purchase_for"] = purchaseFor.ToString();
-      VKRequestsDispatcher.DispatchRequestToVK<StoreCatalog>("execute.getStickersStoreCatalog", parameters, callback,  null, false, true, new CancellationToken?(),  null);
+        StockItem item = catalog.StockItems.items.FirstOrDefault(s => s.product != null && s.product.id == product.id);
+        if (item == null) catalog.StockItems.items.Add(StockItemForProduct(product));
+        else item.product = product;
+      }
+      catalog.StockItems.count = catalog.StockItems.items.Count;
+      return catalog;
     }
 
     public void GetBalanceData(Action<BackendResult<BalanceData, ResultCode>> callback)
@@ -329,6 +387,10 @@ namespace VKClient.Audio.Base.BackendServices
         },
         {
           "all_products",
+          "0"
+        },
+        {
+          "need_stickers",
           "1"
         }
       }, callback,  null, false, true, new CancellationToken?(),  null);
@@ -336,44 +398,25 @@ namespace VKClient.Audio.Base.BackendServices
 
     public void GetStockItemByStickerId(long stickerId, Action<BackendResult<StockItem, ResultCode>> callback, CancellationToken? cancellationToken = null)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<StockItem>("store.getStockItemByStickerId", new Dictionary<string, string>()
-      {
-        {
-          "sticker_id",
-          stickerId.ToString()
-        },
-        {
-          "merchant",
-          "microsoft"
-        },
-        {
-          "no_inapp",
-          "1"
-        }
-      }, callback,  null, false, true, cancellationToken,  null);
+      this.FindStockItem(item => item.product != null && item.product.stickers != null &&
+        item.product.stickers.sticker_ids != null && item.product.stickers.sticker_ids.Contains((int)stickerId), callback);
     }
 
     public void GetStockItemByName(string name, Action<BackendResult<StockItem, ResultCode>> callback, CancellationToken? cancellationToken = null)
     {
-      VKRequestsDispatcher.DispatchRequestToVK<StockItem>("store.getStockItemByName", new Dictionary<string, string>()
+      this.FindStockItem(item => item.product != null &&
+        (string.Equals(item.product.title, name, StringComparison.OrdinalIgnoreCase) || item.product.id.ToString() == name), callback);
+    }
+
+    private void FindStockItem(Func<StockItem, bool> predicate, Action<BackendResult<StockItem, ResultCode>> callback)
+    {
+      GetStickersStoreCatalog(0, result =>
       {
-        {
-          "type",
-          "stickers"
-        },
-        {
-          "name",
-          name
-        },
-        {
-          "merchant",
-          "microsoft"
-        },
-        {
-          "no_inapp",
-          "1"
-        }
-      }, callback,  null, false, true, cancellationToken,  null);
+        StockItem item = result.ResultData == null || result.ResultData.StockItems == null || result.ResultData.StockItems.items == null
+          ? null : result.ResultData.StockItems.items.FirstOrDefault(predicate);
+        callback(new BackendResult<StockItem, ResultCode>(item != null ? ResultCode.Succeeded :
+          (result.ResultCode == ResultCode.Succeeded ? ResultCode.UnknownError : result.ResultCode), item));
+      });
     }
 
     public void GetStockItems(StoreProductType productType, List<long> productIds = null, List<StoreProductFilter> productFilters = null, long purchaseForId = 0, Action<BackendResult<VKList<StockItem>, ResultCode>> callback = null)
@@ -399,6 +442,18 @@ namespace VKClient.Audio.Base.BackendServices
         parameters["filters"] = string.Join(",", productFilters.Select<StoreProductFilter, string>((Func<StoreProductFilter, string>) (filter => filter.ToString().ToLowerInvariant())));
       if (purchaseForId > 0L)
         parameters["purchase_for"] = purchaseForId.ToString();
+      parameters["count"] = "200";
+      if (productType == StoreProductType.stickers && ((productIds != null && productIds.Count > 0) || (productFilters != null && productFilters.Count > 0)))
+      {
+        VKRequestsDispatcher.DispatchRequestToVK<VKList<StoreProduct>>("store.getProducts", parameters, result =>
+        {
+          var items = result.ResultData == null || result.ResultData.items == null ? new List<StockItem>() :
+            result.ResultData.items.Select(StockItemForProduct).ToList();
+          if (callback != null) callback(new BackendResult<VKList<StockItem>, ResultCode>(result.ResultCode,
+            new VKList<StockItem> { items = items, count = items.Count }));
+        });
+        return;
+      }
       VKRequestsDispatcher.DispatchRequestToVK<VKList<StockItem>>("store.getStockItems", parameters, callback,  null, false, true, new CancellationToken?(),  null);
     }
 
@@ -459,7 +514,8 @@ namespace VKClient.Audio.Base.BackendServices
       };
       if (productFilters != null && productFilters.Count > 0)
         parameters["filters"] = string.Join(",", productFilters.Select<StoreProductFilter, string>((Func<StoreProductFilter, string>) (filter => filter.ToString().ToLowerInvariant())));
-      VKRequestsDispatcher.DispatchRequestToVK<ProductsWithStockItems>("execute.getProductsWithStockItems", parameters, (Action<BackendResult<ProductsWithStockItems, ResultCode>>) (result =>
+      parameters["code"] = "return {\"products\":API.store.getProducts(" + JsonConvert.SerializeObject(parameters) + "),\"stockItems\":API.store.getStockItems({\"type\":\"stickers\",\"section\":\"all\",\"count\":200,\"extended\":1})};";
+      VKRequestsDispatcher.DispatchRequestToVK<ProductsWithStockItems>("execute", parameters, (Action<BackendResult<ProductsWithStockItems, ResultCode>>) (result =>
       {
         List<StockItem> resultData1 = new List<StockItem>();
         if (result.ResultCode == ResultCode.Succeeded)
@@ -474,8 +530,11 @@ namespace VKClient.Audio.Base.BackendServices
               {
                 StoreProduct product = storeProduct;
                 StockItem stockItem = resultData2.stockItems.items.FirstOrDefault<StockItem>((Func<StockItem, bool>) (i => i.product.id == product.id));
-                if (stockItem != null)
-                  resultData1.Add(stockItem);
+                if (stockItem == null)
+                  stockItem = StockItemForProduct(product);
+                else
+                  stockItem.product = product;
+                resultData1.Add(stockItem);
               }
             }
           }

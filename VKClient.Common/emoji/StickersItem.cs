@@ -14,7 +14,7 @@ namespace VKClient.Common.Emoji
 {
   public class StickersItem : VirtualizableItemBase, ISupportOrientationChange
   {
-    private readonly List<Image> _images = new List<Image>();
+    private readonly List<StickerImage> _images = new List<StickerImage>();
     private readonly double _verticalWidth;
     private readonly double _horizontalWidth;
     private bool _isHorizontal;
@@ -96,7 +96,7 @@ namespace VKClient.Common.Emoji
         foreach (StickerItemData stickerItemData1 in stickerItemDataList)
         {
           double num3 = num2 + 12.0;
-          Image image1 = new Image();
+          StickerImage image1 = new StickerImage();
           double num4 = num1;
           ((FrameworkElement) image1).Width = num4;
           double fixedHeight = this._fixedHeight;
@@ -107,7 +107,7 @@ namespace VKClient.Common.Emoji
           ((FrameworkElement) image1).Margin = thickness;
           StickerItemData stickerItemData2 = stickerItemData1;
           ((FrameworkElement) image1).Tag = stickerItemData2;
-          Image image2 = image1;
+          StickerImage image2 = image1;
           Interaction.GetBehaviors((DependencyObject) image2).Add((Behavior) new PreviewBehavior()
           {
             PreviewUri = (ScaleFactor.GetRealScaleFactor() == 100 ? stickerItemData1.LocalPathBig : stickerItemData1.LocalPathExtraBig)
@@ -119,16 +119,16 @@ namespace VKClient.Common.Emoji
         this._recreateImages = false;
       }
       int index = 0;
-      using (List<Image>.Enumerator enumerator = this._images.GetEnumerator())
+      using (List<StickerImage>.Enumerator enumerator = this._images.GetEnumerator())
       {
         while (enumerator.MoveNext())
         {
-          Image current = enumerator.Current;
+          StickerImage current = enumerator.Current;
           if (index < stickerItemDataList.Count)
           {
             StickerItemData stickerItemData = stickerItemDataList[index];
             VeryLowProfileImageLoader.AllowBoostLoading = true;
-            ImageLoader.SetUriSource(current, stickerItemData.LocalPath);
+            ((StickerImage)current).SourceUri = stickerItemData.LocalPath;
           }
           ++index;
           this.Children.Add((FrameworkElement) current);
@@ -139,10 +139,10 @@ namespace VKClient.Common.Emoji
     protected override void ReleaseResourcesOnUnload()
     {
       base.ReleaseResourcesOnUnload();
-      using (List<Image>.Enumerator enumerator = this._images.GetEnumerator())
+      using (List<StickerImage>.Enumerator enumerator = this._images.GetEnumerator())
       {
         while (enumerator.MoveNext())
-          ImageLoader.SetUriSource(enumerator.Current,  null);
+          ((StickerImage)enumerator.Current).SourceUri = null;
       }
     }
 

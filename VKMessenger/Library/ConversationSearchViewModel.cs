@@ -57,6 +57,7 @@ namespace VKMessenger.Library
 
         public void SearchConversations(string query)
         {
+            this._localConversationsQuery = (query ?? "").Trim();
             if (string.IsNullOrWhiteSpace(query))
             {
                 this.Conversations.Clear();
@@ -70,12 +71,13 @@ namespace VKMessenger.Library
                 if (this.CachedConversations.ContainsKey(index))
                     this.Conversations = new ObservableCollection<SearchConversationHeader>(this.CachedConversations[index]);
                 else
-                    this.SearchConversationsLocally(index);
+                    this.SearchConversationsOnline(index);
             }
         }
 
         public void SearchMessages(string query)
         {
+            this._localMessagesQuery = (query ?? "").Trim();
             if (string.IsNullOrWhiteSpace(query))
             {
                 this.Messages.Clear();
@@ -88,10 +90,7 @@ namespace VKMessenger.Library
                 this.Messages.Clear();
                 this._loadedMessages = 0;
                 this._availableMessages = 0;
-                if (this.CachedMessages.ContainsKey(index))
-                    this.Messages = new ObservableCollection<ConversationHeader>(this.CachedMessages[index]);
-                else
-                    this.SearchMessagesLocally(index);
+                this.SearchMessages(index, 0, null);
             }
         }
 
@@ -128,6 +127,8 @@ namespace VKMessenger.Library
 
         private void SearchConversationsOnline(string query)
         {
+            if (string.IsNullOrWhiteSpace(query))
+                return;
             if (this._isLoadingConversations)
                 return;
             this._isLoadingConversations = true;
@@ -182,6 +183,8 @@ namespace VKMessenger.Library
 
         private void SearchMessages(string query, int count, Action callback = null)
         {
+            if (string.IsNullOrWhiteSpace(query))
+                return;
             if (this._isLoadingMessages)
                 return;
             this._isLoadingMessages = true;
@@ -192,7 +195,7 @@ namespace VKMessenger.Library
                 if (string.Compare(this._localMessagesQuery, query) != 0)
                 {
                     this._isLoadingMessages = false;
-                    this.SearchMessages(this._localMessagesQuery, count, callback);
+                    this.SearchMessages(this._localMessagesQuery, 0, callback);
                 }
                 else if (res.ResultCode == ResultCode.Succeeded)
                 {
@@ -200,14 +203,16 @@ namespace VKMessenger.Library
                     if (string.Compare(this._localMessagesQuery, query) != 0)
                     {
                         this._isLoadingMessages = false;
-                        this.SearchMessages(this._localMessagesQuery, count, callback);
+                        this.SearchMessages(this._localMessagesQuery, 0, callback);
                     }
                     else
                     {
                         this._availableMessages = res.ResultData.TotalCount;
-                        this._loadedMessages = this._loadedMessages + VKConstants.DefaultSearchMessagesCount;
+                        this._loadedMessages = count + res.ResultData.Messages.Count;
                         ((DependencyObject)Deployment.Current).Dispatcher.BeginInvoke((Action)(() =>
                         {
+                            if (query != this._localMessagesQuery)
+                                return;
                             foreach (ConversationHeader conversationHeader in ConversationsViewModel.GetConversationHeaders(res.ResultData.DialogHeaders, res.ResultData.Users))
                                 this.Messages.Add(conversationHeader);
                             if (callback == null)
@@ -245,11 +250,11 @@ namespace VKMessenger.Library
                             dialog._associatedUsers = source.ToList<User>();
                         }
                         IntermediateStorage.ForEach((Action<SearchConversationHeader>)(i => i.RefreshUIProperties(false)));
-                        this.CachedConversations.Add(query, IntermediateStorage);
+                        this.CachedConversations[query] = IntermediateStorage;
                         ((DependencyObject)Deployment.Current).Dispatcher.BeginInvoke((Action)(() => this.Conversations = new ObservableCollection<SearchConversationHeader>(IntermediateStorage)));
                     }
                     else
-                        Logger.Instance.Error("Failed to get user profiles");
+                        Execute.ExecuteOnUIThread(() => this.Conversations = new ObservableCollection<SearchConversationHeader>(IntermediateStorage));
                     this._isLoadingConversations = false;
                 }
             }));

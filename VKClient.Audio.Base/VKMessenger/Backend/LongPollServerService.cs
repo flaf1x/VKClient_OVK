@@ -12,7 +12,7 @@ namespace VKMessenger.Backend
 {
   public class LongPollServerService : ILongPollServerService
   {
-    private readonly string _getUpdatesURIFrm = "{0}?act=a_check&key={1}&ts={2}&wait=25&mode=66&version=1";
+    private readonly string _getUpdatesURIFrm = "{0}{1}act=a_check&key={2}&ts={3}&wait=25&mode=66&version=2";
     private static LongPollServerService _instance;
 
     public static LongPollServerService Instance
@@ -29,6 +29,7 @@ namespace VKMessenger.Backend
     {
       Dictionary<string, string> parameters = new Dictionary<string, string>();
       parameters["use_ssl"] = "1";
+      parameters["lp_version"] = "2";
       VKRequestsDispatcher.DispatchRequestToVK<LongPollServerResponse>("messages.getLongPollServer", parameters, callback, new Func<string, LongPollServerResponse>(this.GetLongPollResponseForJson), false, false, new CancellationToken?(),  null);
     }
 
@@ -44,22 +45,46 @@ namespace VKMessenger.Backend
       if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out absoluteServer))
         serverUrl = "https://" + serverUrl.TrimStart('/');
       serverUrl = serverUrl.TrimEnd('/');
-      JsonWebRequest.SendHTTPRequestAsync(string.Format(this._getUpdatesURIFrm, serverUrl, key, ts), (Action<JsonResponseData>) (jsonResp =>
+      // Silverlight can reuse an empty GET response when ts has not changed.
+      // A unique URL forces the next check to reach the long-poll server.
+      string pollUrl = string.Format(this._getUpdatesURIFrm, serverUrl, serverUrl.Contains("?") ? "&" : "?", Uri.EscapeDataString(key ?? ""), ts)
+        + "&_=" + Guid.NewGuid().ToString("N");
+      JsonWebRequest.SendHTTPRequestAsync(pollUrl, (Action<JsonResponseData>) (jsonResp =>
       {
         BackendResult<UpdatesResponse, LongPollResultCode> backendResult = new BackendResult<UpdatesResponse, LongPollResultCode>();
         if (!jsonResp.IsSucceeded || string.IsNullOrWhiteSpace(jsonResp.JsonString))
           backendResult.ResultCode = LongPollResultCode.CommunicationFailed;
-        else if (this.ServerReturnedFailure(jsonResp.JsonString))
-        {
-          backendResult.ResultCode = LongPollResultCode.RequireNewPollServer;
-        }
         else
         {
-          backendResult.ResultCode = LongPollResultCode.Succeeded;
-          LongPollServerService.RootObjectGetUpdates objectGetUpdates = JsonConvert.DeserializeObject<LongPollServerService.RootObjectGetUpdates>(jsonResp.JsonString);
-          backendResult.ResultData = new UpdatesResponse();
-          backendResult.ResultData.ts = (long) objectGetUpdates.ts;
-          backendResult.ResultData.Updates = this.ReadUpdatesResponseFromRaw(objectGetUpdates.updates, new Func<List<object>, LongPollServerUpdateData>(this.GetUpdateDataForNewMessageLongPollData));
+          try
+          {
+            JObject root = JObject.Parse(jsonResp.JsonString);
+            int failed = (int?)root["failed"] ?? 0;
+            if (failed == 1 && root["ts"] != null)
+            {
+              backendResult.ResultCode = LongPollResultCode.Succeeded;
+              backendResult.ResultData = new UpdatesResponse() { ts = (long)root["ts"], Updates = new List<LongPollServerUpdateData>()
+              {
+                new LongPollServerUpdateData() { UpdateType = LongPollServerUpdateType.SynchronizationRequired }
+              } };
+            }
+            else if (failed != 0)
+              backendResult.ResultCode = LongPollResultCode.RequireNewPollServer;
+            else if (root["ts"] == null || !(root["updates"] is JArray))
+              backendResult.ResultCode = LongPollResultCode.CommunicationFailed;
+            else
+            {
+              RootObjectGetUpdates response = root.ToObject<RootObjectGetUpdates>();
+              backendResult.ResultCode = LongPollResultCode.Succeeded;
+              backendResult.ResultData = new UpdatesResponse() { ts = response.ts,
+                Updates = this.ReadUpdatesResponseFromRaw(response.updates, this.GetUpdateDataForNewMessageLongPollData) };
+            }
+          }
+          catch (Exception ex)
+          {
+            Logger.Instance.Error("Invalid long poll response", ex);
+            backendResult.ResultCode = LongPollResultCode.CommunicationFailed;
+          }
         }
         callback(backendResult);
       }),  null);
@@ -72,8 +97,10 @@ namespace VKMessenger.Backend
       {
         foreach (List<object> rawUpdate in rawUpdates)
         {
-          if (rawUpdate != null)
+          if (rawUpdate != null && rawUpdate.Count > 0)
           {
+            try
+            {
             int num1 = int.Parse(rawUpdate.First<object>().ToString());
             if (num1 == 80)
             {
@@ -98,12 +125,13 @@ namespace VKMessenger.Backend
                 Platform = num2
               });
             }
-            if (num1 == 6)
+            if (num1 == 6 || num1 == 7)
             {
               long num2 = long.Parse(rawUpdate[1].ToString());
               LongPollServerUpdateData serverUpdateData = new LongPollServerUpdateData()
               {
-                UpdateType = LongPollServerUpdateType.IncomingMessagesRead
+                UpdateType = num1 == 6 ? LongPollServerUpdateType.IncomingMessagesRead : LongPollServerUpdateType.OutgoingMessagesRead,
+                isChat = num2 >= 2000000000L
               };
               if (num2 >= 2000000000L)
                 serverUpdateData.chat_id = num2 - 2000000000L;
@@ -112,11 +140,15 @@ namespace VKMessenger.Backend
               serverUpdateData.message_id = long.Parse(rawUpdate[2].ToString());
               serverUpdateDataList1.Add(serverUpdateData);
             }
-            if (num1 == 4)
+            if (num1 == 4 || num1 == 5)
             {
               LongPollServerUpdateData serverUpdateData = getUpdatesForNewMessageFunc(rawUpdate);
               if (serverUpdateData != null)
+              {
+                if (num1 == 5)
+                  serverUpdateData.UpdateType = LongPollServerUpdateType.MessageHasBeenEdited;
                 serverUpdateDataList1.Add(serverUpdateData);
+              }
             }
             if (num1 == 3)
             {
@@ -191,6 +223,19 @@ namespace VKMessenger.Backend
                 user_id = num2
               });
             }
+            if (num1 == 114 && rawUpdate.Count >= 4)
+            {
+              long peer = long.Parse(rawUpdate[1].ToString());
+              serverUpdateDataList1.Add(new LongPollServerUpdateData {
+                UpdateType = LongPollServerUpdateType.NotificationSettingsChanged,
+                isChat = peer >= 2000000000L,
+                chat_id = peer >= 2000000000L ? peer - 2000000000L : 0,
+                user_id = peer < 2000000000L ? peer : 0,
+                NotificationSound = rawUpdate[2].ToString().Equals("true", StringComparison.OrdinalIgnoreCase) ? 1 :
+                  rawUpdate[2].ToString().Equals("false", StringComparison.OrdinalIgnoreCase) ? 0 : int.Parse(rawUpdate[2].ToString()),
+                NotificationsDisabledUntil = int.Parse(rawUpdate[3].ToString())
+              });
+            }
             if (num1 == 62)
             {
               long num2 = long.Parse(rawUpdate[1].ToString());
@@ -202,6 +247,11 @@ namespace VKMessenger.Backend
                 chat_id = num3,
                 isChat = true
               });
+            }
+            }
+            catch (Exception ex)
+            {
+              Logger.Instance.Error("Skipping malformed long poll event", ex);
             }
           }
         }
@@ -256,8 +306,8 @@ namespace VKMessenger.Backend
           ? updateDataRaw[5].ToString()
           : "";
         bool flag2 = false;
-        bool flag3 = false;
-        long num4 = 0;
+        bool flag3 = num2 >= 2000000000L;
+        long num4 = flag3 ? num2 - 2000000000L : 0;
         if (updateDataRaw.Count > 6)
         {
           JObject additionalInfo = updateDataRaw[6] as JObject;
@@ -265,11 +315,9 @@ namespace VKMessenger.Backend
           {
             foreach (KeyValuePair<string, JToken> keyValuePair in additionalInfo)
             {
-              if (keyValuePair.Key == "from")
+              if (keyValuePair.Key == "from" && flag3)
               {
-                num4 = num2 - 2000000000L;
                 num2 = long.Parse(keyValuePair.Value.ToString());
-                flag3 = true;
               }
               else if (keyValuePair.Key == "fwd" || keyValuePair.Key == "attach1_type")
                 flag2 = true;
@@ -313,7 +361,7 @@ namespace VKMessenger.Backend
 
     public class RootObjectGetUpdates
     {
-      public int ts { get; set; }
+      public long ts { get; set; }
 
       public List<List<object>> updates { get; set; }
     }
